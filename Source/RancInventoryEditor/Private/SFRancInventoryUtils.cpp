@@ -1,14 +1,14 @@
 // Author: Lucas Vilas-Boas
 // Year: 2023
 
-#include "SElementusUtils.h"
-#include "ElementusStaticIds.h"
-#include "SElementusTable.h"
+#include "SFRancInventoryUtils.h"
+#include "RancInventoryStaticIds.h"
+#include "SFRancInventoryTable.h"
 #include <Engine/AssetManager.h>
 #include <Widgets/Layout/SUniformGridPanel.h>
 #include <ObjectTools.h>
 
-void SElementusUtils::Construct(const FArguments& InArgs)
+void SFRancInventoryUtils::Construct(const FArguments& InArgs)
 {
     TableSource = InArgs._TableSource;
 
@@ -18,7 +18,7 @@ void SElementusUtils::Construct(const FArguments& InArgs)
         ];
 }
 
-TSharedRef<SWidget> SElementusUtils::ConstructContent()
+TSharedRef<SWidget> SFRancInventoryUtils::ConstructContent()
 {
 #if ENGINE_MAJOR_VERSION < 5
     using FAppStyle = FEditorStyle;
@@ -32,7 +32,7 @@ TSharedRef<SWidget> SElementusUtils::ConstructContent()
                 .Text(FText::FromString(InStr))
                 .ToolTip(SNew(SToolTip).Text(FText::FromString(Tooltip)))
                 .HAlign(HAlign_Center)
-                .OnClicked(this, &SElementusUtils::OnButtonClicked, ButtonId);
+                .OnClicked(this, &SFRancInventoryUtils::OnButtonClicked, ButtonId);
         };
 
     return SNew(SVerticalBox)
@@ -65,7 +65,7 @@ TSharedRef<SWidget> SElementusUtils::ConstructContent()
         ];
 }
 
-FReply SElementusUtils::OnButtonClicked(const uint32 ButtonId) const
+FReply SFRancInventoryUtils::OnButtonClicked(const uint32 ButtonId) const
 {
     if (ButtonId == 0)
     {
@@ -76,7 +76,7 @@ FReply SElementusUtils::OnButtonClicked(const uint32 ButtonId) const
         if (const UAssetManager* const AssetManager = UAssetManager::GetIfValid())
         {
             TArray<FAssetData> AssetsToDelete;
-            for (const FElementusItemPtr& Iterator : TableSource->GetSelectedItems())
+            for (const FRancItemPtr& Iterator : TableSource->GetSelectedItems())
             {
                 FAssetData AssetData;
                 AssetManager->GetPrimaryAssetData(Iterator->PrimaryAssetId, AssetData);

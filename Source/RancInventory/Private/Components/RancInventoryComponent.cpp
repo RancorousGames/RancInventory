@@ -42,7 +42,7 @@ float URancInventoryComponent::GetMaxWeight() const
 
 int32 URancInventoryComponent::GetCurrentNumItems() const
 {
-    return ElementusItems.Num();
+    return RancItems.Num();
 }
 
 int32 URancInventoryComponent::GetMaxNumItems() const
@@ -50,31 +50,31 @@ int32 URancInventoryComponent::GetMaxNumItems() const
     return MaxNumItems <= 0 ? MAX_int32 : MaxNumItems;
 }
 
-TArray<FElementusItemInfo> URancInventoryComponent::GetItemsArray() const
+TArray<FRancItemInfo> URancInventoryComponent::GetItemsArray() const
 {
-    return ElementusItems;
+    return RancItems;
 }
 
-FElementusItemInfo& URancInventoryComponent::GetItemReferenceAt(const int32 Index)
+FRancItemInfo& URancInventoryComponent::GetItemReferenceAt(const int32 Index)
 {
-    return ElementusItems[Index];
+    return RancItems[Index];
 }
 
-FElementusItemInfo URancInventoryComponent::GetItemCopyAt(const int32 Index) const
+FRancItemInfo URancInventoryComponent::GetItemCopyAt(const int32 Index) const
 {
-    return ElementusItems[Index];
+    return RancItems[Index];
 }
 
-bool URancInventoryComponent::CanReceiveItem(const FElementusItemInfo InItemInfo) const
+bool URancInventoryComponent::CanReceiveItem(const FRancItemInfo InItemInfo) const
 {
     if (!URancInventoryFunctions::IsItemValid(InItemInfo))
     {
         return false;
     }
 
-    bool bOutput = ElementusItems.Num() <= GetMaxNumItems();
+    bool bOutput = RancItems.Num() <= GetMaxNumItems();
 
-    if (const UElementusItemData* const ItemData = URancInventoryFunctions::GetSingleItemDataById(InItemInfo.ItemId, { "Data" }))
+    if (const URancItemData* const ItemData = URancInventoryFunctions::GetSingleItemDataById(InItemInfo.ItemId, { "Data" }))
     {
         bOutput = bOutput && ((GetCurrentWeight() + (ItemData->ItemWeight * InItemInfo.Quantity)) <= GetMaxWeight());
     }
@@ -87,7 +87,7 @@ bool URancInventoryComponent::CanReceiveItem(const FElementusItemInfo InItemInfo
     return bOutput;
 }
 
-bool URancInventoryComponent::CanGiveItem(const FElementusItemInfo InItemInfo) const
+bool URancInventoryComponent::CanGiveItem(const FRancItemInfo InItemInfo) const
 {
     if (!URancInventoryFunctions::IsItemValid(InItemInfo))
     {
@@ -99,7 +99,7 @@ bool URancInventoryComponent::CanGiveItem(const FElementusItemInfo InItemInfo) c
         int32 Quantity = 0u;
         for (const int32& Index : InIndex)
         {
-            Quantity += ElementusItems[Index].Quantity;
+            Quantity += RancItems[Index].Quantity;
         }
 
         return Quantity >= InItemInfo.Quantity;
@@ -131,8 +131,8 @@ void URancInventoryComponent::SortInventory(const ERancInventorySortingMode Mode
     switch (Mode)
     {
     case ERancInventorySortingMode::ID:
-        ElementusItems.Sort(
-            [SortByOrientation](const FElementusItemInfo& A, const FElementusItemInfo& B)
+        RancItems.Sort(
+            [SortByOrientation](const FRancItemInfo& A, const FRancItemInfo& B)
             {
                 return URancInventoryFunctions::IsItemValid(A) && SortByOrientation(A.ItemId, B.ItemId);
             }
@@ -140,17 +140,17 @@ void URancInventoryComponent::SortInventory(const ERancInventorySortingMode Mode
         break;
 
     case ERancInventorySortingMode::Name:
-        ElementusItems.Sort(
-            [SortByOrientation](const FElementusItemInfo& A, const FElementusItemInfo& B)
+        RancItems.Sort(
+            [SortByOrientation](const FRancItemInfo& A, const FRancItemInfo& B)
             {
                 if (!URancInventoryFunctions::IsItemValid(A))
                 {
                     return false;
                 }
 
-                if (const UElementusItemData* const ItemDataA = URancInventoryFunctions::GetSingleItemDataById(A.ItemId, { "Data" }))
+                if (const URancItemData* const ItemDataA = URancInventoryFunctions::GetSingleItemDataById(A.ItemId, { "Data" }))
                 {
-                    if (const UElementusItemData* const ItemDataB = URancInventoryFunctions::GetSingleItemDataById(B.ItemId, { "Data" }))
+                    if (const URancItemData* const ItemDataB = URancInventoryFunctions::GetSingleItemDataById(B.ItemId, { "Data" }))
                     {
                         return SortByOrientation(ItemDataA->ItemName.ToString(), ItemDataB->ItemName.ToString());
                     }
@@ -162,17 +162,17 @@ void URancInventoryComponent::SortInventory(const ERancInventorySortingMode Mode
         break;
 
     case ERancInventorySortingMode::Type:
-        ElementusItems.Sort(
-            [SortByOrientation](const FElementusItemInfo& A, const FElementusItemInfo& B)
+        RancItems.Sort(
+            [SortByOrientation](const FRancItemInfo& A, const FRancItemInfo& B)
             {
                 if (!URancInventoryFunctions::IsItemValid(A))
                 {
                     return false;
                 }
 
-                if (const UElementusItemData* const ItemDataA = URancInventoryFunctions::GetSingleItemDataById(A.ItemId, { "Data" }))
+                if (const URancItemData* const ItemDataA = URancInventoryFunctions::GetSingleItemDataById(A.ItemId, { "Data" }))
                 {
-                    if (const UElementusItemData* const ItemDataB = URancInventoryFunctions::GetSingleItemDataById(B.ItemId, { "Data" }))
+                    if (const URancItemData* const ItemDataB = URancInventoryFunctions::GetSingleItemDataById(B.ItemId, { "Data" }))
                     {
                         return SortByOrientation(ItemDataA->ItemType, ItemDataB->ItemType);
                     }
@@ -184,17 +184,17 @@ void URancInventoryComponent::SortInventory(const ERancInventorySortingMode Mode
         break;
 
     case ERancInventorySortingMode::IndividualValue:
-        ElementusItems.Sort(
-            [SortByOrientation](const FElementusItemInfo& A, const FElementusItemInfo& B)
+        RancItems.Sort(
+            [SortByOrientation](const FRancItemInfo& A, const FRancItemInfo& B)
             {
                 if (!URancInventoryFunctions::IsItemValid(A))
                 {
                     return false;
                 }
 
-                if (const UElementusItemData* const ItemDataA = URancInventoryFunctions::GetSingleItemDataById(A.ItemId, { "Data" }))
+                if (const URancItemData* const ItemDataA = URancInventoryFunctions::GetSingleItemDataById(A.ItemId, { "Data" }))
                 {
-                    if (const UElementusItemData* const ItemDataB = URancInventoryFunctions::GetSingleItemDataById(B.ItemId, { "Data" }))
+                    if (const URancItemData* const ItemDataB = URancInventoryFunctions::GetSingleItemDataById(B.ItemId, { "Data" }))
                     {
                         return SortByOrientation(ItemDataA->ItemValue, ItemDataB->ItemValue);
                     }
@@ -206,17 +206,17 @@ void URancInventoryComponent::SortInventory(const ERancInventorySortingMode Mode
         break;
 
     case ERancInventorySortingMode::StackValue:
-        ElementusItems.Sort(
-            [SortByOrientation](const FElementusItemInfo& A, const FElementusItemInfo& B)
+        RancItems.Sort(
+            [SortByOrientation](const FRancItemInfo& A, const FRancItemInfo& B)
             {
                 if (!URancInventoryFunctions::IsItemValid(A))
                 {
                     return false;
                 }
 
-                if (const UElementusItemData* const ItemDataA = URancInventoryFunctions::GetSingleItemDataById(A.ItemId, { "Data" }))
+                if (const URancItemData* const ItemDataA = URancInventoryFunctions::GetSingleItemDataById(A.ItemId, { "Data" }))
                 {
-                    if (const UElementusItemData* const ItemDataB = URancInventoryFunctions::GetSingleItemDataById(B.ItemId, { "Data" }))
+                    if (const URancItemData* const ItemDataB = URancInventoryFunctions::GetSingleItemDataById(B.ItemId, { "Data" }))
                     {
                         return SortByOrientation(ItemDataA->ItemValue * A.Quantity, ItemDataB->ItemValue * B.Quantity);
                     }
@@ -228,17 +228,17 @@ void URancInventoryComponent::SortInventory(const ERancInventorySortingMode Mode
         break;
 
     case ERancInventorySortingMode::IndividualWeight:
-        ElementusItems.Sort(
-            [SortByOrientation](const FElementusItemInfo& A, const FElementusItemInfo& B)
+        RancItems.Sort(
+            [SortByOrientation](const FRancItemInfo& A, const FRancItemInfo& B)
             {
                 if (!URancInventoryFunctions::IsItemValid(A))
                 {
                     return false;
                 }
 
-                if (const UElementusItemData* const ItemDataA = URancInventoryFunctions::GetSingleItemDataById(A.ItemId, { "Data" }))
+                if (const URancItemData* const ItemDataA = URancInventoryFunctions::GetSingleItemDataById(A.ItemId, { "Data" }))
                 {
-                    if (const UElementusItemData* const ItemDataB = URancInventoryFunctions::GetSingleItemDataById(B.ItemId, { "Data" }))
+                    if (const URancItemData* const ItemDataB = URancInventoryFunctions::GetSingleItemDataById(B.ItemId, { "Data" }))
                     {
                         return SortByOrientation(ItemDataA->ItemWeight, ItemDataB->ItemWeight);
                     }
@@ -250,17 +250,17 @@ void URancInventoryComponent::SortInventory(const ERancInventorySortingMode Mode
         break;
 
     case ERancInventorySortingMode::StackWeight:
-        ElementusItems.Sort(
-            [SortByOrientation](const FElementusItemInfo& A, const FElementusItemInfo& B)
+        RancItems.Sort(
+            [SortByOrientation](const FRancItemInfo& A, const FRancItemInfo& B)
             {
                 if (!URancInventoryFunctions::IsItemValid(A))
                 {
                     return false;
                 }
 
-                if (const UElementusItemData* const ItemDataA = URancInventoryFunctions::GetSingleItemDataById(A.ItemId, { "Data" }))
+                if (const URancItemData* const ItemDataA = URancInventoryFunctions::GetSingleItemDataById(A.ItemId, { "Data" }))
                 {
-                    if (const UElementusItemData* const ItemDataB = URancInventoryFunctions::GetSingleItemDataById(B.ItemId, { "Data" }))
+                    if (const URancItemData* const ItemDataB = URancInventoryFunctions::GetSingleItemDataById(B.ItemId, { "Data" }))
                     {
                         return SortByOrientation(ItemDataA->ItemWeight * A.Quantity, ItemDataB->ItemWeight * B.Quantity);
                     }
@@ -272,8 +272,8 @@ void URancInventoryComponent::SortInventory(const ERancInventorySortingMode Mode
         break;
 
     case ERancInventorySortingMode::Quantity:
-        ElementusItems.Sort(
-            [SortByOrientation](const FElementusItemInfo& A, const FElementusItemInfo& B)
+        RancItems.Sort(
+            [SortByOrientation](const FRancItemInfo& A, const FRancItemInfo& B)
             {
                 return URancInventoryFunctions::IsItemValid(A) && SortByOrientation(A.Quantity, B.Quantity);
             }
@@ -281,8 +281,8 @@ void URancInventoryComponent::SortInventory(const ERancInventorySortingMode Mode
         break;
 
     case ERancInventorySortingMode::Level:
-        ElementusItems.Sort(
-            [SortByOrientation](const FElementusItemInfo& A, const FElementusItemInfo& B)
+        RancItems.Sort(
+            [SortByOrientation](const FRancItemInfo& A, const FRancItemInfo& B)
             {
                 return URancInventoryFunctions::IsItemValid(A) && SortByOrientation(A.Level, B.Level);
             }
@@ -290,8 +290,8 @@ void URancInventoryComponent::SortInventory(const ERancInventorySortingMode Mode
         break;
 
     case ERancInventorySortingMode::Tags:
-        ElementusItems.Sort(
-            [SortByOrientation](const FElementusItemInfo& A, const FElementusItemInfo& B)
+        RancItems.Sort(
+            [SortByOrientation](const FRancItemInfo& A, const FRancItemInfo& B)
             {
                 return URancInventoryFunctions::IsItemValid(A) && SortByOrientation(A.Tags.Num(), B.Tags.Num());
             }
@@ -317,7 +317,7 @@ void URancInventoryComponent::GetLifetimeReplicatedProps(TArray<FLifetimePropert
     FDoRepLifetimeParams SharedParams;
     SharedParams.bIsPushBased = true;
 
-    DOREPLIFETIME_WITH_PARAMS_FAST(URancInventoryComponent, ElementusItems, SharedParams);
+    DOREPLIFETIME_WITH_PARAMS_FAST(URancInventoryComponent, RancItems, SharedParams);
 }
 
 void URancInventoryComponent::RefreshInventory()
@@ -329,9 +329,9 @@ void URancInventoryComponent::RefreshInventory()
 void URancInventoryComponent::ForceWeightUpdate()
 {
     float NewWeigth = 0.f;
-    for (const FElementusItemInfo& Iterator : ElementusItems)
+    for (const FRancItemInfo& Iterator : RancItems)
     {
-        if (const UElementusItemData* const ItemData = URancInventoryFunctions::GetSingleItemDataById(Iterator.ItemId, { "Data" }))
+        if (const URancItemData* const ItemData = URancInventoryFunctions::GetSingleItemDataById(Iterator.ItemId, { "Data" }))
         {
             NewWeigth += ItemData->ItemWeight * Iterator.Quantity;
         }
@@ -342,23 +342,23 @@ void URancInventoryComponent::ForceWeightUpdate()
 
 void URancInventoryComponent::ForceInventoryValidation()
 {
-    TArray<FElementusItemInfo> NewItems;
+    TArray<FRancItemInfo> NewItems;
     TArray<int32> IndexesToRemove;
 
-    for (int32 i = 0; i < ElementusItems.Num(); ++i)
+    for (int32 i = 0; i < RancItems.Num(); ++i)
     {
-        if (ElementusItems[i].Quantity <= 0)
+        if (RancItems[i].Quantity <= 0)
         {
             IndexesToRemove.Add(i);
         }
 
-        else if (ElementusItems[i].Quantity > 1)
+        else if (RancItems[i].Quantity > 1)
         {
-            if (!URancInventoryFunctions::IsItemStackable(ElementusItems[i]))
+            if (!URancInventoryFunctions::IsItemStackable(RancItems[i]))
             {
-                for (int32 j = 0; j < ElementusItems[i].Quantity; ++j)
+                for (int32 j = 0; j < RancItems[i].Quantity; ++j)
                 {
-                    NewItems.Add(FElementusItemInfo(ElementusItems[i].ItemId, 1, ElementusItems[i].Tags));
+                    NewItems.Add(FRancItemInfo(RancItems[i].ItemId, 1, RancItems[i].Tags));
                 }
 
                 IndexesToRemove.Add(i);
@@ -372,30 +372,30 @@ void URancInventoryComponent::ForceInventoryValidation()
         {
             if (bAllowEmptySlots)
             {
-                ElementusItems[Iterator] = FElementusItemInfo::EmptyItemInfo;
+                RancItems[Iterator] = FRancItemInfo::EmptyItemInfo;
             }
             else
             {
-                ElementusItems.RemoveAt(Iterator, 1, false);
+                RancItems.RemoveAt(Iterator, 1, false);
             }
         }
     }
     if (!URancInventoryFunctions::HasEmptyParam(NewItems))
     {
-        ElementusItems.Append(NewItems);
+        RancItems.Append(NewItems);
     }
 
     NotifyInventoryChange();
 }
 
-bool URancInventoryComponent::FindFirstItemIndexWithInfo(const FElementusItemInfo InItemInfo, int32& OutIndex, const FGameplayTagContainer& IgnoreTags, const int32 Offset) const
+bool URancInventoryComponent::FindFirstItemIndexWithInfo(const FRancItemInfo InItemInfo, int32& OutIndex, const FGameplayTagContainer& IgnoreTags, const int32 Offset) const
 {
-    for (int32 Iterator = Offset; Iterator < ElementusItems.Num(); ++Iterator)
+    for (int32 Iterator = Offset; Iterator < RancItems.Num(); ++Iterator)
     {
-        FElementusItemInfo InParamCopy = InItemInfo;
+        FRancItemInfo InParamCopy = InItemInfo;
         InParamCopy.Tags.RemoveTags(IgnoreTags);
 
-        FElementusItemInfo InExistingCopy = ElementusItems[Iterator];
+        FRancItemInfo InExistingCopy = RancItems[Iterator];
         InExistingCopy.Tags.RemoveTags(IgnoreTags);
 
         if (InExistingCopy == InParamCopy)
@@ -411,9 +411,9 @@ bool URancInventoryComponent::FindFirstItemIndexWithInfo(const FElementusItemInf
 
 bool URancInventoryComponent::FindFirstItemIndexWithTags(const FGameplayTagContainer WithTags, int32& OutIndex, const FGameplayTagContainer& IgnoreTags, const int32 Offset) const
 {
-    for (int32 Iterator = Offset; Iterator < ElementusItems.Num(); ++Iterator)
+    for (int32 Iterator = Offset; Iterator < RancItems.Num(); ++Iterator)
     {
-        FElementusItemInfo InExistingCopy = ElementusItems[Iterator];
+        FRancItemInfo InExistingCopy = RancItems[Iterator];
         InExistingCopy.Tags.RemoveTags(IgnoreTags);
 
         if (InExistingCopy.Tags.HasAllExact(WithTags))
@@ -427,11 +427,11 @@ bool URancInventoryComponent::FindFirstItemIndexWithTags(const FGameplayTagConta
     return false;
 }
 
-bool URancInventoryComponent::FindFirstItemIndexWithId(const FPrimaryElementusItemId InId, int32& OutIndex, const FGameplayTagContainer& IgnoreTags, const int32 Offset) const
+bool URancInventoryComponent::FindFirstItemIndexWithId(const FPrimaryRancItemId InId, int32& OutIndex, const FGameplayTagContainer& IgnoreTags, const int32 Offset) const
 {
-    for (int32 Iterator = Offset; Iterator < ElementusItems.Num(); ++Iterator)
+    for (int32 Iterator = Offset; Iterator < RancItems.Num(); ++Iterator)
     {
-        if (!ElementusItems[Iterator].Tags.HasAny(IgnoreTags) && ElementusItems[Iterator].ItemId == InId)
+        if (!RancItems[Iterator].Tags.HasAny(IgnoreTags) && RancItems[Iterator].ItemId == InId)
         {
             OutIndex = Iterator;
             return true;
@@ -442,9 +442,9 @@ bool URancInventoryComponent::FindFirstItemIndexWithId(const FPrimaryElementusIt
     return false;
 }
 
-bool URancInventoryComponent::FindAllItemIndexesWithInfo(const FElementusItemInfo InItemInfo, TArray<int32>& OutIndexes, const FGameplayTagContainer& IgnoreTags) const
+bool URancInventoryComponent::FindAllItemIndexesWithInfo(const FRancItemInfo InItemInfo, TArray<int32>& OutIndexes, const FGameplayTagContainer& IgnoreTags) const
 {
-    for (auto Iterator = ElementusItems.CreateConstIterator(); Iterator; ++Iterator)
+    for (auto Iterator = RancItems.CreateConstIterator(); Iterator; ++Iterator)
     {
         if (IgnoreTags.IsEmpty() && *Iterator == InItemInfo)
         {
@@ -452,10 +452,10 @@ bool URancInventoryComponent::FindAllItemIndexesWithInfo(const FElementusItemInf
             continue;
         }
 
-        FElementusItemInfo InItCopy(*Iterator);
+        FRancItemInfo InItCopy(*Iterator);
         InItCopy.Tags.RemoveTags(IgnoreTags);
 
-        FElementusItemInfo InParamCopy(InItemInfo);
+        FRancItemInfo InParamCopy(InItemInfo);
         InParamCopy.Tags.RemoveTags(IgnoreTags);
 
         if (InItCopy == InParamCopy)
@@ -469,9 +469,9 @@ bool URancInventoryComponent::FindAllItemIndexesWithInfo(const FElementusItemInf
 
 bool URancInventoryComponent::FindAllItemIndexesWithTags(const FGameplayTagContainer WithTags, TArray<int32>& OutIndexes, const FGameplayTagContainer& IgnoreTags) const
 {
-    for (auto Iterator = ElementusItems.CreateConstIterator(); Iterator; ++Iterator)
+    for (auto Iterator = RancItems.CreateConstIterator(); Iterator; ++Iterator)
     {
-        FElementusItemInfo InCopy(*Iterator);
+        FRancItemInfo InCopy(*Iterator);
         if (!IgnoreTags.IsEmpty())
         {
             InCopy.Tags.RemoveTags(IgnoreTags);
@@ -486,9 +486,9 @@ bool URancInventoryComponent::FindAllItemIndexesWithTags(const FGameplayTagConta
     return !URancInventoryFunctions::HasEmptyParam(OutIndexes);
 }
 
-bool URancInventoryComponent::FindAllItemIndexesWithId(const FPrimaryElementusItemId InId, TArray<int32>& OutIndexes, const FGameplayTagContainer& IgnoreTags) const
+bool URancInventoryComponent::FindAllItemIndexesWithId(const FPrimaryRancItemId InId, TArray<int32>& OutIndexes, const FGameplayTagContainer& IgnoreTags) const
 {
-    for (auto Iterator = ElementusItems.CreateConstIterator(); Iterator; ++Iterator)
+    for (auto Iterator = RancItems.CreateConstIterator(); Iterator; ++Iterator)
     {
         if (!Iterator->Tags.HasAll(IgnoreTags) && Iterator->ItemId == InId)
         {
@@ -499,10 +499,10 @@ bool URancInventoryComponent::FindAllItemIndexesWithId(const FPrimaryElementusIt
     return !URancInventoryFunctions::HasEmptyParam(OutIndexes);
 }
 
-bool URancInventoryComponent::ContainsItem(const FElementusItemInfo InItemInfo, const bool bIgnoreTags) const
+bool URancInventoryComponent::ContainsItem(const FRancItemInfo InItemInfo, const bool bIgnoreTags) const
 {
-    return ElementusItems.FindByPredicate(
-        [&InItemInfo, &bIgnoreTags](const FElementusItemInfo& InInfo)
+    return RancItems.FindByPredicate(
+        [&InItemInfo, &bIgnoreTags](const FRancItemInfo& InInfo)
         {
             if (bIgnoreTags)
             {
@@ -518,7 +518,7 @@ bool URancInventoryComponent::IsInventoryEmpty() const
 {
     bool bOutput = true;
 
-    for (const FElementusItemInfo& Iterator : ElementusItems)
+    for (const FRancItemInfo& Iterator : RancItems)
     {
         if (Iterator.Quantity > 0)
         {
@@ -537,10 +537,10 @@ void URancInventoryComponent::DebugInventory()
     UE_LOG(LogRancInventory_Internal, Warning, TEXT("Owning Actor: %s"), *GetOwner()->GetName());
 
     UE_LOG(LogRancInventory_Internal, Warning, TEXT("Weight: %d"), CurrentWeight);
-    UE_LOG(LogRancInventory_Internal, Warning, TEXT("Num: %d"), ElementusItems.Num());
-    UE_LOG(LogRancInventory_Internal, Warning, TEXT("Size: %d"), ElementusItems.GetAllocatedSize());
+    UE_LOG(LogRancInventory_Internal, Warning, TEXT("Num: %d"), RancItems.Num());
+    UE_LOG(LogRancInventory_Internal, Warning, TEXT("Size: %d"), RancItems.GetAllocatedSize());
 
-    for (const FElementusItemInfo& Iterator : ElementusItems)
+    for (const FRancItemInfo& Iterator : RancItems)
     {
         UE_LOG(LogRancInventory_Internal, Warning, TEXT("Item: %s"), *Iterator.ItemId.ToString());
         UE_LOG(LogRancInventory_Internal, Warning, TEXT("Quantity: %d"), Iterator.Quantity);
@@ -559,7 +559,7 @@ void URancInventoryComponent::ClearInventory_Implementation()
 {
     UE_LOG(LogRancInventory, Display, TEXT("%s: Cleaning %s's inventory"), *FString(__func__), *GetOwner()->GetName());
 
-    ElementusItems.Empty();
+    RancItems.Empty();
     CurrentWeight = 0.f;
 }
 
@@ -570,12 +570,12 @@ void URancInventoryComponent::GetItemIndexesFrom_Implementation(URancInventoryCo
         return;
     }
 
-    TArray<FElementusItemInfo> Modifiers;
+    TArray<FRancItemInfo> Modifiers;
     for (const int32& Iterator : ItemIndexes)
     {
-        if (OtherInventory->ElementusItems.IsValidIndex(Iterator))
+        if (OtherInventory->RancItems.IsValidIndex(Iterator))
         {
-            Modifiers.Add(OtherInventory->ElementusItems[Iterator]);
+            Modifiers.Add(OtherInventory->RancItems[Iterator]);
         }
     }
 
@@ -589,19 +589,19 @@ void URancInventoryComponent::GiveItemIndexesTo_Implementation(URancInventoryCom
         return;
     }
 
-    TArray<FElementusItemInfo> Modifiers;
+    TArray<FRancItemInfo> Modifiers;
     for (const int32& Iterator : ItemIndexes)
     {
-        if (OtherInventory->ElementusItems.IsValidIndex(Iterator))
+        if (OtherInventory->RancItems.IsValidIndex(Iterator))
         {
-            Modifiers.Add(ElementusItems[Iterator]);
+            Modifiers.Add(RancItems[Iterator]);
         }
     }
 
     GiveItemsTo_Implementation(OtherInventory, Modifiers);
 }
 
-void URancInventoryComponent::GetItemsFrom_Implementation(URancInventoryComponent* OtherInventory, const TArray<FElementusItemInfo>& Items)
+void URancInventoryComponent::GetItemsFrom_Implementation(URancInventoryComponent* OtherInventory, const TArray<FRancItemInfo>& Items)
 {
     if (GetOwnerRole() != ROLE_Authority)
     {
@@ -613,13 +613,13 @@ void URancInventoryComponent::GetItemsFrom_Implementation(URancInventoryComponen
         return;
     }
 
-    const TArray<FElementusItemInfo> TradeableItems = URancInventoryFunctions::FilterTradeableItems(OtherInventory, this, Items);
+    const TArray<FRancItemInfo> TradeableItems = URancInventoryFunctions::FilterTradeableItems(OtherInventory, this, Items);
 
-    OtherInventory->UpdateElementusItems(TradeableItems, ERancInventoryUpdateOperation::Remove);
-    UpdateElementusItems(TradeableItems, ERancInventoryUpdateOperation::Add);
+    OtherInventory->UpdateRancItems(TradeableItems, ERancInventoryUpdateOperation::Remove);
+    UpdateRancItems(TradeableItems, ERancInventoryUpdateOperation::Add);
 }
 
-void URancInventoryComponent::GiveItemsTo_Implementation(URancInventoryComponent* OtherInventory, const TArray<FElementusItemInfo>& Items)
+void URancInventoryComponent::GiveItemsTo_Implementation(URancInventoryComponent* OtherInventory, const TArray<FRancItemInfo>& Items)
 {
     if (GetOwnerRole() != ROLE_Authority)
     {
@@ -631,10 +631,10 @@ void URancInventoryComponent::GiveItemsTo_Implementation(URancInventoryComponent
         return;
     }
 
-    const TArray<FElementusItemInfo> TradeableItems = URancInventoryFunctions::FilterTradeableItems(this, OtherInventory, Items);
+    const TArray<FRancItemInfo> TradeableItems = URancInventoryFunctions::FilterTradeableItems(this, OtherInventory, Items);
 
-    UpdateElementusItems(TradeableItems, ERancInventoryUpdateOperation::Remove);
-    OtherInventory->UpdateElementusItems(TradeableItems, ERancInventoryUpdateOperation::Add);
+    UpdateRancItems(TradeableItems, ERancInventoryUpdateOperation::Remove);
+    OtherInventory->UpdateRancItems(TradeableItems, ERancInventoryUpdateOperation::Add);
 }
 
 void URancInventoryComponent::DiscardItemIndexes_Implementation(const TArray<int32>& ItemIndexes)
@@ -644,39 +644,39 @@ void URancInventoryComponent::DiscardItemIndexes_Implementation(const TArray<int
         return;
     }
 
-    TArray<FElementusItemInfo> Modifiers;
+    TArray<FRancItemInfo> Modifiers;
     for (const int32& Iterator : ItemIndexes)
     {
-        if (ElementusItems.IsValidIndex(Iterator))
+        if (RancItems.IsValidIndex(Iterator))
         {
-            Modifiers.Add(ElementusItems[Iterator]);
+            Modifiers.Add(RancItems[Iterator]);
         }
     }
 
     DiscardItems(Modifiers);
 }
 
-void URancInventoryComponent::DiscardItems_Implementation(const TArray<FElementusItemInfo>& Items)
+void URancInventoryComponent::DiscardItems_Implementation(const TArray<FRancItemInfo>& Items)
 {
     if (GetOwnerRole() != ROLE_Authority || URancInventoryFunctions::HasEmptyParam(Items))
     {
         return;
     }
 
-    UpdateElementusItems(Items, ERancInventoryUpdateOperation::Remove);
+    UpdateRancItems(Items, ERancInventoryUpdateOperation::Remove);
 }
 
-void URancInventoryComponent::AddItems_Implementation(const TArray<FElementusItemInfo>& Items)
+void URancInventoryComponent::AddItems_Implementation(const TArray<FRancItemInfo>& Items)
 {
     if (GetOwnerRole() != ROLE_Authority || URancInventoryFunctions::HasEmptyParam(Items))
     {
         return;
     }
 
-    UpdateElementusItems(Items, ERancInventoryUpdateOperation::Add);
+    UpdateRancItems(Items, ERancInventoryUpdateOperation::Add);
 }
 
-void URancInventoryComponent::UpdateElementusItems(const TArray<FElementusItemInfo>& Modifiers, const ERancInventoryUpdateOperation Operation)
+void URancInventoryComponent::UpdateRancItems(const TArray<FRancItemInfo>& Modifiers, const ERancInventoryUpdateOperation Operation)
 {
     TArray<FItemModifierData> ModifierDataArr;
 
@@ -684,8 +684,8 @@ void URancInventoryComponent::UpdateElementusItems(const TArray<FElementusItemIn
     const FString OpPred = Operation == ERancInventoryUpdateOperation::Add ? "to" : "from";
 
     uint32 SearchOffset = 0;
-    FElementusItemInfo LastCheckedItem;
-    for (const FElementusItemInfo& Iterator : Modifiers)
+    FRancItemInfo LastCheckedItem;
+    for (const FRancItemInfo& Iterator : Modifiers)
     {
         UE_LOG(LogRancInventory_Internal, Display, TEXT("%s: %s %d item(s) with name '%s' %s inventory"), *FString(__func__), *OpStr, Iterator.Quantity, *Iterator.ItemId.ToString(), *OpPred);
 
@@ -731,20 +731,20 @@ void URancInventoryComponent::Server_ProcessInventoryAddition_Internal_Implement
         if (const bool bIsStackable = URancInventoryFunctions::IsItemStackable(Iterator.ItemInfo);
             bIsStackable && Iterator.Index != INDEX_NONE)
         {
-            ElementusItems[Iterator.Index].Quantity += Iterator.ItemInfo.Quantity;
+            RancItems[Iterator.Index].Quantity += Iterator.ItemInfo.Quantity;
         }
         else if (!bIsStackable)
         {
             for (int32 i = 0u; i < Iterator.ItemInfo.Quantity; ++i)
             {
-                const FElementusItemInfo ItemInfo{ Iterator.ItemInfo.ItemId, 1, Iterator.ItemInfo.Tags };
+                const FRancItemInfo ItemInfo{ Iterator.ItemInfo.ItemId, 1, Iterator.ItemInfo.Tags };
 
-                ElementusItems.Add(ItemInfo);
+                RancItems.Add(ItemInfo);
             }
         }
         else
         {
-            ElementusItems.Add(Iterator.ItemInfo);
+            RancItems.Add(Iterator.ItemInfo);
         }
     }
 
@@ -760,30 +760,30 @@ void URancInventoryComponent::Server_ProcessInventoryRemoval_Internal_Implementa
 
     for (const FItemModifierData& Iterator : Modifiers)
     {
-        if (Iterator.Index == INDEX_NONE || Iterator.Index > ElementusItems.Num())
+        if (Iterator.Index == INDEX_NONE || Iterator.Index > RancItems.Num())
         {
             UE_LOG(LogRancInventory_Internal, Warning, TEXT("%s: Item with name '%s' not found in inventory"), *FString(__func__), *Iterator.ItemInfo.ItemId.ToString());
 
             continue;
         }
 
-        ElementusItems[Iterator.Index].Quantity -= Iterator.ItemInfo.Quantity;
+        RancItems[Iterator.Index].Quantity -= Iterator.ItemInfo.Quantity;
     }
 
     if (bAllowEmptySlots)
     {
-        Algo::ForEach(ElementusItems, [](FElementusItemInfo& InInfo)
+        Algo::ForEach(RancItems, [](FRancItemInfo& InInfo)
             {
                 if (InInfo.Quantity <= 0)
                 {
-                    InInfo = FElementusItemInfo::EmptyItemInfo;
+                    InInfo = FRancItemInfo::EmptyItemInfo;
                 }
             });
     }
     else
     {
-        ElementusItems.RemoveAll(
-            [](const FElementusItemInfo& InInfo)
+        RancItems.RemoveAll(
+            [](const FRancItemInfo& InInfo)
             {
                 return InInfo.Quantity <= 0;
             }
@@ -793,22 +793,22 @@ void URancInventoryComponent::Server_ProcessInventoryRemoval_Internal_Implementa
     NotifyInventoryChange();
 }
 
-void URancInventoryComponent::OnRep_ElementusItems()
+void URancInventoryComponent::OnRep_RancItems()
 {
-    if (const int32 LastValidIndex = ElementusItems.FindLastByPredicate([](const FElementusItemInfo& Item) { return URancInventoryFunctions::IsItemValid(Item); }); LastValidIndex != INDEX_NONE && ElementusItems.IsValidIndex(LastValidIndex + 1))
+    if (const int32 LastValidIndex = RancItems.FindLastByPredicate([](const FRancItemInfo& Item) { return URancInventoryFunctions::IsItemValid(Item); }); LastValidIndex != INDEX_NONE && RancItems.IsValidIndex(LastValidIndex + 1))
     {
-        ElementusItems.RemoveAt(LastValidIndex + 1, ElementusItems.Num() - LastValidIndex - 1, false);
+        RancItems.RemoveAt(LastValidIndex + 1, RancItems.Num() - LastValidIndex - 1, false);
     }
-    else if (LastValidIndex == INDEX_NONE && !URancInventoryFunctions::HasEmptyParam(ElementusItems))
+    else if (LastValidIndex == INDEX_NONE && !URancInventoryFunctions::HasEmptyParam(RancItems))
     {
-        ElementusItems.Empty();
+        RancItems.Empty();
     }
 
-    ElementusItems.Shrink();
+    RancItems.Shrink();
 
     if (IsInventoryEmpty())
     {
-        ElementusItems.Empty();
+        RancItems.Empty();
 
         CurrentWeight = 0.f;
         OnInventoryEmpty.Broadcast();
@@ -825,18 +825,18 @@ void URancInventoryComponent::NotifyInventoryChange()
 {
     if (GetOwnerRole() == ROLE_Authority)
     {
-        OnRep_ElementusItems();
+        OnRep_RancItems();
     }
 
-    MARK_PROPERTY_DIRTY_FROM_NAME(URancInventoryComponent, ElementusItems, this);
+    MARK_PROPERTY_DIRTY_FROM_NAME(URancInventoryComponent, RancItems, this);
 }
 
 void URancInventoryComponent::UpdateWeight_Implementation()
 {
     float NewWeight = 0.f;
-    for (const FElementusItemInfo& Iterator : ElementusItems)
+    for (const FRancItemInfo& Iterator : RancItems)
     {
-        if (const UElementusItemData* const ItemData = URancInventoryFunctions::GetSingleItemDataById(Iterator.ItemId, { "Data" }))
+        if (const URancItemData* const ItemData = URancInventoryFunctions::GetSingleItemDataById(Iterator.ItemId, { "Data" }))
         {
             NewWeight += ItemData->ItemWeight * Iterator.Quantity;
         }

@@ -1,7 +1,7 @@
 // Author: Lucas Vilas-Boas
 // Year: 2023
 
-#include "SElementusTable.h"
+#include "SFRancInventoryTable.h"
 #include <Management/RancInventoryFunctions.h>
 #include <Management/RancInventoryData.h>
 #include <Subsystems/AssetEditorSubsystem.h>
@@ -16,22 +16,22 @@ static const FName ColumnId_ClassLabel("Class");
 static const FName ColumnId_ValueLabel("Value");
 static const FName ColumnId_WeightLabel("Weight");
 
-class SElementusItemTableRow final : public SMultiColumnTableRow<FElementusItemPtr>
+class SRancItemTableRow final : public SMultiColumnTableRow<FRancItemPtr>
 {
 public:
-    SLATE_BEGIN_ARGS(SElementusItemTableRow) : _HightlightTextSource()
+    SLATE_BEGIN_ARGS(SRancItemTableRow) : _HightlightTextSource()
         {
         }
 
         SLATE_ARGUMENT(TSharedPtr<FText>, HightlightTextSource)
     SLATE_END_ARGS()
 
-    void Construct(const FArguments& InArgs, const TSharedRef<STableViewBase>& InOwnerTableView, const FElementusItemPtr InEntryItem)
+    void Construct(const FArguments& InArgs, const TSharedRef<STableViewBase>& InOwnerTableView, const FRancItemPtr InEntryItem)
     {
         HighlightText = InArgs._HightlightTextSource;
         Item = InEntryItem;
 
-        SMultiColumnTableRow<FElementusItemPtr>::Construct(FSuperRowType::FArguments(), InOwnerTableView);
+        SMultiColumnTableRow<FRancItemPtr>::Construct(FSuperRowType::FArguments(), InOwnerTableView);
     }
 
 protected:
@@ -66,7 +66,7 @@ protected:
 
         if (ColumnName == ColumnId_TypeLabel)
         {
-            return TextBlockCreator_Lambda(FText::FromString(URancInventoryFunctions::ElementusItemEnumTypeToString(Item->Type)));
+            return TextBlockCreator_Lambda(FText::FromString(URancInventoryFunctions::RancItemEnumTypeToString(Item->Type)));
         }
 
         if (ColumnName == ColumnId_ObjectLabel)
@@ -93,11 +93,11 @@ protected:
     }
 
 private:
-    FElementusItemPtr Item;
+    FRancItemPtr Item;
     TSharedPtr<FText> HighlightText;
 };
 
-void SElementusTable::Construct([[maybe_unused]] const FArguments&)
+void SFRancInventoryTable::Construct([[maybe_unused]] const FArguments&)
 {
     const TSharedPtr<SHeaderRow> HeaderRow = SNew(SHeaderRow);
 
@@ -106,8 +106,8 @@ void SElementusTable::Construct([[maybe_unused]] const FArguments&)
             return SHeaderRow::Column(ColumnId)
                 .DefaultLabel(FText::FromString(ColumnText))
                 .FillWidth(InWidth)
-                .SortMode(this, &SElementusTable::GetColumnSort, ColumnId)
-                .OnSort(this, &SElementusTable::OnColumnSort)
+                .SortMode(this, &SFRancInventoryTable::GetColumnSort, ColumnId)
+                .OnSort(this, &SFRancInventoryTable::OnColumnSort)
                 .HeaderComboVisibility(EHeaderComboVisibility::OnHover);
         };
 
@@ -135,36 +135,36 @@ void SElementusTable::Construct([[maybe_unused]] const FArguments&)
     );
 }
 
-TSharedRef<SWidget> SElementusTable::ConstructContent(const TSharedRef<SHeaderRow> HeaderRow)
+TSharedRef<SWidget> SFRancInventoryTable::ConstructContent(const TSharedRef<SHeaderRow> HeaderRow)
 {
-    return SAssignNew(EdListView, SListView<FElementusItemPtr>)
+    return SAssignNew(EdListView, SListView<FRancItemPtr>)
         .ListItemsSource(&ItemArr)
         .SelectionMode(ESelectionMode::Multi)
         .IsFocusable(true)
-        .OnGenerateRow(this, &SElementusTable::OnGenerateWidgetForList)
+        .OnGenerateRow(this, &SFRancInventoryTable::OnGenerateWidgetForList)
         .HeaderRow(HeaderRow)
-        .OnMouseButtonDoubleClick(this, &SElementusTable::OnTableItemDoubleClicked);
+        .OnMouseButtonDoubleClick(this, &SFRancInventoryTable::OnTableItemDoubleClicked);
 }
 
-TSharedRef<ITableRow> SElementusTable::OnGenerateWidgetForList(const FElementusItemPtr InItem, const TSharedRef<STableViewBase>& OwnerTable) const
+TSharedRef<ITableRow> SFRancInventoryTable::OnGenerateWidgetForList(const FRancItemPtr InItem, const TSharedRef<STableViewBase>& OwnerTable) const
 {
-    return SNew(SElementusItemTableRow, OwnerTable, InItem)
-        .Visibility(this, &SElementusTable::GetIsVisible, InItem)
+    return SNew(SRancItemTableRow, OwnerTable, InItem)
+        .Visibility(this, &SFRancInventoryTable::GetIsVisible, InItem)
         .HightlightTextSource(SearchText);
 }
 
-void SElementusTable::OnTableItemDoubleClicked(const FElementusItemPtr ElementusItemRowData) const
+void SFRancInventoryTable::OnTableItemDoubleClicked(const FRancItemPtr RancItemRowData) const
 {
     if (const UAssetManager* const AssetManager = UAssetManager::GetIfValid())
     {
         UAssetEditorSubsystem* const AssetEditorSubsystem = NewObject<UAssetEditorSubsystem>();
-        const FSoftObjectPath AssetPath = AssetManager->GetPrimaryAssetPath(ElementusItemRowData->PrimaryAssetId);
+        const FSoftObjectPath AssetPath = AssetManager->GetPrimaryAssetPath(RancItemRowData->PrimaryAssetId);
 
         AssetEditorSubsystem->OpenEditorForAsset(AssetPath.ToString());
     }
 }
 
-EVisibility SElementusTable::GetIsVisible(const FElementusItemPtr InItem) const
+EVisibility SFRancInventoryTable::GetIsVisible(const FRancItemPtr InItem) const
 {
     EVisibility Output;
 
@@ -174,7 +174,7 @@ EVisibility SElementusTable::GetIsVisible(const FElementusItemPtr InItem) const
                 || InItem->PrimaryAssetId.ToString().Contains(InText, ESearchCase::IgnoreCase)
                 || FString::FromInt(InItem->Id).Contains(InText, ESearchCase::IgnoreCase)
                 || InItem->Name.ToString().Contains(InText, ESearchCase::IgnoreCase)
-                || URancInventoryFunctions::ElementusItemEnumTypeToString(InItem->Type).Contains(InText, ESearchCase::IgnoreCase)
+                || URancInventoryFunctions::RancItemEnumTypeToString(InItem->Type).Contains(InText, ESearchCase::IgnoreCase)
                 || InItem->Class.ToString().Contains(InText, ESearchCase::IgnoreCase)
                 || FString::SanitizeFloat(InItem->Value).Contains(InText, ESearchCase::IgnoreCase)
                 || FString::SanitizeFloat(InItem->Weight).Contains(InText, ESearchCase::IgnoreCase);
@@ -191,13 +191,13 @@ EVisibility SElementusTable::GetIsVisible(const FElementusItemPtr InItem) const
     return Output;
 }
 
-void SElementusTable::OnSearchTextModified(const FText& InText)
+void SFRancInventoryTable::OnSearchTextModified(const FText& InText)
 {
     SearchText = MakeShared<FText>(InText);
     EdListView->RebuildList();
 }
 
-void SElementusTable::OnSearchTypeModified(const ECheckBoxState InState, const int32 InType)
+void SFRancInventoryTable::OnSearchTypeModified(const ECheckBoxState InState, const int32 InType)
 {
     switch (InState)
     {
@@ -215,29 +215,29 @@ void SElementusTable::OnSearchTypeModified(const ECheckBoxState InState, const i
     EdListView->RequestListRefresh();
 }
 
-void SElementusTable::UpdateItemList()
+void SFRancInventoryTable::UpdateItemList()
 {
     ItemArr.Empty();
 
-    for (const FPrimaryAssetId& Iterator : URancInventoryFunctions::GetAllElementusItemIds())
+    for (const FPrimaryAssetId& Iterator : URancInventoryFunctions::GetAllRancItemIds())
     {
-        ItemArr.Add(MakeShared<FElementusItemRowData>(Iterator));
+        ItemArr.Add(MakeShared<FRancItemRowData>(Iterator));
     }
 
     EdListView->RequestListRefresh();
 
     if (const UAssetManager* const AssetManager = UAssetManager::GetIfValid(); IsValid(AssetManager) && AssetManager->HasInitialScanCompleted() && URancInventoryFunctions::HasEmptyParam(ItemArr))
     {
-        FMessageDialog::Open(EAppMsgType::Ok, FText::FromString(TEXT("Asset Manager could not find any Elementus Items. Please check your Asset Manager settings.")));
+        FMessageDialog::Open(EAppMsgType::Ok, FText::FromString(TEXT("Asset Manager could not find any Ranc Items. Please check your Asset Manager settings.")));
     }
 }
 
-TArray<FElementusItemPtr> SElementusTable::GetSelectedItems() const
+TArray<FRancItemPtr> SFRancInventoryTable::GetSelectedItems() const
 {
     return EdListView->GetSelectedItems();
 }
 
-void SElementusTable::OnColumnSort([[maybe_unused]] const EColumnSortPriority::Type, const FName& ColumnName, const EColumnSortMode::Type SortMode)
+void SFRancInventoryTable::OnColumnSort([[maybe_unused]] const EColumnSortPriority::Type, const FName& ColumnName, const EColumnSortMode::Type SortMode)
 {
     ColumnBeingSorted = ColumnName;
     CurrentSortMode = SortMode;
@@ -260,7 +260,7 @@ void SElementusTable::OnColumnSort([[maybe_unused]] const EColumnSortPriority::T
             }
         };
 
-    const auto Sort_Lambda = [&ColumnName, &Compare_Lambda](const FElementusItemPtr& Val1, const FElementusItemPtr& Val2) -> bool
+    const auto Sort_Lambda = [&ColumnName, &Compare_Lambda](const FRancItemPtr& Val1, const FRancItemPtr& Val2) -> bool
         {
             if (ColumnName == ColumnId_PrimaryIdLabel)
             {
@@ -279,9 +279,9 @@ void SElementusTable::OnColumnSort([[maybe_unused]] const EColumnSortPriority::T
 
             if (ColumnName == ColumnId_TypeLabel)
             {
-                const auto ItemTypeToString_Lambda = [&](const EElementusItemType& InType) -> FString
+                const auto ItemTypeToString_Lambda = [&](const ERancItemType& InType) -> FString
                     {
-                        return *URancInventoryFunctions::ElementusItemEnumTypeToString(InType);
+                        return *URancInventoryFunctions::RancItemEnumTypeToString(InType);
                     };
 
                 return Compare_Lambda(ItemTypeToString_Lambda(Val1->Type), ItemTypeToString_Lambda(Val2->Type));
@@ -309,7 +309,7 @@ void SElementusTable::OnColumnSort([[maybe_unused]] const EColumnSortPriority::T
     EdListView->RequestListRefresh();
 }
 
-EColumnSortMode::Type SElementusTable::GetColumnSort(const FName ColumnId) const
+EColumnSortMode::Type SFRancInventoryTable::GetColumnSort(const FName ColumnId) const
 {
     if (ColumnBeingSorted != ColumnId)
     {

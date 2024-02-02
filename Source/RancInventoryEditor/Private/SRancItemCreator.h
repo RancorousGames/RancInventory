@@ -5,10 +5,10 @@
 
 #include <CoreMinimal.h>
 
-class SElementusItemCreator final : public SCompoundWidget
+class SRancItemCreator final : public SCompoundWidget
 {
 public:
-    SLATE_USER_ARGS(SElementusItemCreator)
+    SLATE_USER_ARGS(SRancItemCreator)
         {
         }
 

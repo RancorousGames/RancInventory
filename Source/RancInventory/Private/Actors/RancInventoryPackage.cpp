@@ -56,15 +56,15 @@ void ARancInventoryPackage::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>
     DOREPLIFETIME_WITH_PARAMS_FAST(ARancInventoryPackage, PackageInventory, SharedParams);
 }
 
-void ARancInventoryPackage::PutItemIntoPackage(const TArray<FElementusItemInfo> ItemInfo, URancInventoryComponent* FromInventory)
+void ARancInventoryPackage::PutItemIntoPackage(const TArray<FRancItemInfo> ItemInfo, URancInventoryComponent* FromInventory)
 {
-    URancInventoryFunctions::TradeElementusItem(ItemInfo, FromInventory, PackageInventory);
+    URancInventoryFunctions::TradeRancItem(ItemInfo, FromInventory, PackageInventory);
     MARK_PROPERTY_DIRTY_FROM_NAME(ARancInventoryPackage, PackageInventory, this);
 }
 
-void ARancInventoryPackage::GetItemFromPackage(const TArray<FElementusItemInfo> ItemInfo, URancInventoryComponent* ToInventory)
+void ARancInventoryPackage::GetItemFromPackage(const TArray<FRancItemInfo> ItemInfo, URancInventoryComponent* ToInventory)
 {
-    URancInventoryFunctions::TradeElementusItem(ItemInfo, PackageInventory, ToInventory);
+    URancInventoryFunctions::TradeRancItem(ItemInfo, PackageInventory, ToInventory);
     MARK_PROPERTY_DIRTY_FROM_NAME(ARancInventoryPackage, PackageInventory, this);
 }
 

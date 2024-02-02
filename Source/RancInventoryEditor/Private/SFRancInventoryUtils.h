@@ -5,16 +5,16 @@
 
 #include <CoreMinimal.h>
 
-class SElementusTable;
+class SFRancInventoryTable;
 
-class SElementusUtils final : public SCompoundWidget
+class SFRancInventoryUtils final : public SCompoundWidget
 {
 public:
-    SLATE_USER_ARGS(SElementusUtils) : _TableSource()
+    SLATE_USER_ARGS(SFRancInventoryUtils) : _TableSource()
         {
         }
 
-        SLATE_ARGUMENT(TSharedPtr<class SElementusTable>, TableSource)
+        SLATE_ARGUMENT(TSharedPtr<class SFRancInventoryTable>, TableSource)
     SLATE_END_ARGS()
 
     void Construct(const FArguments& InArgs);
@@ -23,5 +23,5 @@ private:
     TSharedRef<SWidget> ConstructContent();
     FReply OnButtonClicked(const uint32 ButtonId) const;
 
-    TSharedPtr<class SElementusTable> TableSource;
+    TSharedPtr<class SFRancInventoryTable> TableSource;
 };

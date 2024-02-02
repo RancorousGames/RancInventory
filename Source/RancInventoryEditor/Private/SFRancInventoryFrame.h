@@ -5,10 +5,10 @@
 
 #include <CoreMinimal.h>
 
-class SElementusFrame final : public SCompoundWidget
+class SFRancInventoryFrame final : public SCompoundWidget
 {
 public:
-    SLATE_USER_ARGS(SElementusFrame)
+    SLATE_USER_ARGS(SFRancInventoryFrame)
         {
         }
 
@@ -19,5 +19,5 @@ public:
 private:
     TSharedRef<SWidget> ConstructContent();
 
-    TSharedPtr<class SElementusTable> Table;
+    TSharedPtr<class SFRancInventoryTable> Table;
 };

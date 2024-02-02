@@ -5,17 +5,17 @@
 
 #include <CoreMinimal.h>
 
-enum class EElementusItemType : uint8;
+enum class ERancItemType : uint8;
 
-DECLARE_DELEGATE_TwoParams(FOnElementusItemCheckStateChanged, ECheckBoxState, int32 ItemType);
+DECLARE_DELEGATE_TwoParams(FOnRancItemCheckStateChanged, ECheckBoxState, int32 ItemType);
 
-class SElementusSearch final : public SCompoundWidget
+class SFRancInventorySearch final : public SCompoundWidget
 {
 public:
-    SLATE_USER_ARGS(SElementusSearch)
+    SLATE_USER_ARGS(SFRancInventorySearch)
         {
         }
-        SLATE_EVENT(FOnElementusItemCheckStateChanged, OnCheckboxStateChanged)
+        SLATE_EVENT(FOnRancItemCheckStateChanged, OnCheckboxStateChanged)
         SLATE_EVENT(FOnTextChanged, OnSearchTextChanged)
 
     SLATE_END_ARGS()
@@ -28,6 +28,6 @@ private:
     void TriggerOnCheckboxStateChanged(ECheckBoxState NewState, int32 InType) const;
     void TriggerOnSearchTextChanged(const FText& InText) const;
 
-    FOnElementusItemCheckStateChanged OnCheckStateChanged;
+    FOnRancItemCheckStateChanged OnCheckStateChanged;
     FOnTextChanged OnTextChangedDelegate;
 };

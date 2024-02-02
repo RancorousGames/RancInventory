@@ -1,13 +1,13 @@
 // Author: Lucas Vilas-Boas
 // Year: 2023
 
-#include "SElementusSearch.h"
+#include "SFRancInventorySearch.h"
 #include <Management/RancInventoryData.h>
 #include <Management/RancInventoryFunctions.h>
 #include <Widgets/Input/SSearchBox.h>
 #include <Widgets/Layout/SUniformGridPanel.h>
 
-void SElementusSearch::Construct(const FArguments& InArgs)
+void SFRancInventorySearch::Construct(const FArguments& InArgs)
 {
     OnCheckStateChanged = InArgs._OnCheckboxStateChanged;
     OnTextChangedDelegate = InArgs._OnSearchTextChanged;
@@ -18,7 +18,7 @@ void SElementusSearch::Construct(const FArguments& InArgs)
         ];
 }
 
-TSharedRef<SWidget> SElementusSearch::ConstructContent()
+TSharedRef<SWidget> SFRancInventorySearch::ConstructContent()
 {
 #if ENGINE_MAJOR_VERSION < 5
     using FAppStyle = FEditorStyle;
@@ -26,18 +26,18 @@ TSharedRef<SWidget> SElementusSearch::ConstructContent()
 
     constexpr float SlotPadding = 4.f;
 
-    const auto CheckBoxCreator_Lambda = [this](const EElementusItemType& InType) -> const TSharedRef<SCheckBox>
+    const auto CheckBoxCreator_Lambda = [this](const ERancItemType& InType) -> const TSharedRef<SCheckBox>
         {
             constexpr float CheckBoxPadding = 2.f;
             const int32 Index = static_cast<int32>(InType);
 
             return SNew(SCheckBox)
                 .Padding(CheckBoxPadding)
-                .OnCheckStateChanged(this, &SElementusSearch::TriggerOnCheckboxStateChanged, Index)
+                .OnCheckStateChanged(this, &SFRancInventorySearch::TriggerOnCheckboxStateChanged, Index)
                 .Content()
                 [
                     SNew(STextBlock)
-                        .Text(FText::FromString(URancInventoryFunctions::ElementusItemEnumTypeToString(static_cast<EElementusItemType>(Index))))
+                        .Text(FText::FromString(URancInventoryFunctions::RancItemEnumTypeToString(static_cast<ERancItemType>(Index))))
                         .Margin(CheckBoxPadding)
                 ];
         };
@@ -47,7 +47,7 @@ TSharedRef<SWidget> SElementusSearch::ConstructContent()
         .AutoHeight()
         [
             SNew(SSearchBox)
-                .OnTextChanged(this, &SElementusSearch::TriggerOnSearchTextChanged)
+                .OnTextChanged(this, &SFRancInventorySearch::TriggerOnSearchTextChanged)
         ]
         + SVerticalBox::Slot()
         .AutoHeight()
@@ -65,65 +65,65 @@ TSharedRef<SWidget> SElementusSearch::ConstructContent()
                 .SlotPadding(1.f)
                 + SUniformGridPanel::Slot(0, 0)
                 [
-                    CheckBoxCreator_Lambda(EElementusItemType::Accessory)
+                    CheckBoxCreator_Lambda(ERancItemType::Accessory)
                 ]
                 + SUniformGridPanel::Slot(1, 0)
                 [
-                    CheckBoxCreator_Lambda(EElementusItemType::Armor)
+                    CheckBoxCreator_Lambda(ERancItemType::Armor)
                 ]
                 + SUniformGridPanel::Slot(0, 1)
                 [
-                    CheckBoxCreator_Lambda(EElementusItemType::Weapon)
+                    CheckBoxCreator_Lambda(ERancItemType::Weapon)
                 ]
                 + SUniformGridPanel::Slot(1, 1)
                 [
-                    CheckBoxCreator_Lambda(EElementusItemType::Consumable)
+                    CheckBoxCreator_Lambda(ERancItemType::Consumable)
                 ]
                 + SUniformGridPanel::Slot(0, 2)
                 [
-                    CheckBoxCreator_Lambda(EElementusItemType::Material)
+                    CheckBoxCreator_Lambda(ERancItemType::Material)
                 ]
                 + SUniformGridPanel::Slot(1, 2)
                 [
-                    CheckBoxCreator_Lambda(EElementusItemType::Crafting)
+                    CheckBoxCreator_Lambda(ERancItemType::Crafting)
                 ]
                 + SUniformGridPanel::Slot(0, 3)
                 [
-                    CheckBoxCreator_Lambda(EElementusItemType::Information)
+                    CheckBoxCreator_Lambda(ERancItemType::Information)
                 ]
                 + SUniformGridPanel::Slot(1, 3)
                 [
-                    CheckBoxCreator_Lambda(EElementusItemType::Event)
+                    CheckBoxCreator_Lambda(ERancItemType::Event)
                 ]
                 + SUniformGridPanel::Slot(0, 4)
                 [
-                    CheckBoxCreator_Lambda(EElementusItemType::Quest)
+                    CheckBoxCreator_Lambda(ERancItemType::Quest)
                 ]
                 + SUniformGridPanel::Slot(1, 4)
                 [
-                    CheckBoxCreator_Lambda(EElementusItemType::Junk)
+                    CheckBoxCreator_Lambda(ERancItemType::Junk)
                 ]
                 + SUniformGridPanel::Slot(0, 5)
                 [
-                    CheckBoxCreator_Lambda(EElementusItemType::Special)
+                    CheckBoxCreator_Lambda(ERancItemType::Special)
                 ]
                 + SUniformGridPanel::Slot(1, 5)
                 [
-                    CheckBoxCreator_Lambda(EElementusItemType::Other)
+                    CheckBoxCreator_Lambda(ERancItemType::Other)
                 ]
                 + SUniformGridPanel::Slot(0, 6)
                 [
-                    CheckBoxCreator_Lambda(EElementusItemType::None)
+                    CheckBoxCreator_Lambda(ERancItemType::None)
                 ]
         ];
 }
 
-void SElementusSearch::TriggerOnCheckboxStateChanged(const ECheckBoxState NewState, const int32 InType) const
+void SFRancInventorySearch::TriggerOnCheckboxStateChanged(const ECheckBoxState NewState, const int32 InType) const
 {
     OnCheckStateChanged.ExecuteIfBound(NewState, InType);
 }
 
-void SElementusSearch::TriggerOnSearchTextChanged(const FText& InText) const
+void SFRancInventorySearch::TriggerOnSearchTextChanged(const FText& InText) const
 {
     OnTextChangedDelegate.ExecuteIfBound(InText);
 }

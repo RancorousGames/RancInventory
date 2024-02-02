@@ -11,7 +11,7 @@
 /**
  *
  */
-UCLASS(Config = Plugins, DefaultConfig, meta = (DisplayName = "Elementus Inventory"))
+UCLASS(Config = Plugins, DefaultConfig, meta = (DisplayName = "Ranc Inventory"))
 class RANCINVENTORY_API URancInventorySettings final : public UDeveloperSettings
 {
     GENERATED_BODY()

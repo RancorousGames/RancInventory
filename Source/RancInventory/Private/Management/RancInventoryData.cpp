@@ -7,8 +7,8 @@
 #include UE_INLINE_GENERATED_CPP_BY_NAME(RancInventoryData)
 #endif
 
-const FElementusItemInfo FElementusItemInfo::EmptyItemInfo(FPrimaryElementusItemId(), -1);
+const FRancItemInfo FRancItemInfo::EmptyItemInfo(FPrimaryRancItemId(), -1);
 
-UElementusItemData::UElementusItemData(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
+URancItemData::URancItemData(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
 }

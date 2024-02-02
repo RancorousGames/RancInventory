@@ -7,9 +7,9 @@
 #include "Management/RancInventoryData.h"
 #include "Management/RancInventoryFunctions.h"
 
-struct FElementusItemRowData
+struct FRancItemRowData
 {
-    explicit FElementusItemRowData(const FPrimaryElementusItemId& InPrimaryAssetId)
+    explicit FRancItemRowData(const FPrimaryRancItemId& InPrimaryAssetId)
     {
         const auto ItemData = URancInventoryFunctions::GetSingleItemDataById(InPrimaryAssetId, { TEXT("Data"), TEXT("SoftData"), }, false);
 
@@ -22,32 +22,32 @@ struct FElementusItemRowData
         Value = ItemData->ItemValue;
         Weight = ItemData->ItemWeight;
 
-        URancInventoryFunctions::UnloadElementusItem(InPrimaryAssetId);
+        URancInventoryFunctions::UnloadRancItem(InPrimaryAssetId);
     }
 
-    explicit FElementusItemRowData(const FPrimaryAssetId& InPrimaryAssetId) : FElementusItemRowData(FPrimaryElementusItemId(InPrimaryAssetId))
+    explicit FRancItemRowData(const FPrimaryAssetId& InPrimaryAssetId) : FRancItemRowData(FPrimaryRancItemId(InPrimaryAssetId))
     {
     }
 
     FPrimaryAssetId PrimaryAssetId;
     int32 Id = -1;
     FName Name = NAME_None;
-    EElementusItemType Type = EElementusItemType::None;
+    ERancItemType Type = ERancItemType::None;
     FName Class = NAME_None;
     FName Object = NAME_None;
     float Value = -1.f;
     float Weight = -1.f;
 };
 
-using FElementusItemPtr = TSharedPtr<FElementusItemRowData, ESPMode::ThreadSafe>;
+using FRancItemPtr = TSharedPtr<FRancItemRowData, ESPMode::ThreadSafe>;
 
-class SElementusTable final : public SCompoundWidget
+class SFRancInventoryTable final : public SCompoundWidget
 {
-    friend class SElementusFrame;
-    friend class SElementusUtils;
+    friend class SFRancInventoryFrame;
+    friend class SFRancInventoryUtils;
 
 public:
-    SLATE_USER_ARGS(SElementusTable)
+    SLATE_USER_ARGS(SFRancInventoryTable)
         {
         }
 
@@ -58,21 +58,21 @@ public:
 private:
     TSharedRef<SWidget> ConstructContent(const TSharedRef<class SHeaderRow> HeaderRow);
 
-    TSharedRef<ITableRow> OnGenerateWidgetForList(const FElementusItemPtr InItem, const TSharedRef<STableViewBase>& OwnerTable) const;
-    void OnTableItemDoubleClicked(FElementusItemPtr ElementusItemRowData) const;
+    TSharedRef<ITableRow> OnGenerateWidgetForList(const FRancItemPtr InItem, const TSharedRef<STableViewBase>& OwnerTable) const;
+    void OnTableItemDoubleClicked(FRancItemPtr RancItemRowData) const;
     void OnColumnSort(EColumnSortPriority::Type SortPriority, const FName& ColumnName, EColumnSortMode::Type SortMode);
     EColumnSortMode::Type GetColumnSort(const FName ColumnId) const;
-    EVisibility GetIsVisible(const FElementusItemPtr InItem) const;
+    EVisibility GetIsVisible(const FRancItemPtr InItem) const;
     void OnSearchTextModified(const FText& InText);
     void OnSearchTypeModified(const ECheckBoxState InState, const int32 InType);
     void UpdateItemList();
-    TArray<FElementusItemPtr> GetSelectedItems() const;
+    TArray<FRancItemPtr> GetSelectedItems() const;
 
-    TArray<FElementusItemPtr> ItemArr;
+    TArray<FRancItemPtr> ItemArr;
     TArray<int32> AllowedTypes;
     TSharedPtr<FText> SearchText;
     FName ColumnBeingSorted = NAME_None;
     EColumnSortMode::Type CurrentSortMode = EColumnSortMode::None;
 
-    TSharedPtr<SListView<FElementusItemPtr>> EdListView;
+    TSharedPtr<SListView<FRancItemPtr>> EdListView;
 };

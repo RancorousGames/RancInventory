@@ -2,10 +2,10 @@
 // Year: 2023
 
 #include "RancInventoryEditor.h"
-#include "SElementusDetailsPanel.h"
-#include "SElementusFrame.h"
-#include "SElementusItemCreator.h"
-#include "ElementusStaticIds.h"
+#include "SFRancInventoryDetailsPanel.h"
+#include "SFRancInventoryFrame.h"
+#include "SRancItemCreator.h"
+#include "RancInventoryStaticIds.h"
 #include <ToolMenus.h>
 #include <Widgets/Docking/SDockTab.h>
 #include <WorkspaceMenuStructure.h>
@@ -19,7 +19,7 @@ void FRancInventoryEditorModule::StartupModule()
 
     UToolMenus::RegisterStartupCallback(RegisterDelegate);
 
-    const auto MakeInstanceDelegate = FOnGetPropertyTypeCustomizationInstance::CreateStatic(&SElementusDetailsPanel::MakeInstance);
+    const auto MakeInstanceDelegate = FOnGetPropertyTypeCustomizationInstance::CreateStatic(&SFRancInventoryDetailsPanel::MakeInstance);
 
     PropertyEditorModule = &FModuleManager::LoadModuleChecked<FPropertyEditorModule>(TEXT("PropertyEditor"));
     PropertyEditorModule->RegisterCustomPropertyTypeLayout(ItemStackPropertyId, MakeInstanceDelegate);
@@ -30,7 +30,7 @@ void FRancInventoryEditorModule::ShutdownModule()
     UToolMenus::UnRegisterStartupCallback(this);
     UToolMenus::UnregisterOwner(this);
 
-    FGlobalTabmanager::Get()->UnregisterNomadTabSpawner(ElementusEditorTabId);
+    FGlobalTabmanager::Get()->UnregisterNomadTabSpawner(RancInventoryEditorTabId);
     FGlobalTabmanager::Get()->UnregisterNomadTabSpawner(ItemCreatorTabId);
 
     PropertyEditorModule->UnregisterCustomPropertyTypeLayout(ItemStackPropertyId);
@@ -40,13 +40,13 @@ TSharedRef<SDockTab> FRancInventoryEditorModule::OnSpawnTab([[maybe_unused]] con
 {
     TSharedPtr<SWidget> OutContent;
 
-    if (TabId == ElementusEditorTabId)
+    if (TabId == RancInventoryEditorTabId)
     {
-        OutContent = SNew(SElementusFrame);
+        OutContent = SNew(SFRancInventoryFrame);
     }
     else if (TabId == ItemCreatorTabId)
     {
-        OutContent = SNew(SElementusItemCreator);
+        OutContent = SNew(SRancItemCreator);
     }
 
     if (OutContent.IsValid())
@@ -71,20 +71,20 @@ void FRancInventoryEditorModule::RegisterMenus()
     const FName AppStyleName = FAppStyle::GetAppStyleSetName();
 #endif
 
-    const TSharedPtr<FWorkspaceItem> Menu = WorkspaceMenu::GetMenuStructure().GetToolsCategory()->AddGroup(LOCTEXT("ElementusCategory", "Elementus"), LOCTEXT("ElementusCategoryTooltip", "Elementus Plugins Tabs"), FSlateIcon(AppStyleName, "InputBindingEditor.LevelViewport"));
+    const TSharedPtr<FWorkspaceItem> Menu = WorkspaceMenu::GetMenuStructure().GetToolsCategory()->AddGroup(LOCTEXT("RancInventoryCategory", "RancInventory"), LOCTEXT("RancInventoryCategoryTooltip", "Ranc Inventory Plugins Tabs"), FSlateIcon(AppStyleName, "InputBindingEditor.LevelViewport"));
 
-    const auto EditorTabSpawnerDelegate = FOnSpawnTab::CreateRaw(this, &FRancInventoryEditorModule::OnSpawnTab, ElementusEditorTabId);
+    const auto EditorTabSpawnerDelegate = FOnSpawnTab::CreateRaw(this, &FRancInventoryEditorModule::OnSpawnTab, RancInventoryEditorTabId);
 
-    FGlobalTabmanager::Get()->RegisterNomadTabSpawner(ElementusEditorTabId, EditorTabSpawnerDelegate)
-        .SetDisplayName(FText::FromString(TEXT("Elementus Inventory Management")))
-        .SetTooltipText(FText::FromString(TEXT("Open Elementus Inventory Window")))
+    FGlobalTabmanager::Get()->RegisterNomadTabSpawner(RancInventoryEditorTabId, EditorTabSpawnerDelegate)
+        .SetDisplayName(FText::FromString(TEXT("Ranc Inventory Management")))
+        .SetTooltipText(FText::FromString(TEXT("Open Ranc Inventory Window")))
         .SetGroup(Menu.ToSharedRef())
         .SetIcon(FSlateIcon(AppStyleName, "Icons.Package"));
 
     const auto ItemCreatorTabSpawnerDelegate = FOnSpawnTab::CreateRaw(this, &FRancInventoryEditorModule::OnSpawnTab, ItemCreatorTabId);
 
     FGlobalTabmanager::Get()->RegisterNomadTabSpawner(ItemCreatorTabId, ItemCreatorTabSpawnerDelegate)
-        .SetDisplayName(FText::FromString(TEXT("Elementus Item Creator")))
+        .SetDisplayName(FText::FromString(TEXT("Ranc Item Creator")))
         .SetGroup(Menu.ToSharedRef())
         .SetIcon(FSlateIcon(AppStyleName, "Icons.PlusCircle"));
 }

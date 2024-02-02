@@ -1,7 +1,7 @@
 // Author: Lucas Vilas-Boas
 // Year: 2023
 
-#include "SElementusItemCreator.h"
+#include "SRancItemCreator.h"
 #include <Management/RancInventoryData.h>
 #include <Management/RancInventoryFunctions.h>
 #include <PropertyCustomizationHelpers.h>
@@ -20,7 +20,7 @@
 #include <UObject/SavePackage.h>
 #endif
 
-void SElementusItemCreator::Construct([[maybe_unused]] const FArguments&)
+void SRancItemCreator::Construct([[maybe_unused]] const FArguments&)
 {
     ItemTypesArr = GetEnumValuesAsStringArray();
     UpdateFolders();
@@ -31,7 +31,7 @@ void SElementusItemCreator::Construct([[maybe_unused]] const FArguments&)
         ];
 }
 
-TSharedRef<SWidget> SElementusItemCreator::ConstructContent()
+TSharedRef<SWidget> SRancItemCreator::ConstructContent()
 {
     constexpr float SlotPadding = 4.f;
 
@@ -51,8 +51,8 @@ TSharedRef<SWidget> SElementusItemCreator::ConstructContent()
                 .DisplayBrowse(true)
                 .DisplayThumbnail(true)
                 .ThumbnailPool(ImageIcon_ThumbnailPool.ToSharedRef())
-                .ObjectPath(this, &SElementusItemCreator::GetObjPath, ObjId)
-                .OnObjectChanged(this, &SElementusItemCreator::OnObjChanged, ObjId);
+                .ObjectPath(this, &SRancItemCreator::GetObjPath, ObjId)
+                .OnObjectChanged(this, &SRancItemCreator::OnObjChanged, ObjId);
         };
 
     return SNew(SScrollBox)
@@ -109,8 +109,8 @@ TSharedRef<SWidget> SElementusItemCreator::ConstructContent()
                 [
                     SNew(SClassPropertyEntryBox)
                         .AllowAbstract(true)
-                        .SelectedClass(this, &SElementusItemCreator::GetSelectedEntryClass)
-                        .OnSetClass(this, &SElementusItemCreator::HandleNewEntryClassSelected)
+                        .SelectedClass(this, &SRancItemCreator::GetSelectedEntryClass)
+                        .OnSetClass(this, &SRancItemCreator::HandleNewEntryClassSelected)
                 ]
                 + SGridPanel::Slot(0, 3)
                 .Padding(SlotPadding)
@@ -326,8 +326,8 @@ TSharedRef<SWidget> SElementusItemCreator::ConstructContent()
                 [
                     SNew(SButton)
                         .Text(FText::FromString(TEXT("Create Item")))
-                        .OnClicked(this, &SElementusItemCreator::HandleCreateItemButtonClicked)
-                        .IsEnabled(this, &SElementusItemCreator::IsCreateEnabled)
+                        .OnClicked(this, &SRancItemCreator::HandleCreateItemButtonClicked)
+                        .IsEnabled(this, &SRancItemCreator::IsCreateEnabled)
                         .ToolTip(
                             SNew(SToolTip)
                             .Text(FText::FromString(TEXT("Already exists a item with this Id.")))
@@ -342,33 +342,33 @@ TSharedRef<SWidget> SElementusItemCreator::ConstructContent()
         ];
 }
 
-void SElementusItemCreator::OnObjChanged(const FAssetData& AssetData, const int32 ObjId)
+void SRancItemCreator::OnObjChanged(const FAssetData& AssetData, const int32 ObjId)
 {
     ObjectMap.FindOrAdd(ObjId) = AssetData.GetAsset();
 }
 
-FString SElementusItemCreator::GetObjPath(const int32 ObjId) const
+FString SRancItemCreator::GetObjPath(const int32 ObjId) const
 {
     return ObjectMap.Contains(ObjId) && ObjectMap.FindRef(ObjId).IsValid() ? ObjectMap.FindRef(ObjId)->GetPathName() : FString();
 }
 
-void SElementusItemCreator::HandleNewEntryClassSelected(const UClass* Class)
+void SRancItemCreator::HandleNewEntryClassSelected(const UClass* Class)
 {
     ItemClass = Class;
 }
 
-const UClass* SElementusItemCreator::GetSelectedEntryClass() const
+const UClass* SRancItemCreator::GetSelectedEntryClass() const
 {
     return ItemClass.Get();
 }
 
-void SElementusItemCreator::UpdateFolders()
+void SRancItemCreator::UpdateFolders()
 {
     AssetFoldersArr.Empty();
 
     if (const UAssetManager* const AssetManager = UAssetManager::GetIfValid())
     {
-        if (FPrimaryAssetTypeInfo Info; AssetManager->GetPrimaryAssetTypeInfo(FPrimaryAssetType(ElementusItemDataType), Info))
+        if (FPrimaryAssetTypeInfo Info; AssetManager->GetPrimaryAssetTypeInfo(FPrimaryAssetType(RancItemDataType), Info))
         {
             for (const FString& Path : Info.AssetScanPaths)
             {
@@ -383,7 +383,7 @@ void SElementusItemCreator::UpdateFolders()
     }
 }
 
-FReply SElementusItemCreator::HandleCreateItemButtonClicked() const
+FReply SRancItemCreator::HandleCreateItemButtonClicked() const
 {
     if (AssetFolder.IsNone() || AssetName.IsNone())
     {
@@ -398,15 +398,15 @@ FReply SElementusItemCreator::HandleCreateItemButtonClicked() const
 
     UDataAssetFactory* const Factory = NewObject<UDataAssetFactory>();
 
-    if (UObject* const NewData = AssetToolsModule.Get().CreateAsset(AssetName.ToString(), FPackageName::GetLongPackagePath(PackageName), UElementusItemData::StaticClass(), Factory))
+    if (UObject* const NewData = AssetToolsModule.Get().CreateAsset(AssetName.ToString(), FPackageName::GetLongPackagePath(PackageName), URancItemData::StaticClass(), Factory))
     {
-        UElementusItemData* const ItemData = Cast<UElementusItemData>(NewData);
+        URancItemData* const ItemData = Cast<URancItemData>(NewData);
         ItemData->ItemId = ItemId;
         ItemData->ItemObject = TSoftObjectPtr<UObject>(Cast<UObject>(ObjectMap.FindRef(0)));
         ItemData->ItemClass = TSoftClassPtr<UClass>(ItemClass.Get());
         ItemData->ItemName = ItemName;
         ItemData->ItemDescription = ItemDescription;
-        ItemData->ItemType = static_cast<EElementusItemType>(ItemType);
+        ItemData->ItemType = static_cast<ERancItemType>(ItemType);
         ItemData->bIsStackable = bIsStackable;
         ItemData->ItemValue = ItemValue;
         ItemData->ItemWeight = ItemWeight;
@@ -432,22 +432,22 @@ FReply SElementusItemCreator::HandleCreateItemButtonClicked() const
     return FReply::Handled();
 }
 
-bool SElementusItemCreator::IsCreateEnabled() const
+bool SRancItemCreator::IsCreateEnabled() const
 {
     if (const UAssetManager* const AssetManager = UAssetManager::GetIfValid())
     {
-        return ItemId != 0 && !AssetManager->GetPrimaryAssetPath(FPrimaryAssetId(ElementusItemDataType, *("Item_" + FString::FromInt(ItemId)))).IsValid();
+        return ItemId != 0 && !AssetManager->GetPrimaryAssetPath(FPrimaryAssetId(RancItemDataType, *("Item_" + FString::FromInt(ItemId)))).IsValid();
     }
 
     return false;
 }
 
-TArray<FTextDisplayStringPtr> SElementusItemCreator::GetEnumValuesAsStringArray() const
+TArray<FTextDisplayStringPtr> SRancItemCreator::GetEnumValuesAsStringArray() const
 {
     TArray<FTextDisplayStringPtr> EnumValues;
-    for (uint32 iterator = 0; iterator < static_cast<uint32>(EElementusItemType::MAX); iterator++)
+    for (uint32 iterator = 0; iterator < static_cast<uint32>(ERancItemType::MAX); iterator++)
     {
-        EnumValues.Add(MakeShared<FString>(URancInventoryFunctions::ElementusItemEnumTypeToString(static_cast<EElementusItemType>(iterator))));
+        EnumValues.Add(MakeShared<FString>(URancInventoryFunctions::RancItemEnumTypeToString(static_cast<ERancItemType>(iterator))));
     }
 
     return EnumValues;

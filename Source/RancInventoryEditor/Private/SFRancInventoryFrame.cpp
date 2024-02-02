@@ -1,13 +1,13 @@
 // Author: Lucas Vilas-Boas
 // Year: 2023
 
-#include "SElementusFrame.h"
-#include "SElementusSearch.h"
-#include "SElementusTable.h"
-#include "SElementusUtils.h"
+#include "SFRancInventoryFrame.h"
+#include "SFRancInventorySearch.h"
+#include "SFRancInventoryTable.h"
+#include "SFRancInventoryUtils.h"
 #include <Widgets/Layout/SScrollBox.h>
 
-void SElementusFrame::Construct([[maybe_unused]] const FArguments& InArgs)
+void SFRancInventoryFrame::Construct([[maybe_unused]] const FArguments& InArgs)
 {
     ChildSlot
         [
@@ -15,11 +15,11 @@ void SElementusFrame::Construct([[maybe_unused]] const FArguments& InArgs)
         ];
 }
 
-TSharedRef<SWidget> SElementusFrame::ConstructContent()
+TSharedRef<SWidget> SFRancInventoryFrame::ConstructContent()
 {
     constexpr float SlotPadding = 4.f;
 
-    SAssignNew(Table, SElementusTable);
+    SAssignNew(Table, SFRancInventoryTable);
 
     return SNew(SHorizontalBox)
         + SHorizontalBox::Slot()
@@ -34,15 +34,15 @@ TSharedRef<SWidget> SElementusFrame::ConstructContent()
                         .Padding(SlotPadding)
                         .AutoHeight()
                         [
-                            SNew(SElementusSearch)
-                                .OnSearchTextChanged(Table.ToSharedRef(), &SElementusTable::OnSearchTextModified)
-                                .OnCheckboxStateChanged(Table.ToSharedRef(), &SElementusTable::OnSearchTypeModified)
+                            SNew(SFRancInventorySearch)
+                                .OnSearchTextChanged(Table.ToSharedRef(), &SFRancInventoryTable::OnSearchTextModified)
+                                .OnCheckboxStateChanged(Table.ToSharedRef(), &SFRancInventoryTable::OnSearchTypeModified)
                         ]
                         + SVerticalBox::Slot()
                         .Padding(SlotPadding)
                         .AutoHeight()
                         [
-                            SNew(SElementusUtils)
+                            SNew(SFRancInventoryUtils)
                                 .TableSource(Table)
                         ]
                 ]

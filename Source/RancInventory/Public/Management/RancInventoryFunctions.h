@@ -8,8 +8,8 @@
 #include <Runtime/Launch/Resources/Version.h>
 #include "RancInventoryFunctions.generated.h"
 
-UENUM(BlueprintType, Category = "Elementus Inventory | Enumerations")
-enum class EElementusSearchType : uint8
+UENUM(BlueprintType, Category = "Ranc Inventory | Enumerations")
+enum class ERancItemSearchType : uint8
 {
     Name,
     ID,
@@ -18,69 +18,69 @@ enum class EElementusSearchType : uint8
 
 class URancInventoryComponent;
 class UAssetManager;
-class UElementusItemData;
-struct FPrimaryElementusItemId;
+class URancItemData;
+struct FPrimaryRancItemId;
 
 /**
  *
  */
-UCLASS(Category = "Elementus Inventory | Functions")
+UCLASS(Category = "Ranc Inventory | Functions")
 class RANCINVENTORY_API URancInventoryFunctions final : public UBlueprintFunctionLibrary
 {
     GENERATED_BODY()
 
 public:
-    /* Unload all elementus items that were loaded by Asset Manager */
-    UFUNCTION(BlueprintCallable, Category = "Elementus Inventory")
-    static void UnloadAllElementusItems();
+    /* Unload all items that were loaded by Asset Manager */
+    UFUNCTION(BlueprintCallable, Category = "Ranc Inventory")
+    static void UnloadAllRancItems();
 
-    /* Unload a elementus item that was loaded by Asset Manager */
-    UFUNCTION(BlueprintCallable, Category = "Elementus Inventory")
-    static void UnloadElementusItem(const FPrimaryElementusItemId& InItemId);
+    /* Unload a item that was loaded by Asset Manager */
+    UFUNCTION(BlueprintCallable, Category = "Ranc Inventory")
+    static void UnloadRancItem(const FPrimaryRancItemId& InItemId);
 
     /* Check if the ids are equal */
-    UFUNCTION(BlueprintPure, Category = "Elementus Inventory")
-    static bool CompareItemInfo(const FElementusItemInfo& Info1, const FElementusItemInfo& Info2);
+    UFUNCTION(BlueprintPure, Category = "Ranc Inventory")
+    static bool CompareItemInfo(const FRancItemInfo& Info1, const FRancItemInfo& Info2);
 
     /* Check if the ids of the given item datas are equal */
-    UFUNCTION(BlueprintPure, Category = "Elementus Inventory")
-    static bool CompareItemData(const UElementusItemData* Data1, const UElementusItemData* Data2);
+    UFUNCTION(BlueprintPure, Category = "Ranc Inventory")
+    static bool CompareItemData(const URancItemData* Data1, const URancItemData* Data2);
 
     /* Return the item data related to the given id */
-    UFUNCTION(BlueprintCallable, Category = "Elementus Inventory")
-    static UElementusItemData* GetSingleItemDataById(const FPrimaryElementusItemId& InID, const TArray<FName>& InBundles, const bool bAutoUnload = true);
+    UFUNCTION(BlueprintCallable, Category = "Ranc Inventory")
+    static URancItemData* GetSingleItemDataById(const FPrimaryRancItemId& InID, const TArray<FName>& InBundles, const bool bAutoUnload = true);
 
     /* Return a array of data depending of the given ids */
-    UFUNCTION(BlueprintCallable, Category = "Elementus Inventory")
-    static TArray<UElementusItemData*> GetItemDataArrayById(const TArray<FPrimaryElementusItemId>& InIDs, const TArray<FName>& InBundles, const bool bAutoUnload = true);
+    UFUNCTION(BlueprintCallable, Category = "Ranc Inventory")
+    static TArray<URancItemData*> GetItemDataArrayById(const TArray<FPrimaryRancItemId>& InIDs, const TArray<FName>& InBundles, const bool bAutoUnload = true);
 
-    /* Search all registered elementus items and return a array of item data that match with the given parameters */
-    UFUNCTION(BlueprintCallable, Category = "Elementus Inventory")
-    static TArray<UElementusItemData*> SearchElementusItemData(const EElementusSearchType SearchType, const FString& SearchString, const TArray<FName>& InBundles, const bool bAutoUnload = true);
+    /* Search all registered items and return a array of item data that match with the given parameters */
+    UFUNCTION(BlueprintCallable, Category = "Ranc Inventory")
+    static TArray<URancItemData*> SearchRancItemData(const ERancItemSearchType SearchType, const FString& SearchString, const TArray<FName>& InBundles, const bool bAutoUnload = true);
 
-    /* Get the primary asset ids of all registered elementus items */
-    UFUNCTION(BlueprintPure, Category = "Elementus Inventory")
-    static TArray<FPrimaryAssetId> GetAllElementusItemIds();
+    /* Get the primary asset ids of all registered items */
+    UFUNCTION(BlueprintPure, Category = "Ranc Inventory")
+    static TArray<FPrimaryAssetId> GetAllRancItemIds();
 
     /* Trade items between two inventory components */
-    UFUNCTION(BlueprintCallable, Category = "Elementus Inventory")
-    static void TradeElementusItem(TArray<FElementusItemInfo> ItemsToTrade, URancInventoryComponent* FromInventory, URancInventoryComponent* ToInventory);
+    UFUNCTION(BlueprintCallable, Category = "Ranc Inventory")
+    static void TradeRancItem(TArray<FRancItemInfo> ItemsToTrade, URancInventoryComponent* FromInventory, URancInventoryComponent* ToInventory);
 
     /* Check if the given item info have a valid id */
-    UFUNCTION(BlueprintPure, Category = "Elementus Inventory")
-    static bool IsItemValid(const FElementusItemInfo InItemInfo);
+    UFUNCTION(BlueprintPure, Category = "Ranc Inventory")
+    static bool IsItemValid(const FRancItemInfo InItemInfo);
 
     /* Check if the given item info represents a stackable item */
-    UFUNCTION(BlueprintPure, Category = "Elementus Inventory")
-    static bool IsItemStackable(const FElementusItemInfo InItemInfo);
+    UFUNCTION(BlueprintPure, Category = "Ranc Inventory")
+    static bool IsItemStackable(const FRancItemInfo InItemInfo);
 
     /* Get item tags providing a parent tag */
-    UFUNCTION(BlueprintPure, Category = "Elementus Inventory")
-    static FGameplayTagContainer GetItemTagsWithParentTag(const FElementusItemInfo InItemInfo, const FGameplayTag FromParentTag);
+    UFUNCTION(BlueprintPure, Category = "Ranc Inventory")
+    static FGameplayTagContainer GetItemTagsWithParentTag(const FRancItemInfo InItemInfo, const FGameplayTag FromParentTag);
 
     /* Convert an item type enum value to string */
-    UFUNCTION(BlueprintPure, Category = "Elementus Inventory")
-    static FString ElementusItemEnumTypeToString(const EElementusItemType InEnumName);
+    UFUNCTION(BlueprintPure, Category = "Ranc Inventory")
+    static FString RancItemEnumTypeToString(const ERancItemType InEnumName);
 
     template<typename Ty>
     constexpr static const bool HasEmptyParam(const Ty& Arg1)
@@ -103,18 +103,18 @@ public:
         }
     }
 
-    UFUNCTION(BlueprintPure, Category = "Elementus Inventory")
-    static TMap<FGameplayTag, FName> GetItemMetadatas(const FElementusItemInfo InItemInfo);
+    UFUNCTION(BlueprintPure, Category = "Ranc Inventory")
+    static TMap<FGameplayTag, FName> GetItemMetadatas(const FRancItemInfo InItemInfo);
 
-    UFUNCTION(BlueprintPure, Category = "Elementus Inventory")
-    static TMap<FGameplayTag, FPrimaryElementusItemIdContainer> GetItemRelations(const FElementusItemInfo InItemInfo);
+    UFUNCTION(BlueprintPure, Category = "Ranc Inventory")
+    static TMap<FGameplayTag, FPrimaryRancItemIdContainer> GetItemRelations(const FRancItemInfo InItemInfo);
 
 private:
-    static TArray<UElementusItemData*> LoadElementusItemDatas_Internal(UAssetManager* InAssetManager, const TArray<FPrimaryAssetId>& InIDs, const TArray<FName>& InBundles, const bool bAutoUnload);
-    static TArray<UElementusItemData*> LoadElementusItemDatas_Internal(UAssetManager* InAssetManager, const TArray<FPrimaryElementusItemId>& InIDs, const TArray<FName>& InBundles, const bool bAutoUnload);
+    static TArray<URancItemData*> LoadRancItemDatas_Internal(UAssetManager* InAssetManager, const TArray<FPrimaryAssetId>& InIDs, const TArray<FName>& InBundles, const bool bAutoUnload);
+    static TArray<URancItemData*> LoadRancItemDatas_Internal(UAssetManager* InAssetManager, const TArray<FPrimaryRancItemId>& InIDs, const TArray<FName>& InBundles, const bool bAutoUnload);
 
 public:
     /* Filter the container and return only items that can be traded at the current context */
-    UFUNCTION(BlueprintPure, Category = "Elementus Inventory")
-    static TArray<FElementusItemInfo> FilterTradeableItems(URancInventoryComponent* FromInventory, URancInventoryComponent* ToInventory, const TArray<FElementusItemInfo>& Items);
+    UFUNCTION(BlueprintPure, Category = "Ranc Inventory")
+    static TArray<FRancItemInfo> FilterTradeableItems(URancInventoryComponent* FromInventory, URancInventoryComponent* ToInventory, const TArray<FRancItemInfo>& Items);
 };

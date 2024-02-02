@@ -1,11 +1,11 @@
 // Author: Lucas Vilas-Boas
 // Year: 2023
 
-#include "SElementusDetailsPanel.h"
+#include "SFRancInventoryDetailsPanel.h"
 #include <Management/RancInventoryData.h>
 #include <Engine/AssetManager.h>
 
-void SElementusDetailsPanel::CustomizeHeader(const TSharedRef<IPropertyHandle> PropertyHandle, FDetailWidgetRow& HeaderRow, IPropertyTypeCustomizationUtils& CustomizationUtils)
+void SFRancInventoryDetailsPanel::CustomizeHeader(const TSharedRef<IPropertyHandle> PropertyHandle, FDetailWidgetRow& HeaderRow, IPropertyTypeCustomizationUtils& CustomizationUtils)
 {
     PropertyHandlePtr = PropertyHandle;
 
@@ -17,26 +17,26 @@ void SElementusDetailsPanel::CustomizeHeader(const TSharedRef<IPropertyHandle> P
         .ValueContent()
         [
             SNew(SObjectPropertyEntryBox)
-                .AllowedClass(UElementusItemData::StaticClass())
+                .AllowedClass(URancItemData::StaticClass())
                 .PropertyHandle(PropertyHandle)
                 .DisplayThumbnail(true)
                 .ThumbnailPool(CustomizationUtils.GetThumbnailPool())
-                .ObjectPath(this, &SElementusDetailsPanel::GetObjPath)
-                .OnObjectChanged(this, &SElementusDetailsPanel::OnObjChanged)
+                .ObjectPath(this, &SFRancInventoryDetailsPanel::GetObjPath)
+                .OnObjectChanged(this, &SFRancInventoryDetailsPanel::OnObjChanged)
                 .OnShouldFilterAsset_Lambda(
                     [](const FAssetData& AssetData) -> bool
                     {
-                        return AssetData.GetPrimaryAssetId().PrimaryAssetType != FPrimaryAssetType(ElementusItemDataType);
+                        return AssetData.GetPrimaryAssetId().PrimaryAssetType != FPrimaryAssetType(RancItemDataType);
                     }
                 )
         ];
 }
 
-void SElementusDetailsPanel::CustomizeChildren(TSharedRef<IPropertyHandle> StructPropertyHandle, IDetailChildrenBuilder& StructBuilder, IPropertyTypeCustomizationUtils& CustomizationUtils)
+void SFRancInventoryDetailsPanel::CustomizeChildren(TSharedRef<IPropertyHandle> StructPropertyHandle, IDetailChildrenBuilder& StructBuilder, IPropertyTypeCustomizationUtils& CustomizationUtils)
 {
 }
 
-void SElementusDetailsPanel::OnObjChanged(const FAssetData& AssetData) const
+void SFRancInventoryDetailsPanel::OnObjChanged(const FAssetData& AssetData) const
 {
     // (PrimaryAssetType="VALUE",PrimaryAssetName="VALUE")
     const FString InValue(FString::Printf(TEXT("(PrimaryAssetType=\"%s\",PrimaryAssetName=\"%s\")"), *AssetData.GetPrimaryAssetId().PrimaryAssetType.ToString(), *AssetData.GetPrimaryAssetId().PrimaryAssetName.ToString()));
@@ -44,7 +44,7 @@ void SElementusDetailsPanel::OnObjChanged(const FAssetData& AssetData) const
     ensure(PropertyHandlePtr->SetValueFromFormattedString(InValue) == FPropertyAccess::Result::Success);
 }
 
-FString SElementusDetailsPanel::GetObjPath() const
+FString SFRancInventoryDetailsPanel::GetObjPath() const
 {
     if (const UAssetManager* const AssetManager = UAssetManager::GetIfValid();
         AssetManager && PropertyHandlePtr.IsValid())

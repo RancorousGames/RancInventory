@@ -6,12 +6,12 @@
 #include <CoreMinimal.h>
 #include <PropertyCustomizationHelpers.h>
 
-class SElementusDetailsPanel final : public IPropertyTypeCustomization
+class SFRancInventoryDetailsPanel final : public IPropertyTypeCustomization
 {
 public:
     static TSharedRef<IPropertyTypeCustomization> MakeInstance()
     {
-        return MakeShared<SElementusDetailsPanel>();
+        return MakeShared<SFRancInventoryDetailsPanel>();
     }
 
 protected:
