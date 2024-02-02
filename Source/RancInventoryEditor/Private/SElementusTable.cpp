@@ -1,10 +1,9 @@
 // Author: Lucas Vilas-Boas
 // Year: 2023
-// Repo: https://github.com/lucoiso/UEElementusInventory
 
 #include "SElementusTable.h"
-#include <Management/ElementusInventoryFunctions.h>
-#include <Management/ElementusInventoryData.h>
+#include <Management/RancInventoryFunctions.h>
+#include <Management/RancInventoryData.h>
 #include <Subsystems/AssetEditorSubsystem.h>
 #include <Engine/AssetManager.h>
 
@@ -67,7 +66,7 @@ protected:
 
         if (ColumnName == ColumnId_TypeLabel)
         {
-            return TextBlockCreator_Lambda(FText::FromString(UElementusInventoryFunctions::ElementusItemEnumTypeToString(Item->Type)));
+            return TextBlockCreator_Lambda(FText::FromString(URancInventoryFunctions::ElementusItemEnumTypeToString(Item->Type)));
         }
 
         if (ColumnName == ColumnId_ObjectLabel)
@@ -175,12 +174,12 @@ EVisibility SElementusTable::GetIsVisible(const FElementusItemPtr InItem) const
                 || InItem->PrimaryAssetId.ToString().Contains(InText, ESearchCase::IgnoreCase)
                 || FString::FromInt(InItem->Id).Contains(InText, ESearchCase::IgnoreCase)
                 || InItem->Name.ToString().Contains(InText, ESearchCase::IgnoreCase)
-                || UElementusInventoryFunctions::ElementusItemEnumTypeToString(InItem->Type).Contains(InText, ESearchCase::IgnoreCase)
+                || URancInventoryFunctions::ElementusItemEnumTypeToString(InItem->Type).Contains(InText, ESearchCase::IgnoreCase)
                 || InItem->Class.ToString().Contains(InText, ESearchCase::IgnoreCase)
                 || FString::SanitizeFloat(InItem->Value).Contains(InText, ESearchCase::IgnoreCase)
                 || FString::SanitizeFloat(InItem->Weight).Contains(InText, ESearchCase::IgnoreCase);
         }(SearchText.IsValid() ? SearchText->ToString() : FString())
-                && (AllowedTypes.Contains(static_cast<uint8>(InItem->Type)) || UElementusInventoryFunctions::HasEmptyParam(AllowedTypes)))
+                && (AllowedTypes.Contains(static_cast<uint8>(InItem->Type)) || URancInventoryFunctions::HasEmptyParam(AllowedTypes)))
     {
         Output = EVisibility::Visible;
     }
@@ -220,14 +219,14 @@ void SElementusTable::UpdateItemList()
 {
     ItemArr.Empty();
 
-    for (const FPrimaryAssetId& Iterator : UElementusInventoryFunctions::GetAllElementusItemIds())
+    for (const FPrimaryAssetId& Iterator : URancInventoryFunctions::GetAllElementusItemIds())
     {
         ItemArr.Add(MakeShared<FElementusItemRowData>(Iterator));
     }
 
     EdListView->RequestListRefresh();
 
-    if (const UAssetManager* const AssetManager = UAssetManager::GetIfValid(); IsValid(AssetManager) && AssetManager->HasInitialScanCompleted() && UElementusInventoryFunctions::HasEmptyParam(ItemArr))
+    if (const UAssetManager* const AssetManager = UAssetManager::GetIfValid(); IsValid(AssetManager) && AssetManager->HasInitialScanCompleted() && URancInventoryFunctions::HasEmptyParam(ItemArr))
     {
         FMessageDialog::Open(EAppMsgType::Ok, FText::FromString(TEXT("Asset Manager could not find any Elementus Items. Please check your Asset Manager settings.")));
     }
@@ -282,7 +281,7 @@ void SElementusTable::OnColumnSort([[maybe_unused]] const EColumnSortPriority::T
             {
                 const auto ItemTypeToString_Lambda = [&](const EElementusItemType& InType) -> FString
                     {
-                        return *UElementusInventoryFunctions::ElementusItemEnumTypeToString(InType);
+                        return *URancInventoryFunctions::ElementusItemEnumTypeToString(InType);
                     };
 
                 return Compare_Lambda(ItemTypeToString_Lambda(Val1->Type), ItemTypeToString_Lambda(Val2->Type));

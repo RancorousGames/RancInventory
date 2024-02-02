@@ -1,18 +1,17 @@
 // Author: Lucas Vilas-Boas
 // Year: 2023
-// Repo: https://github.com/lucoiso/UEElementusInventory
 
 #pragma once
 
 #include <CoreMinimal.h>
-#include "Management/ElementusInventoryData.h"
-#include "Management/ElementusInventoryFunctions.h"
+#include "Management/RancInventoryData.h"
+#include "Management/RancInventoryFunctions.h"
 
 struct FElementusItemRowData
 {
     explicit FElementusItemRowData(const FPrimaryElementusItemId& InPrimaryAssetId)
     {
-        const auto ItemData = UElementusInventoryFunctions::GetSingleItemDataById(InPrimaryAssetId, { TEXT("Data"), TEXT("SoftData"), }, false);
+        const auto ItemData = URancInventoryFunctions::GetSingleItemDataById(InPrimaryAssetId, { TEXT("Data"), TEXT("SoftData"), }, false);
 
         PrimaryAssetId = InPrimaryAssetId;
         Id = ItemData->ItemId;
@@ -23,7 +22,7 @@ struct FElementusItemRowData
         Value = ItemData->ItemValue;
         Weight = ItemData->ItemWeight;
 
-        UElementusInventoryFunctions::UnloadElementusItem(InPrimaryAssetId);
+        URancInventoryFunctions::UnloadElementusItem(InPrimaryAssetId);
     }
 
     explicit FElementusItemRowData(const FPrimaryAssetId& InPrimaryAssetId) : FElementusItemRowData(FPrimaryElementusItemId(InPrimaryAssetId))

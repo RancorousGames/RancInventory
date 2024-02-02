@@ -1,10 +1,9 @@
 // Author: Lucas Vilas-Boas
 // Year: 2023
-// Repo: https://github.com/lucoiso/UEElementusInventory
 
 #include "SElementusItemCreator.h"
-#include <Management/ElementusInventoryData.h>
-#include <Management/ElementusInventoryFunctions.h>
+#include <Management/RancInventoryData.h>
+#include <Management/RancInventoryFunctions.h>
 #include <PropertyCustomizationHelpers.h>
 #include <AssetThumbnail.h>
 #include <AssetToolsModule.h>
@@ -378,7 +377,7 @@ void SElementusItemCreator::UpdateFolders()
         }
     }
 
-    if (const UAssetManager* const AssetManager = UAssetManager::GetIfValid(); IsValid(AssetManager) && AssetManager->HasInitialScanCompleted() && UElementusInventoryFunctions::HasEmptyParam(AssetFoldersArr))
+    if (const UAssetManager* const AssetManager = UAssetManager::GetIfValid(); IsValid(AssetManager) && AssetManager->HasInitialScanCompleted() && URancInventoryFunctions::HasEmptyParam(AssetFoldersArr))
     {
         FMessageDialog::Open(EAppMsgType::Ok, FText::FromString(TEXT("Asset Manager could not find any folder. Please check your Asset Manager settings.")));
     }
@@ -448,7 +447,7 @@ TArray<FTextDisplayStringPtr> SElementusItemCreator::GetEnumValuesAsStringArray(
     TArray<FTextDisplayStringPtr> EnumValues;
     for (uint32 iterator = 0; iterator < static_cast<uint32>(EElementusItemType::MAX); iterator++)
     {
-        EnumValues.Add(MakeShared<FString>(UElementusInventoryFunctions::ElementusItemEnumTypeToString(static_cast<EElementusItemType>(iterator))));
+        EnumValues.Add(MakeShared<FString>(URancInventoryFunctions::ElementusItemEnumTypeToString(static_cast<EElementusItemType>(iterator))));
     }
 
     return EnumValues;

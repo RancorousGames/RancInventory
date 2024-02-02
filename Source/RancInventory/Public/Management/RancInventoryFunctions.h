@@ -1,13 +1,12 @@
 // Author: Lucas Vilas-Boas
 // Year: 2023
-// Repo: https://github.com/lucoiso/UEElementusInventory
 
 #pragma once
 
 #include <CoreMinimal.h>
 #include <Kismet/BlueprintFunctionLibrary.h>
 #include <Runtime/Launch/Resources/Version.h>
-#include "ElementusInventoryFunctions.generated.h"
+#include "RancInventoryFunctions.generated.h"
 
 UENUM(BlueprintType, Category = "Elementus Inventory | Enumerations")
 enum class EElementusSearchType : uint8
@@ -17,7 +16,7 @@ enum class EElementusSearchType : uint8
     Type
 };
 
-class UElementusInventoryComponent;
+class URancInventoryComponent;
 class UAssetManager;
 class UElementusItemData;
 struct FPrimaryElementusItemId;
@@ -26,7 +25,7 @@ struct FPrimaryElementusItemId;
  *
  */
 UCLASS(Category = "Elementus Inventory | Functions")
-class ELEMENTUSINVENTORY_API UElementusInventoryFunctions final : public UBlueprintFunctionLibrary
+class RANCINVENTORY_API URancInventoryFunctions final : public UBlueprintFunctionLibrary
 {
     GENERATED_BODY()
 
@@ -65,7 +64,7 @@ public:
 
     /* Trade items between two inventory components */
     UFUNCTION(BlueprintCallable, Category = "Elementus Inventory")
-    static void TradeElementusItem(TArray<FElementusItemInfo> ItemsToTrade, UElementusInventoryComponent* FromInventory, UElementusInventoryComponent* ToInventory);
+    static void TradeElementusItem(TArray<FElementusItemInfo> ItemsToTrade, URancInventoryComponent* FromInventory, URancInventoryComponent* ToInventory);
 
     /* Check if the given item info have a valid id */
     UFUNCTION(BlueprintPure, Category = "Elementus Inventory")
@@ -117,5 +116,5 @@ private:
 public:
     /* Filter the container and return only items that can be traded at the current context */
     UFUNCTION(BlueprintPure, Category = "Elementus Inventory")
-    static TArray<FElementusItemInfo> FilterTradeableItems(UElementusInventoryComponent* FromInventory, UElementusInventoryComponent* ToInventory, const TArray<FElementusItemInfo>& Items);
+    static TArray<FElementusItemInfo> FilterTradeableItems(URancInventoryComponent* FromInventory, URancInventoryComponent* ToInventory, const TArray<FElementusItemInfo>& Items);
 };

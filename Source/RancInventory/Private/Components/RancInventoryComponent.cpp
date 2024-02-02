@@ -1,11 +1,10 @@
 // Author: Lucas Vilas-Boas
 // Year: 2023
-// Repo: https://github.com/lucoiso/UEElementusInventory
 
-#include "Components/ElementusInventoryComponent.h"
-#include "Management/ElementusInventoryFunctions.h"
-#include "Management/ElementusInventorySettings.h"
-#include "LogElementusInventory.h"
+#include "Components/RancInventoryComponent.h"
+#include "Management/RancInventoryFunctions.h"
+#include "Management/RancInventorySettings.h"
+#include "LogRancInventory.h"
 #include <Engine/AssetManager.h>
 #include <GameFramework/Actor.h>
 #include <Algo/ForEach.h>
@@ -13,17 +12,17 @@
 #include <Net/Core/PushModel/PushModel.h>
 
 #ifdef UE_INLINE_GENERATED_CPP_BY_NAME
-#include UE_INLINE_GENERATED_CPP_BY_NAME(ElementusInventoryComponent)
+#include UE_INLINE_GENERATED_CPP_BY_NAME(RancInventoryComponent)
 #endif
 
-UElementusInventoryComponent::UElementusInventoryComponent(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer), CurrentWeight(0.f), MaxWeight(0.f), MaxNumItems(0)
+URancInventoryComponent::URancInventoryComponent(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer), CurrentWeight(0.f), MaxWeight(0.f), MaxNumItems(0)
 {
     PrimaryComponentTick.bCanEverTick = false;
     PrimaryComponentTick.bStartWithTickEnabled = false;
 
     SetIsReplicatedByDefault(true);
 
-    if (const UElementusInventorySettings* const Settings = UElementusInventorySettings::Get())
+    if (const URancInventorySettings* const Settings = URancInventorySettings::Get())
     {
         bAllowEmptySlots = Settings->bAllowEmptySlots;
         MaxWeight = Settings->MaxWeight;
@@ -31,66 +30,66 @@ UElementusInventoryComponent::UElementusInventoryComponent(const FObjectInitiali
     }
 }
 
-float UElementusInventoryComponent::GetCurrentWeight() const
+float URancInventoryComponent::GetCurrentWeight() const
 {
     return CurrentWeight;
 }
 
-float UElementusInventoryComponent::GetMaxWeight() const
+float URancInventoryComponent::GetMaxWeight() const
 {
     return MaxWeight <= 0.f ? MAX_flt : MaxWeight;
 }
 
-int32 UElementusInventoryComponent::GetCurrentNumItems() const
+int32 URancInventoryComponent::GetCurrentNumItems() const
 {
     return ElementusItems.Num();
 }
 
-int32 UElementusInventoryComponent::GetMaxNumItems() const
+int32 URancInventoryComponent::GetMaxNumItems() const
 {
     return MaxNumItems <= 0 ? MAX_int32 : MaxNumItems;
 }
 
-TArray<FElementusItemInfo> UElementusInventoryComponent::GetItemsArray() const
+TArray<FElementusItemInfo> URancInventoryComponent::GetItemsArray() const
 {
     return ElementusItems;
 }
 
-FElementusItemInfo& UElementusInventoryComponent::GetItemReferenceAt(const int32 Index)
+FElementusItemInfo& URancInventoryComponent::GetItemReferenceAt(const int32 Index)
 {
     return ElementusItems[Index];
 }
 
-FElementusItemInfo UElementusInventoryComponent::GetItemCopyAt(const int32 Index) const
+FElementusItemInfo URancInventoryComponent::GetItemCopyAt(const int32 Index) const
 {
     return ElementusItems[Index];
 }
 
-bool UElementusInventoryComponent::CanReceiveItem(const FElementusItemInfo InItemInfo) const
+bool URancInventoryComponent::CanReceiveItem(const FElementusItemInfo InItemInfo) const
 {
-    if (!UElementusInventoryFunctions::IsItemValid(InItemInfo))
+    if (!URancInventoryFunctions::IsItemValid(InItemInfo))
     {
         return false;
     }
 
     bool bOutput = ElementusItems.Num() <= GetMaxNumItems();
 
-    if (const UElementusItemData* const ItemData = UElementusInventoryFunctions::GetSingleItemDataById(InItemInfo.ItemId, { "Data" }))
+    if (const UElementusItemData* const ItemData = URancInventoryFunctions::GetSingleItemDataById(InItemInfo.ItemId, { "Data" }))
     {
         bOutput = bOutput && ((GetCurrentWeight() + (ItemData->ItemWeight * InItemInfo.Quantity)) <= GetMaxWeight());
     }
 
     if (!bOutput)
     {
-        UE_LOG(LogElementusInventory, Warning, TEXT("%s: Actor %s cannot receive %d item(s) with name '%s'"), *FString(__func__), *GetOwner()->GetName(), InItemInfo.Quantity, *InItemInfo.ItemId.ToString());
+        UE_LOG(LogRancInventory, Warning, TEXT("%s: Actor %s cannot receive %d item(s) with name '%s'"), *FString(__func__), *GetOwner()->GetName(), InItemInfo.Quantity, *InItemInfo.ItemId.ToString());
     }
 
     return bOutput;
 }
 
-bool UElementusInventoryComponent::CanGiveItem(const FElementusItemInfo InItemInfo) const
+bool URancInventoryComponent::CanGiveItem(const FElementusItemInfo InItemInfo) const
 {
-    if (!UElementusInventoryFunctions::IsItemValid(InItemInfo))
+    if (!URancInventoryFunctions::IsItemValid(InItemInfo))
     {
         return false;
     }
@@ -106,20 +105,20 @@ bool UElementusInventoryComponent::CanGiveItem(const FElementusItemInfo InItemIn
         return Quantity >= InItemInfo.Quantity;
     }
 
-    UE_LOG(LogElementusInventory, Warning, TEXT("%s: Actor %s cannot give %d item(s) with name '%s'"), *FString(__func__), *GetOwner()->GetName(), InItemInfo.Quantity, *InItemInfo.ItemId.ToString());
+    UE_LOG(LogRancInventory, Warning, TEXT("%s: Actor %s cannot give %d item(s) with name '%s'"), *FString(__func__), *GetOwner()->GetName(), InItemInfo.Quantity, *InItemInfo.ItemId.ToString());
 
     return false;
 }
 
-void UElementusInventoryComponent::SortInventory(const EElementusInventorySortingMode Mode, const EElementusInventorySortingOrientation Orientation)
+void URancInventoryComponent::SortInventory(const ERancInventorySortingMode Mode, const ERancInventorySortingOrientation Orientation)
 {
     const auto SortByOrientation = [Orientation](const auto A, const auto B) {
         switch (Orientation)
         {
-        case EElementusInventorySortingOrientation::Ascending:
+        case ERancInventorySortingOrientation::Ascending:
             return A < B;
 
-        case EElementusInventorySortingOrientation::Descending:
+        case ERancInventorySortingOrientation::Descending:
             return A > B;
 
         default:
@@ -131,27 +130,27 @@ void UElementusInventoryComponent::SortInventory(const EElementusInventorySortin
 
     switch (Mode)
     {
-    case EElementusInventorySortingMode::ID:
+    case ERancInventorySortingMode::ID:
         ElementusItems.Sort(
             [SortByOrientation](const FElementusItemInfo& A, const FElementusItemInfo& B)
             {
-                return UElementusInventoryFunctions::IsItemValid(A) && SortByOrientation(A.ItemId, B.ItemId);
+                return URancInventoryFunctions::IsItemValid(A) && SortByOrientation(A.ItemId, B.ItemId);
             }
         );
         break;
 
-    case EElementusInventorySortingMode::Name:
+    case ERancInventorySortingMode::Name:
         ElementusItems.Sort(
             [SortByOrientation](const FElementusItemInfo& A, const FElementusItemInfo& B)
             {
-                if (!UElementusInventoryFunctions::IsItemValid(A))
+                if (!URancInventoryFunctions::IsItemValid(A))
                 {
                     return false;
                 }
 
-                if (const UElementusItemData* const ItemDataA = UElementusInventoryFunctions::GetSingleItemDataById(A.ItemId, { "Data" }))
+                if (const UElementusItemData* const ItemDataA = URancInventoryFunctions::GetSingleItemDataById(A.ItemId, { "Data" }))
                 {
-                    if (const UElementusItemData* const ItemDataB = UElementusInventoryFunctions::GetSingleItemDataById(B.ItemId, { "Data" }))
+                    if (const UElementusItemData* const ItemDataB = URancInventoryFunctions::GetSingleItemDataById(B.ItemId, { "Data" }))
                     {
                         return SortByOrientation(ItemDataA->ItemName.ToString(), ItemDataB->ItemName.ToString());
                     }
@@ -162,18 +161,18 @@ void UElementusInventoryComponent::SortInventory(const EElementusInventorySortin
         );
         break;
 
-    case EElementusInventorySortingMode::Type:
+    case ERancInventorySortingMode::Type:
         ElementusItems.Sort(
             [SortByOrientation](const FElementusItemInfo& A, const FElementusItemInfo& B)
             {
-                if (!UElementusInventoryFunctions::IsItemValid(A))
+                if (!URancInventoryFunctions::IsItemValid(A))
                 {
                     return false;
                 }
 
-                if (const UElementusItemData* const ItemDataA = UElementusInventoryFunctions::GetSingleItemDataById(A.ItemId, { "Data" }))
+                if (const UElementusItemData* const ItemDataA = URancInventoryFunctions::GetSingleItemDataById(A.ItemId, { "Data" }))
                 {
-                    if (const UElementusItemData* const ItemDataB = UElementusInventoryFunctions::GetSingleItemDataById(B.ItemId, { "Data" }))
+                    if (const UElementusItemData* const ItemDataB = URancInventoryFunctions::GetSingleItemDataById(B.ItemId, { "Data" }))
                     {
                         return SortByOrientation(ItemDataA->ItemType, ItemDataB->ItemType);
                     }
@@ -184,18 +183,18 @@ void UElementusInventoryComponent::SortInventory(const EElementusInventorySortin
         );
         break;
 
-    case EElementusInventorySortingMode::IndividualValue:
+    case ERancInventorySortingMode::IndividualValue:
         ElementusItems.Sort(
             [SortByOrientation](const FElementusItemInfo& A, const FElementusItemInfo& B)
             {
-                if (!UElementusInventoryFunctions::IsItemValid(A))
+                if (!URancInventoryFunctions::IsItemValid(A))
                 {
                     return false;
                 }
 
-                if (const UElementusItemData* const ItemDataA = UElementusInventoryFunctions::GetSingleItemDataById(A.ItemId, { "Data" }))
+                if (const UElementusItemData* const ItemDataA = URancInventoryFunctions::GetSingleItemDataById(A.ItemId, { "Data" }))
                 {
-                    if (const UElementusItemData* const ItemDataB = UElementusInventoryFunctions::GetSingleItemDataById(B.ItemId, { "Data" }))
+                    if (const UElementusItemData* const ItemDataB = URancInventoryFunctions::GetSingleItemDataById(B.ItemId, { "Data" }))
                     {
                         return SortByOrientation(ItemDataA->ItemValue, ItemDataB->ItemValue);
                     }
@@ -206,18 +205,18 @@ void UElementusInventoryComponent::SortInventory(const EElementusInventorySortin
         );
         break;
 
-    case EElementusInventorySortingMode::StackValue:
+    case ERancInventorySortingMode::StackValue:
         ElementusItems.Sort(
             [SortByOrientation](const FElementusItemInfo& A, const FElementusItemInfo& B)
             {
-                if (!UElementusInventoryFunctions::IsItemValid(A))
+                if (!URancInventoryFunctions::IsItemValid(A))
                 {
                     return false;
                 }
 
-                if (const UElementusItemData* const ItemDataA = UElementusInventoryFunctions::GetSingleItemDataById(A.ItemId, { "Data" }))
+                if (const UElementusItemData* const ItemDataA = URancInventoryFunctions::GetSingleItemDataById(A.ItemId, { "Data" }))
                 {
-                    if (const UElementusItemData* const ItemDataB = UElementusInventoryFunctions::GetSingleItemDataById(B.ItemId, { "Data" }))
+                    if (const UElementusItemData* const ItemDataB = URancInventoryFunctions::GetSingleItemDataById(B.ItemId, { "Data" }))
                     {
                         return SortByOrientation(ItemDataA->ItemValue * A.Quantity, ItemDataB->ItemValue * B.Quantity);
                     }
@@ -228,18 +227,18 @@ void UElementusInventoryComponent::SortInventory(const EElementusInventorySortin
         );
         break;
 
-    case EElementusInventorySortingMode::IndividualWeight:
+    case ERancInventorySortingMode::IndividualWeight:
         ElementusItems.Sort(
             [SortByOrientation](const FElementusItemInfo& A, const FElementusItemInfo& B)
             {
-                if (!UElementusInventoryFunctions::IsItemValid(A))
+                if (!URancInventoryFunctions::IsItemValid(A))
                 {
                     return false;
                 }
 
-                if (const UElementusItemData* const ItemDataA = UElementusInventoryFunctions::GetSingleItemDataById(A.ItemId, { "Data" }))
+                if (const UElementusItemData* const ItemDataA = URancInventoryFunctions::GetSingleItemDataById(A.ItemId, { "Data" }))
                 {
-                    if (const UElementusItemData* const ItemDataB = UElementusInventoryFunctions::GetSingleItemDataById(B.ItemId, { "Data" }))
+                    if (const UElementusItemData* const ItemDataB = URancInventoryFunctions::GetSingleItemDataById(B.ItemId, { "Data" }))
                     {
                         return SortByOrientation(ItemDataA->ItemWeight, ItemDataB->ItemWeight);
                     }
@@ -250,18 +249,18 @@ void UElementusInventoryComponent::SortInventory(const EElementusInventorySortin
         );
         break;
 
-    case EElementusInventorySortingMode::StackWeight:
+    case ERancInventorySortingMode::StackWeight:
         ElementusItems.Sort(
             [SortByOrientation](const FElementusItemInfo& A, const FElementusItemInfo& B)
             {
-                if (!UElementusInventoryFunctions::IsItemValid(A))
+                if (!URancInventoryFunctions::IsItemValid(A))
                 {
                     return false;
                 }
 
-                if (const UElementusItemData* const ItemDataA = UElementusInventoryFunctions::GetSingleItemDataById(A.ItemId, { "Data" }))
+                if (const UElementusItemData* const ItemDataA = URancInventoryFunctions::GetSingleItemDataById(A.ItemId, { "Data" }))
                 {
-                    if (const UElementusItemData* const ItemDataB = UElementusInventoryFunctions::GetSingleItemDataById(B.ItemId, { "Data" }))
+                    if (const UElementusItemData* const ItemDataB = URancInventoryFunctions::GetSingleItemDataById(B.ItemId, { "Data" }))
                     {
                         return SortByOrientation(ItemDataA->ItemWeight * A.Quantity, ItemDataB->ItemWeight * B.Quantity);
                     }
@@ -272,29 +271,29 @@ void UElementusInventoryComponent::SortInventory(const EElementusInventorySortin
         );
         break;
 
-    case EElementusInventorySortingMode::Quantity:
+    case ERancInventorySortingMode::Quantity:
         ElementusItems.Sort(
             [SortByOrientation](const FElementusItemInfo& A, const FElementusItemInfo& B)
             {
-                return UElementusInventoryFunctions::IsItemValid(A) && SortByOrientation(A.Quantity, B.Quantity);
+                return URancInventoryFunctions::IsItemValid(A) && SortByOrientation(A.Quantity, B.Quantity);
             }
         );
         break;
 
-    case EElementusInventorySortingMode::Level:
+    case ERancInventorySortingMode::Level:
         ElementusItems.Sort(
             [SortByOrientation](const FElementusItemInfo& A, const FElementusItemInfo& B)
             {
-                return UElementusInventoryFunctions::IsItemValid(A) && SortByOrientation(A.Level, B.Level);
+                return URancInventoryFunctions::IsItemValid(A) && SortByOrientation(A.Level, B.Level);
             }
         );
         break;
 
-    case EElementusInventorySortingMode::Tags:
+    case ERancInventorySortingMode::Tags:
         ElementusItems.Sort(
             [SortByOrientation](const FElementusItemInfo& A, const FElementusItemInfo& B)
             {
-                return UElementusInventoryFunctions::IsItemValid(A) && SortByOrientation(A.Tags.Num(), B.Tags.Num());
+                return URancInventoryFunctions::IsItemValid(A) && SortByOrientation(A.Tags.Num(), B.Tags.Num());
             }
         );
         break;
@@ -304,35 +303,35 @@ void UElementusInventoryComponent::SortInventory(const EElementusInventorySortin
     }
 }
 
-void UElementusInventoryComponent::BeginPlay()
+void URancInventoryComponent::BeginPlay()
 {
     Super::BeginPlay();
 
     RefreshInventory();
 }
 
-void UElementusInventoryComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+void URancInventoryComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
     FDoRepLifetimeParams SharedParams;
     SharedParams.bIsPushBased = true;
 
-    DOREPLIFETIME_WITH_PARAMS_FAST(UElementusInventoryComponent, ElementusItems, SharedParams);
+    DOREPLIFETIME_WITH_PARAMS_FAST(URancInventoryComponent, ElementusItems, SharedParams);
 }
 
-void UElementusInventoryComponent::RefreshInventory()
+void URancInventoryComponent::RefreshInventory()
 {
     ForceWeightUpdate();
     ForceInventoryValidation();
 }
 
-void UElementusInventoryComponent::ForceWeightUpdate()
+void URancInventoryComponent::ForceWeightUpdate()
 {
     float NewWeigth = 0.f;
     for (const FElementusItemInfo& Iterator : ElementusItems)
     {
-        if (const UElementusItemData* const ItemData = UElementusInventoryFunctions::GetSingleItemDataById(Iterator.ItemId, { "Data" }))
+        if (const UElementusItemData* const ItemData = URancInventoryFunctions::GetSingleItemDataById(Iterator.ItemId, { "Data" }))
         {
             NewWeigth += ItemData->ItemWeight * Iterator.Quantity;
         }
@@ -341,7 +340,7 @@ void UElementusInventoryComponent::ForceWeightUpdate()
     CurrentWeight = NewWeigth;
 }
 
-void UElementusInventoryComponent::ForceInventoryValidation()
+void URancInventoryComponent::ForceInventoryValidation()
 {
     TArray<FElementusItemInfo> NewItems;
     TArray<int32> IndexesToRemove;
@@ -355,7 +354,7 @@ void UElementusInventoryComponent::ForceInventoryValidation()
 
         else if (ElementusItems[i].Quantity > 1)
         {
-            if (!UElementusInventoryFunctions::IsItemStackable(ElementusItems[i]))
+            if (!URancInventoryFunctions::IsItemStackable(ElementusItems[i]))
             {
                 for (int32 j = 0; j < ElementusItems[i].Quantity; ++j)
                 {
@@ -367,7 +366,7 @@ void UElementusInventoryComponent::ForceInventoryValidation()
         }
     }
 
-    if (!UElementusInventoryFunctions::HasEmptyParam(IndexesToRemove))
+    if (!URancInventoryFunctions::HasEmptyParam(IndexesToRemove))
     {
         for (const int32& Iterator : IndexesToRemove)
         {
@@ -381,7 +380,7 @@ void UElementusInventoryComponent::ForceInventoryValidation()
             }
         }
     }
-    if (!UElementusInventoryFunctions::HasEmptyParam(NewItems))
+    if (!URancInventoryFunctions::HasEmptyParam(NewItems))
     {
         ElementusItems.Append(NewItems);
     }
@@ -389,7 +388,7 @@ void UElementusInventoryComponent::ForceInventoryValidation()
     NotifyInventoryChange();
 }
 
-bool UElementusInventoryComponent::FindFirstItemIndexWithInfo(const FElementusItemInfo InItemInfo, int32& OutIndex, const FGameplayTagContainer& IgnoreTags, const int32 Offset) const
+bool URancInventoryComponent::FindFirstItemIndexWithInfo(const FElementusItemInfo InItemInfo, int32& OutIndex, const FGameplayTagContainer& IgnoreTags, const int32 Offset) const
 {
     for (int32 Iterator = Offset; Iterator < ElementusItems.Num(); ++Iterator)
     {
@@ -410,7 +409,7 @@ bool UElementusInventoryComponent::FindFirstItemIndexWithInfo(const FElementusIt
     return false;
 }
 
-bool UElementusInventoryComponent::FindFirstItemIndexWithTags(const FGameplayTagContainer WithTags, int32& OutIndex, const FGameplayTagContainer& IgnoreTags, const int32 Offset) const
+bool URancInventoryComponent::FindFirstItemIndexWithTags(const FGameplayTagContainer WithTags, int32& OutIndex, const FGameplayTagContainer& IgnoreTags, const int32 Offset) const
 {
     for (int32 Iterator = Offset; Iterator < ElementusItems.Num(); ++Iterator)
     {
@@ -428,7 +427,7 @@ bool UElementusInventoryComponent::FindFirstItemIndexWithTags(const FGameplayTag
     return false;
 }
 
-bool UElementusInventoryComponent::FindFirstItemIndexWithId(const FPrimaryElementusItemId InId, int32& OutIndex, const FGameplayTagContainer& IgnoreTags, const int32 Offset) const
+bool URancInventoryComponent::FindFirstItemIndexWithId(const FPrimaryElementusItemId InId, int32& OutIndex, const FGameplayTagContainer& IgnoreTags, const int32 Offset) const
 {
     for (int32 Iterator = Offset; Iterator < ElementusItems.Num(); ++Iterator)
     {
@@ -443,7 +442,7 @@ bool UElementusInventoryComponent::FindFirstItemIndexWithId(const FPrimaryElemen
     return false;
 }
 
-bool UElementusInventoryComponent::FindAllItemIndexesWithInfo(const FElementusItemInfo InItemInfo, TArray<int32>& OutIndexes, const FGameplayTagContainer& IgnoreTags) const
+bool URancInventoryComponent::FindAllItemIndexesWithInfo(const FElementusItemInfo InItemInfo, TArray<int32>& OutIndexes, const FGameplayTagContainer& IgnoreTags) const
 {
     for (auto Iterator = ElementusItems.CreateConstIterator(); Iterator; ++Iterator)
     {
@@ -465,10 +464,10 @@ bool UElementusInventoryComponent::FindAllItemIndexesWithInfo(const FElementusIt
         }
     }
 
-    return !UElementusInventoryFunctions::HasEmptyParam(OutIndexes);
+    return !URancInventoryFunctions::HasEmptyParam(OutIndexes);
 }
 
-bool UElementusInventoryComponent::FindAllItemIndexesWithTags(const FGameplayTagContainer WithTags, TArray<int32>& OutIndexes, const FGameplayTagContainer& IgnoreTags) const
+bool URancInventoryComponent::FindAllItemIndexesWithTags(const FGameplayTagContainer WithTags, TArray<int32>& OutIndexes, const FGameplayTagContainer& IgnoreTags) const
 {
     for (auto Iterator = ElementusItems.CreateConstIterator(); Iterator; ++Iterator)
     {
@@ -484,10 +483,10 @@ bool UElementusInventoryComponent::FindAllItemIndexesWithTags(const FGameplayTag
         }
     }
 
-    return !UElementusInventoryFunctions::HasEmptyParam(OutIndexes);
+    return !URancInventoryFunctions::HasEmptyParam(OutIndexes);
 }
 
-bool UElementusInventoryComponent::FindAllItemIndexesWithId(const FPrimaryElementusItemId InId, TArray<int32>& OutIndexes, const FGameplayTagContainer& IgnoreTags) const
+bool URancInventoryComponent::FindAllItemIndexesWithId(const FPrimaryElementusItemId InId, TArray<int32>& OutIndexes, const FGameplayTagContainer& IgnoreTags) const
 {
     for (auto Iterator = ElementusItems.CreateConstIterator(); Iterator; ++Iterator)
     {
@@ -497,10 +496,10 @@ bool UElementusInventoryComponent::FindAllItemIndexesWithId(const FPrimaryElemen
         }
     }
 
-    return !UElementusInventoryFunctions::HasEmptyParam(OutIndexes);
+    return !URancInventoryFunctions::HasEmptyParam(OutIndexes);
 }
 
-bool UElementusInventoryComponent::ContainsItem(const FElementusItemInfo InItemInfo, const bool bIgnoreTags) const
+bool URancInventoryComponent::ContainsItem(const FElementusItemInfo InItemInfo, const bool bIgnoreTags) const
 {
     return ElementusItems.FindByPredicate(
         [&InItemInfo, &bIgnoreTags](const FElementusItemInfo& InInfo)
@@ -515,7 +514,7 @@ bool UElementusInventoryComponent::ContainsItem(const FElementusItemInfo InItemI
     ) != nullptr;
 }
 
-bool UElementusInventoryComponent::IsInventoryEmpty() const
+bool URancInventoryComponent::IsInventoryEmpty() const
 {
     bool bOutput = true;
 
@@ -531,40 +530,40 @@ bool UElementusInventoryComponent::IsInventoryEmpty() const
     return bOutput;
 }
 
-void UElementusInventoryComponent::DebugInventory()
+void URancInventoryComponent::DebugInventory()
 {
 #if !UE_BUILD_SHIPPING
-    UE_LOG(LogElementusInventory_Internal, Warning, TEXT("%s"), *FString(__func__));
-    UE_LOG(LogElementusInventory_Internal, Warning, TEXT("Owning Actor: %s"), *GetOwner()->GetName());
+    UE_LOG(LogRancInventory_Internal, Warning, TEXT("%s"), *FString(__func__));
+    UE_LOG(LogRancInventory_Internal, Warning, TEXT("Owning Actor: %s"), *GetOwner()->GetName());
 
-    UE_LOG(LogElementusInventory_Internal, Warning, TEXT("Weight: %d"), CurrentWeight);
-    UE_LOG(LogElementusInventory_Internal, Warning, TEXT("Num: %d"), ElementusItems.Num());
-    UE_LOG(LogElementusInventory_Internal, Warning, TEXT("Size: %d"), ElementusItems.GetAllocatedSize());
+    UE_LOG(LogRancInventory_Internal, Warning, TEXT("Weight: %d"), CurrentWeight);
+    UE_LOG(LogRancInventory_Internal, Warning, TEXT("Num: %d"), ElementusItems.Num());
+    UE_LOG(LogRancInventory_Internal, Warning, TEXT("Size: %d"), ElementusItems.GetAllocatedSize());
 
     for (const FElementusItemInfo& Iterator : ElementusItems)
     {
-        UE_LOG(LogElementusInventory_Internal, Warning, TEXT("Item: %s"), *Iterator.ItemId.ToString());
-        UE_LOG(LogElementusInventory_Internal, Warning, TEXT("Quantity: %d"), Iterator.Quantity);
+        UE_LOG(LogRancInventory_Internal, Warning, TEXT("Item: %s"), *Iterator.ItemId.ToString());
+        UE_LOG(LogRancInventory_Internal, Warning, TEXT("Quantity: %d"), Iterator.Quantity);
 
         for (const FGameplayTag& Tag : Iterator.Tags)
         {
-            UE_LOG(LogElementusInventory_Internal, Warning, TEXT("Tag: %s"), *Tag.ToString());
+            UE_LOG(LogRancInventory_Internal, Warning, TEXT("Tag: %s"), *Tag.ToString());
         }
     }
 
-    UE_LOG(LogElementusInventory_Internal, Warning, TEXT("Component Memory Size: %d"), GetResourceSizeBytes(EResourceSizeMode::EstimatedTotal));
+    UE_LOG(LogRancInventory_Internal, Warning, TEXT("Component Memory Size: %d"), GetResourceSizeBytes(EResourceSizeMode::EstimatedTotal));
 #endif
 }
 
-void UElementusInventoryComponent::ClearInventory_Implementation()
+void URancInventoryComponent::ClearInventory_Implementation()
 {
-    UE_LOG(LogElementusInventory, Display, TEXT("%s: Cleaning %s's inventory"), *FString(__func__), *GetOwner()->GetName());
+    UE_LOG(LogRancInventory, Display, TEXT("%s: Cleaning %s's inventory"), *FString(__func__), *GetOwner()->GetName());
 
     ElementusItems.Empty();
     CurrentWeight = 0.f;
 }
 
-void UElementusInventoryComponent::GetItemIndexesFrom_Implementation(UElementusInventoryComponent* OtherInventory, const TArray<int32>& ItemIndexes)
+void URancInventoryComponent::GetItemIndexesFrom_Implementation(URancInventoryComponent* OtherInventory, const TArray<int32>& ItemIndexes)
 {
     if (GetOwnerRole() != ROLE_Authority)
     {
@@ -583,7 +582,7 @@ void UElementusInventoryComponent::GetItemIndexesFrom_Implementation(UElementusI
     GetItemsFrom_Implementation(OtherInventory, Modifiers);
 }
 
-void UElementusInventoryComponent::GiveItemIndexesTo_Implementation(UElementusInventoryComponent* OtherInventory, const TArray<int32>& ItemIndexes)
+void URancInventoryComponent::GiveItemIndexesTo_Implementation(URancInventoryComponent* OtherInventory, const TArray<int32>& ItemIndexes)
 {
     if (GetOwnerRole() != ROLE_Authority)
     {
@@ -602,7 +601,7 @@ void UElementusInventoryComponent::GiveItemIndexesTo_Implementation(UElementusIn
     GiveItemsTo_Implementation(OtherInventory, Modifiers);
 }
 
-void UElementusInventoryComponent::GetItemsFrom_Implementation(UElementusInventoryComponent* OtherInventory, const TArray<FElementusItemInfo>& Items)
+void URancInventoryComponent::GetItemsFrom_Implementation(URancInventoryComponent* OtherInventory, const TArray<FElementusItemInfo>& Items)
 {
     if (GetOwnerRole() != ROLE_Authority)
     {
@@ -614,13 +613,13 @@ void UElementusInventoryComponent::GetItemsFrom_Implementation(UElementusInvento
         return;
     }
 
-    const TArray<FElementusItemInfo> TradeableItems = UElementusInventoryFunctions::FilterTradeableItems(OtherInventory, this, Items);
+    const TArray<FElementusItemInfo> TradeableItems = URancInventoryFunctions::FilterTradeableItems(OtherInventory, this, Items);
 
-    OtherInventory->UpdateElementusItems(TradeableItems, EElementusInventoryUpdateOperation::Remove);
-    UpdateElementusItems(TradeableItems, EElementusInventoryUpdateOperation::Add);
+    OtherInventory->UpdateElementusItems(TradeableItems, ERancInventoryUpdateOperation::Remove);
+    UpdateElementusItems(TradeableItems, ERancInventoryUpdateOperation::Add);
 }
 
-void UElementusInventoryComponent::GiveItemsTo_Implementation(UElementusInventoryComponent* OtherInventory, const TArray<FElementusItemInfo>& Items)
+void URancInventoryComponent::GiveItemsTo_Implementation(URancInventoryComponent* OtherInventory, const TArray<FElementusItemInfo>& Items)
 {
     if (GetOwnerRole() != ROLE_Authority)
     {
@@ -632,15 +631,15 @@ void UElementusInventoryComponent::GiveItemsTo_Implementation(UElementusInventor
         return;
     }
 
-    const TArray<FElementusItemInfo> TradeableItems = UElementusInventoryFunctions::FilterTradeableItems(this, OtherInventory, Items);
+    const TArray<FElementusItemInfo> TradeableItems = URancInventoryFunctions::FilterTradeableItems(this, OtherInventory, Items);
 
-    UpdateElementusItems(TradeableItems, EElementusInventoryUpdateOperation::Remove);
-    OtherInventory->UpdateElementusItems(TradeableItems, EElementusInventoryUpdateOperation::Add);
+    UpdateElementusItems(TradeableItems, ERancInventoryUpdateOperation::Remove);
+    OtherInventory->UpdateElementusItems(TradeableItems, ERancInventoryUpdateOperation::Add);
 }
 
-void UElementusInventoryComponent::DiscardItemIndexes_Implementation(const TArray<int32>& ItemIndexes)
+void URancInventoryComponent::DiscardItemIndexes_Implementation(const TArray<int32>& ItemIndexes)
 {
-    if (GetOwnerRole() != ROLE_Authority || UElementusInventoryFunctions::HasEmptyParam(ItemIndexes))
+    if (GetOwnerRole() != ROLE_Authority || URancInventoryFunctions::HasEmptyParam(ItemIndexes))
     {
         return;
     }
@@ -657,38 +656,38 @@ void UElementusInventoryComponent::DiscardItemIndexes_Implementation(const TArra
     DiscardItems(Modifiers);
 }
 
-void UElementusInventoryComponent::DiscardItems_Implementation(const TArray<FElementusItemInfo>& Items)
+void URancInventoryComponent::DiscardItems_Implementation(const TArray<FElementusItemInfo>& Items)
 {
-    if (GetOwnerRole() != ROLE_Authority || UElementusInventoryFunctions::HasEmptyParam(Items))
+    if (GetOwnerRole() != ROLE_Authority || URancInventoryFunctions::HasEmptyParam(Items))
     {
         return;
     }
 
-    UpdateElementusItems(Items, EElementusInventoryUpdateOperation::Remove);
+    UpdateElementusItems(Items, ERancInventoryUpdateOperation::Remove);
 }
 
-void UElementusInventoryComponent::AddItems_Implementation(const TArray<FElementusItemInfo>& Items)
+void URancInventoryComponent::AddItems_Implementation(const TArray<FElementusItemInfo>& Items)
 {
-    if (GetOwnerRole() != ROLE_Authority || UElementusInventoryFunctions::HasEmptyParam(Items))
+    if (GetOwnerRole() != ROLE_Authority || URancInventoryFunctions::HasEmptyParam(Items))
     {
         return;
     }
 
-    UpdateElementusItems(Items, EElementusInventoryUpdateOperation::Add);
+    UpdateElementusItems(Items, ERancInventoryUpdateOperation::Add);
 }
 
-void UElementusInventoryComponent::UpdateElementusItems(const TArray<FElementusItemInfo>& Modifiers, const EElementusInventoryUpdateOperation Operation)
+void URancInventoryComponent::UpdateElementusItems(const TArray<FElementusItemInfo>& Modifiers, const ERancInventoryUpdateOperation Operation)
 {
     TArray<FItemModifierData> ModifierDataArr;
 
-    const FString OpStr = Operation == EElementusInventoryUpdateOperation::Add ? "Add" : "Remove";
-    const FString OpPred = Operation == EElementusInventoryUpdateOperation::Add ? "to" : "from";
+    const FString OpStr = Operation == ERancInventoryUpdateOperation::Add ? "Add" : "Remove";
+    const FString OpPred = Operation == ERancInventoryUpdateOperation::Add ? "to" : "from";
 
     uint32 SearchOffset = 0;
     FElementusItemInfo LastCheckedItem;
     for (const FElementusItemInfo& Iterator : Modifiers)
     {
-        UE_LOG(LogElementusInventory_Internal, Display, TEXT("%s: %s %d item(s) with name '%s' %s inventory"), *FString(__func__), *OpStr, Iterator.Quantity, *Iterator.ItemId.ToString(), *OpPred);
+        UE_LOG(LogRancInventory_Internal, Display, TEXT("%s: %s %d item(s) with name '%s' %s inventory"), *FString(__func__), *OpStr, Iterator.Quantity, *Iterator.ItemId.ToString(), *OpPred);
 
         if (Iterator != LastCheckedItem)
         {
@@ -696,7 +695,7 @@ void UElementusInventoryComponent::UpdateElementusItems(const TArray<FElementusI
         }
 
         int32 Index;
-        if (FindFirstItemIndexWithInfo(Iterator, Index, FGameplayTagContainer::EmptyContainer, SearchOffset) && Operation == EElementusInventoryUpdateOperation::Remove)
+        if (FindFirstItemIndexWithInfo(Iterator, Index, FGameplayTagContainer::EmptyContainer, SearchOffset) && Operation == ERancInventoryUpdateOperation::Remove)
         {
             SearchOffset = Index + 1u;
         }
@@ -707,11 +706,11 @@ void UElementusInventoryComponent::UpdateElementusItems(const TArray<FElementusI
 
     switch (Operation)
     {
-    case EElementusInventoryUpdateOperation::Add:
+    case ERancInventoryUpdateOperation::Add:
         Server_ProcessInventoryAddition_Internal(ModifierDataArr);
         break;
 
-    case EElementusInventoryUpdateOperation::Remove:
+    case ERancInventoryUpdateOperation::Remove:
         Server_ProcessInventoryRemoval_Internal(ModifierDataArr);
         break;
 
@@ -720,7 +719,7 @@ void UElementusInventoryComponent::UpdateElementusItems(const TArray<FElementusI
     }
 }
 
-void UElementusInventoryComponent::Server_ProcessInventoryAddition_Internal_Implementation(const TArray<FItemModifierData>& Modifiers)
+void URancInventoryComponent::Server_ProcessInventoryAddition_Internal_Implementation(const TArray<FItemModifierData>& Modifiers)
 {
     if (GetOwnerRole() != ROLE_Authority)
     {
@@ -729,7 +728,7 @@ void UElementusInventoryComponent::Server_ProcessInventoryAddition_Internal_Impl
 
     for (const FItemModifierData& Iterator : Modifiers)
     {
-        if (const bool bIsStackable = UElementusInventoryFunctions::IsItemStackable(Iterator.ItemInfo);
+        if (const bool bIsStackable = URancInventoryFunctions::IsItemStackable(Iterator.ItemInfo);
             bIsStackable && Iterator.Index != INDEX_NONE)
         {
             ElementusItems[Iterator.Index].Quantity += Iterator.ItemInfo.Quantity;
@@ -752,7 +751,7 @@ void UElementusInventoryComponent::Server_ProcessInventoryAddition_Internal_Impl
     NotifyInventoryChange();
 }
 
-void UElementusInventoryComponent::Server_ProcessInventoryRemoval_Internal_Implementation(const TArray<FItemModifierData>& Modifiers)
+void URancInventoryComponent::Server_ProcessInventoryRemoval_Internal_Implementation(const TArray<FItemModifierData>& Modifiers)
 {
     if (GetOwnerRole() != ROLE_Authority)
     {
@@ -763,7 +762,7 @@ void UElementusInventoryComponent::Server_ProcessInventoryRemoval_Internal_Imple
     {
         if (Iterator.Index == INDEX_NONE || Iterator.Index > ElementusItems.Num())
         {
-            UE_LOG(LogElementusInventory_Internal, Warning, TEXT("%s: Item with name '%s' not found in inventory"), *FString(__func__), *Iterator.ItemInfo.ItemId.ToString());
+            UE_LOG(LogRancInventory_Internal, Warning, TEXT("%s: Item with name '%s' not found in inventory"), *FString(__func__), *Iterator.ItemInfo.ItemId.ToString());
 
             continue;
         }
@@ -794,13 +793,13 @@ void UElementusInventoryComponent::Server_ProcessInventoryRemoval_Internal_Imple
     NotifyInventoryChange();
 }
 
-void UElementusInventoryComponent::OnRep_ElementusItems()
+void URancInventoryComponent::OnRep_ElementusItems()
 {
-    if (const int32 LastValidIndex = ElementusItems.FindLastByPredicate([](const FElementusItemInfo& Item) { return UElementusInventoryFunctions::IsItemValid(Item); }); LastValidIndex != INDEX_NONE && ElementusItems.IsValidIndex(LastValidIndex + 1))
+    if (const int32 LastValidIndex = ElementusItems.FindLastByPredicate([](const FElementusItemInfo& Item) { return URancInventoryFunctions::IsItemValid(Item); }); LastValidIndex != INDEX_NONE && ElementusItems.IsValidIndex(LastValidIndex + 1))
     {
         ElementusItems.RemoveAt(LastValidIndex + 1, ElementusItems.Num() - LastValidIndex - 1, false);
     }
-    else if (LastValidIndex == INDEX_NONE && !UElementusInventoryFunctions::HasEmptyParam(ElementusItems))
+    else if (LastValidIndex == INDEX_NONE && !URancInventoryFunctions::HasEmptyParam(ElementusItems))
     {
         ElementusItems.Empty();
     }
@@ -822,22 +821,22 @@ void UElementusInventoryComponent::OnRep_ElementusItems()
     OnInventoryUpdate.Broadcast();
 }
 
-void UElementusInventoryComponent::NotifyInventoryChange()
+void URancInventoryComponent::NotifyInventoryChange()
 {
     if (GetOwnerRole() == ROLE_Authority)
     {
         OnRep_ElementusItems();
     }
 
-    MARK_PROPERTY_DIRTY_FROM_NAME(UElementusInventoryComponent, ElementusItems, this);
+    MARK_PROPERTY_DIRTY_FROM_NAME(URancInventoryComponent, ElementusItems, this);
 }
 
-void UElementusInventoryComponent::UpdateWeight_Implementation()
+void URancInventoryComponent::UpdateWeight_Implementation()
 {
     float NewWeight = 0.f;
     for (const FElementusItemInfo& Iterator : ElementusItems)
     {
-        if (const UElementusItemData* const ItemData = UElementusInventoryFunctions::GetSingleItemDataById(Iterator.ItemId, { "Data" }))
+        if (const UElementusItemData* const ItemData = URancInventoryFunctions::GetSingleItemDataById(Iterator.ItemId, { "Data" }))
         {
             NewWeight += ItemData->ItemWeight * Iterator.Quantity;
         }

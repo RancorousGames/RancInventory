@@ -6,19 +6,19 @@
 
 #include <CoreMinimal.h>
 #include <Engine/DeveloperSettings.h>
-#include "ElementusInventorySettings.generated.h"
+#include "RancInventorySettings.generated.h"
 
 /**
  *
  */
 UCLASS(Config = Plugins, DefaultConfig, meta = (DisplayName = "Elementus Inventory"))
-class ELEMENTUSINVENTORY_API UElementusInventorySettings final : public UDeveloperSettings
+class RANCINVENTORY_API URancInventorySettings final : public UDeveloperSettings
 {
     GENERATED_BODY()
 
 public:
-    explicit UElementusInventorySettings(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
-    static const UElementusInventorySettings* Get();
+    explicit URancInventorySettings(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
+    static const URancInventorySettings* Get();
 
     /* Will print extra internal informations in log - Useful for debugging */
     UPROPERTY(GlobalConfig, EditAnywhere, Category = "Settings", Meta = (DisplayName = "Enable Internal Logs"))

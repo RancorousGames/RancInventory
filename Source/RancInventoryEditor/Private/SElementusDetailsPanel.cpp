@@ -1,9 +1,8 @@
 // Author: Lucas Vilas-Boas
 // Year: 2023
-// Repo: https://github.com/lucoiso/UEElementusInventory
 
 #include "SElementusDetailsPanel.h"
-#include <Management/ElementusInventoryData.h>
+#include <Management/RancInventoryData.h>
 #include <Engine/AssetManager.h>
 
 void SElementusDetailsPanel::CustomizeHeader(const TSharedRef<IPropertyHandle> PropertyHandle, FDetailWidgetRow& HeaderRow, IPropertyTypeCustomizationUtils& CustomizationUtils)

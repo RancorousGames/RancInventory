@@ -1,6 +1,5 @@
 // Author: Lucas Vilas-Boas
 // Year: 2023
-// Repo: https://github.com/lucoiso/UEElementusInventory
 
 #include "SElementusUtils.h"
 #include "ElementusStaticIds.h"

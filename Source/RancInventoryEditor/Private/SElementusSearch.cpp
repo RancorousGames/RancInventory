@@ -1,10 +1,9 @@
 // Author: Lucas Vilas-Boas
 // Year: 2023
-// Repo: https://github.com/lucoiso/UEElementusInventory
 
 #include "SElementusSearch.h"
-#include <Management/ElementusInventoryData.h>
-#include <Management/ElementusInventoryFunctions.h>
+#include <Management/RancInventoryData.h>
+#include <Management/RancInventoryFunctions.h>
 #include <Widgets/Input/SSearchBox.h>
 #include <Widgets/Layout/SUniformGridPanel.h>
 
@@ -38,7 +37,7 @@ TSharedRef<SWidget> SElementusSearch::ConstructContent()
                 .Content()
                 [
                     SNew(STextBlock)
-                        .Text(FText::FromString(UElementusInventoryFunctions::ElementusItemEnumTypeToString(static_cast<EElementusItemType>(Index))))
+                        .Text(FText::FromString(URancInventoryFunctions::ElementusItemEnumTypeToString(static_cast<EElementusItemType>(Index))))
                         .Margin(CheckBoxPadding)
                 ];
         };

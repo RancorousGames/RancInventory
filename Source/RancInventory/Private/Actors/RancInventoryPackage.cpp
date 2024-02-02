@@ -1,21 +1,20 @@
 // Author: Lucas Vilas-Boas
 // Year: 2023
-// Repo: https://github.com/lucoiso/UEElementusInventory
 
-#include "Actors/ElementusInventoryPackage.h"
-#include "Components/ElementusInventoryComponent.h"
-#include "Management/ElementusInventorySettings.h"
-#include "Management/ElementusInventoryFunctions.h"
-#include "Management/ElementusInventoryData.h"
-#include "LogElementusInventory.h"
+#include "Actors/RancInventoryPackage.h"
+#include "Components/RancInventoryComponent.h"
+#include "Management/RancInventorySettings.h"
+#include "Management/RancInventoryFunctions.h"
+#include "Management/RancInventoryData.h"
+#include "LogRancInventory.h"
 #include <Net/UnrealNetwork.h>
 #include <Net/Core/PushModel/PushModel.h>
 
 #ifdef UE_INLINE_GENERATED_CPP_BY_NAME
-#include UE_INLINE_GENERATED_CPP_BY_NAME(ElementusInventoryPackage)
+#include UE_INLINE_GENERATED_CPP_BY_NAME(RancInventoryPackage)
 #endif
 
-AElementusInventoryPackage::AElementusInventoryPackage(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
+ARancInventoryPackage::ARancInventoryPackage(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
     bNetStartup = false;
     bNetLoadOnClient = false;
@@ -26,50 +25,50 @@ AElementusInventoryPackage::AElementusInventoryPackage(const FObjectInitializer&
 
     RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("RootComponent"));
 
-    PackageInventory = CreateDefaultSubobject<UElementusInventoryComponent>(TEXT("PackageInventory"));
+    PackageInventory = CreateDefaultSubobject<URancInventoryComponent>(TEXT("PackageInventory"));
     PackageInventory->SetIsReplicated(true);
 
-    if (const UElementusInventorySettings* const Settings = UElementusInventorySettings::Get())
+    if (const URancInventorySettings* const Settings = URancInventorySettings::Get())
     {
         bDestroyWhenInventoryIsEmpty = Settings->bDestroyWhenInventoryIsEmpty;
     }
 }
 
-void AElementusInventoryPackage::BeginPlay()
+void ARancInventoryPackage::BeginPlay()
 {
     Super::BeginPlay();
 
     SetDestroyOnEmpty(bDestroyWhenInventoryIsEmpty);
 
-    if (bDestroyWhenInventoryIsEmpty && UElementusInventoryFunctions::HasEmptyParam(PackageInventory->GetItemsArray()))
+    if (bDestroyWhenInventoryIsEmpty && URancInventoryFunctions::HasEmptyParam(PackageInventory->GetItemsArray()))
     {
         Destroy();
     }
 }
 
-void AElementusInventoryPackage::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+void ARancInventoryPackage::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
     FDoRepLifetimeParams SharedParams;
     SharedParams.bIsPushBased = true;
 
-    DOREPLIFETIME_WITH_PARAMS_FAST(AElementusInventoryPackage, PackageInventory, SharedParams);
+    DOREPLIFETIME_WITH_PARAMS_FAST(ARancInventoryPackage, PackageInventory, SharedParams);
 }
 
-void AElementusInventoryPackage::PutItemIntoPackage(const TArray<FElementusItemInfo> ItemInfo, UElementusInventoryComponent* FromInventory)
+void ARancInventoryPackage::PutItemIntoPackage(const TArray<FElementusItemInfo> ItemInfo, URancInventoryComponent* FromInventory)
 {
-    UElementusInventoryFunctions::TradeElementusItem(ItemInfo, FromInventory, PackageInventory);
-    MARK_PROPERTY_DIRTY_FROM_NAME(AElementusInventoryPackage, PackageInventory, this);
+    URancInventoryFunctions::TradeElementusItem(ItemInfo, FromInventory, PackageInventory);
+    MARK_PROPERTY_DIRTY_FROM_NAME(ARancInventoryPackage, PackageInventory, this);
 }
 
-void AElementusInventoryPackage::GetItemFromPackage(const TArray<FElementusItemInfo> ItemInfo, UElementusInventoryComponent* ToInventory)
+void ARancInventoryPackage::GetItemFromPackage(const TArray<FElementusItemInfo> ItemInfo, URancInventoryComponent* ToInventory)
 {
-    UElementusInventoryFunctions::TradeElementusItem(ItemInfo, PackageInventory, ToInventory);
-    MARK_PROPERTY_DIRTY_FROM_NAME(AElementusInventoryPackage, PackageInventory, this);
+    URancInventoryFunctions::TradeElementusItem(ItemInfo, PackageInventory, ToInventory);
+    MARK_PROPERTY_DIRTY_FROM_NAME(ARancInventoryPackage, PackageInventory, this);
 }
 
-void AElementusInventoryPackage::SetDestroyOnEmpty(const bool bDestroy)
+void ARancInventoryPackage::SetDestroyOnEmpty(const bool bDestroy)
 {
     if (bDestroyWhenInventoryIsEmpty == bDestroy)
     {
@@ -77,24 +76,24 @@ void AElementusInventoryPackage::SetDestroyOnEmpty(const bool bDestroy)
     }
 
     bDestroyWhenInventoryIsEmpty = bDestroy;
-    FElementusInventoryEmpty Delegate = PackageInventory->OnInventoryEmpty;
+    FRancInventoryEmpty Delegate = PackageInventory->OnInventoryEmpty;
 
-    if (const bool bIsAlreadyBound = Delegate.IsAlreadyBound(this, &AElementusInventoryPackage::BeginPackageDestruction); bDestroy && !bIsAlreadyBound)
+    if (const bool bIsAlreadyBound = Delegate.IsAlreadyBound(this, &ARancInventoryPackage::BeginPackageDestruction); bDestroy && !bIsAlreadyBound)
     {
-        Delegate.AddDynamic(this, &AElementusInventoryPackage::BeginPackageDestruction);
+        Delegate.AddDynamic(this, &ARancInventoryPackage::BeginPackageDestruction);
     }
     else if (!bDestroy && bIsAlreadyBound)
     {
-        Delegate.RemoveDynamic(this, &AElementusInventoryPackage::BeginPackageDestruction);
+        Delegate.RemoveDynamic(this, &ARancInventoryPackage::BeginPackageDestruction);
     }
 }
 
-bool AElementusInventoryPackage::GetDestroyOnEmpty() const
+bool ARancInventoryPackage::GetDestroyOnEmpty() const
 {
     return bDestroyWhenInventoryIsEmpty;
 }
 
-void AElementusInventoryPackage::BeginPackageDestruction_Implementation()
+void ARancInventoryPackage::BeginPackageDestruction_Implementation()
 {
     // Check if this option is still active before the destruction
     if (bDestroyWhenInventoryIsEmpty)
@@ -103,6 +102,6 @@ void AElementusInventoryPackage::BeginPackageDestruction_Implementation()
     }
     else
     {
-        UE_LOG(LogElementusInventory_Internal, Warning, TEXT("ElementusInventory - %s: Package %s was not destroyed because the " "option 'bDestroyWhenInventoryIsEmpty' was disabled"), *FString(__func__), *GetName());
+        UE_LOG(LogRancInventory_Internal, Warning, TEXT("RancInventory - %s: Package %s was not destroyed because the " "option 'bDestroyWhenInventoryIsEmpty' was disabled"), *FString(__func__), *GetName());
     }
 }

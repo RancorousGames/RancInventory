@@ -1,6 +1,5 @@
 // Author: Lucas Vilas-Boas
 // Year: 2023
-// Repo: https://github.com/lucoiso/UEElementusInventory
 
 #pragma once
 
@@ -10,5 +9,5 @@
  *
  */
 
-DECLARE_LOG_CATEGORY_EXTERN(LogElementusInventory, Display, All);
-DECLARE_LOG_CATEGORY_EXTERN(LogElementusInventory_Internal, NoLogging, All);
+DECLARE_LOG_CATEGORY_EXTERN(LogRancInventory, Display, All);
+DECLARE_LOG_CATEGORY_EXTERN(LogRancInventory_Internal, NoLogging, All);

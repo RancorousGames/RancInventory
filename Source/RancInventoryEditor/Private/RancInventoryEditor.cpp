@@ -1,8 +1,7 @@
 // Author: Lucas Vilas-Boas
 // Year: 2023
-// Repo: https://github.com/lucoiso/UEElementusInventory
 
-#include "ElementusInventoryEditor.h"
+#include "RancInventoryEditor.h"
 #include "SElementusDetailsPanel.h"
 #include "SElementusFrame.h"
 #include "SElementusItemCreator.h"
@@ -12,11 +11,11 @@
 #include <WorkspaceMenuStructure.h>
 #include <WorkspaceMenuStructureModule.h>
 
-#define LOCTEXT_NAMESPACE "FElementusInventoryEditorModule"
+#define LOCTEXT_NAMESPACE "FRancInventoryEditorModule"
 
-void FElementusInventoryEditorModule::StartupModule()
+void FRancInventoryEditorModule::StartupModule()
 {
-    const auto RegisterDelegate = FSimpleMulticastDelegate::FDelegate::CreateRaw(this, &FElementusInventoryEditorModule::RegisterMenus);
+    const auto RegisterDelegate = FSimpleMulticastDelegate::FDelegate::CreateRaw(this, &FRancInventoryEditorModule::RegisterMenus);
 
     UToolMenus::RegisterStartupCallback(RegisterDelegate);
 
@@ -26,7 +25,7 @@ void FElementusInventoryEditorModule::StartupModule()
     PropertyEditorModule->RegisterCustomPropertyTypeLayout(ItemStackPropertyId, MakeInstanceDelegate);
 }
 
-void FElementusInventoryEditorModule::ShutdownModule()
+void FRancInventoryEditorModule::ShutdownModule()
 {
     UToolMenus::UnRegisterStartupCallback(this);
     UToolMenus::UnregisterOwner(this);
@@ -37,7 +36,7 @@ void FElementusInventoryEditorModule::ShutdownModule()
     PropertyEditorModule->UnregisterCustomPropertyTypeLayout(ItemStackPropertyId);
 }
 
-TSharedRef<SDockTab> FElementusInventoryEditorModule::OnSpawnTab([[maybe_unused]] const FSpawnTabArgs&, const FName TabId) const
+TSharedRef<SDockTab> FRancInventoryEditorModule::OnSpawnTab([[maybe_unused]] const FSpawnTabArgs&, const FName TabId) const
 {
     TSharedPtr<SWidget> OutContent;
 
@@ -62,7 +61,7 @@ TSharedRef<SDockTab> FElementusInventoryEditorModule::OnSpawnTab([[maybe_unused]
     return SNew(SDockTab);
 }
 
-void FElementusInventoryEditorModule::RegisterMenus()
+void FRancInventoryEditorModule::RegisterMenus()
 {
     FToolMenuOwnerScoped OwnerScoped(this);
 
@@ -74,7 +73,7 @@ void FElementusInventoryEditorModule::RegisterMenus()
 
     const TSharedPtr<FWorkspaceItem> Menu = WorkspaceMenu::GetMenuStructure().GetToolsCategory()->AddGroup(LOCTEXT("ElementusCategory", "Elementus"), LOCTEXT("ElementusCategoryTooltip", "Elementus Plugins Tabs"), FSlateIcon(AppStyleName, "InputBindingEditor.LevelViewport"));
 
-    const auto EditorTabSpawnerDelegate = FOnSpawnTab::CreateRaw(this, &FElementusInventoryEditorModule::OnSpawnTab, ElementusEditorTabId);
+    const auto EditorTabSpawnerDelegate = FOnSpawnTab::CreateRaw(this, &FRancInventoryEditorModule::OnSpawnTab, ElementusEditorTabId);
 
     FGlobalTabmanager::Get()->RegisterNomadTabSpawner(ElementusEditorTabId, EditorTabSpawnerDelegate)
         .SetDisplayName(FText::FromString(TEXT("Elementus Inventory Management")))
@@ -82,7 +81,7 @@ void FElementusInventoryEditorModule::RegisterMenus()
         .SetGroup(Menu.ToSharedRef())
         .SetIcon(FSlateIcon(AppStyleName, "Icons.Package"));
 
-    const auto ItemCreatorTabSpawnerDelegate = FOnSpawnTab::CreateRaw(this, &FElementusInventoryEditorModule::OnSpawnTab, ItemCreatorTabId);
+    const auto ItemCreatorTabSpawnerDelegate = FOnSpawnTab::CreateRaw(this, &FRancInventoryEditorModule::OnSpawnTab, ItemCreatorTabId);
 
     FGlobalTabmanager::Get()->RegisterNomadTabSpawner(ItemCreatorTabId, ItemCreatorTabSpawnerDelegate)
         .SetDisplayName(FText::FromString(TEXT("Elementus Item Creator")))
@@ -91,4 +90,4 @@ void FElementusInventoryEditorModule::RegisterMenus()
 }
 #undef LOCTEXT_NAMESPACE
 
-IMPLEMENT_MODULE(FElementusInventoryEditorModule, ElementusInventoryEditor)
+IMPLEMENT_MODULE(FRancInventoryEditorModule, RancInventoryEditor)

@@ -1,12 +1,11 @@
 // Author: Lucas Vilas-Boas
 // Year: 2023
-// Repo: https://github.com/lucoiso/UEElementusInventory
 
 using UnrealBuildTool;
 
-public class ElementusInventoryEditor : ModuleRules
+public class RancInventoryEditor : ModuleRules
 {
-    public ElementusInventoryEditor(ReadOnlyTargetRules Target) : base(Target)
+    public RancInventoryEditor(ReadOnlyTargetRules Target) : base(Target)
     {
         PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
         CppStandard = CppStandardVersion.Cpp17;
@@ -18,7 +17,7 @@ public class ElementusInventoryEditor : ModuleRules
 
         PrivateDependencyModuleNames.AddRange(new[]
         {
-            "ElementusInventory",
+            "RancInventory",
             "InputCore",
             "CoreUObject",
             "UnrealEd",

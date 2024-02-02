@@ -1,17 +1,16 @@
 // Author: Lucas Vilas-Boas
 // Year: 2023
-// Repo: https://github.com/lucoiso/UEElementusInventory
 
 #pragma once
 
 #include <CoreMinimal.h>
 #include <GameplayTagContainer.h>
 #include <Components/ActorComponent.h>
-#include "Management/ElementusInventoryData.h"
-#include "ElementusInventoryComponent.generated.h"
+#include "Management/RancInventoryData.h"
+#include "RancInventoryComponent.generated.h"
 
 UENUM(Category = "Elementus Inventory | Enumerations")
-enum class EElementusInventoryUpdateOperation : uint8
+enum class ERancInventoryUpdateOperation : uint8
 {
     None,
     Add,
@@ -19,7 +18,7 @@ enum class EElementusInventoryUpdateOperation : uint8
 };
 
 UENUM(Category = "Elementus Inventory | Enumerations")
-enum class EElementusInventorySortingMode : uint8
+enum class ERancInventorySortingMode : uint8
 {
     ID,
     Name,
@@ -34,7 +33,7 @@ enum class EElementusInventorySortingMode : uint8
 };
 
 UENUM(Category = "Elementus Inventory | Enumerations")
-enum class EElementusInventorySortingOrientation : uint8
+enum class ERancInventorySortingOrientation : uint8
 {
     Ascending,
     Descending
@@ -59,17 +58,17 @@ struct FItemModifierData
     int32 Index = INDEX_NONE;
 };
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE(FElementusInventoryUpdate);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FRancInventoryUpdate);
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE(FElementusInventoryEmpty);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FRancInventoryEmpty);
 
 UCLASS(Blueprintable, ClassGroup = (Custom), Category = "Elementus Inventory | Classes", EditInlineNew, meta = (BlueprintSpawnableComponent))
-class ELEMENTUSINVENTORY_API UElementusInventoryComponent : public UActorComponent
+class RANCINVENTORY_API URancInventoryComponent : public UActorComponent
 {
     GENERATED_BODY()
 
 public:
-    explicit UElementusInventoryComponent(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
+    explicit URancInventoryComponent(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
 
     /* Experimental parameter to assist using empty slots in the inventory: If true, will replace empty slots with empty item info */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Elementus Inventory")
@@ -93,11 +92,11 @@ public:
 
     /* Called on every inventory update */
     UPROPERTY(BlueprintAssignable, Category = "Elementus Inventory")
-    FElementusInventoryUpdate OnInventoryUpdate;
+    FRancInventoryUpdate OnInventoryUpdate;
 
     /* Called when the inventory is empty */
     UPROPERTY(BlueprintAssignable, Category = "Elementus Inventory")
-    FElementusInventoryEmpty OnInventoryEmpty;
+    FRancInventoryEmpty OnInventoryEmpty;
 
     /* Get the items that this inventory have */
     UFUNCTION(BlueprintPure, Category = "Elementus Inventory")
@@ -165,19 +164,19 @@ public:
 
     /* Get items from another inventory */
     UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Elementus Inventory")
-    void GetItemIndexesFrom(UElementusInventoryComponent* OtherInventory, const TArray<int32>& ItemIndexes);
+    void GetItemIndexesFrom(URancInventoryComponent* OtherInventory, const TArray<int32>& ItemIndexes);
 
     /* Give items to another inventory */
     UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Elementus Inventory")
-    void GiveItemIndexesTo(UElementusInventoryComponent* OtherInventory, const TArray<int32>& ItemIndexes);
+    void GiveItemIndexesTo(URancInventoryComponent* OtherInventory, const TArray<int32>& ItemIndexes);
 
     /* Get items from another inventory */
     UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Elementus Inventory")
-    void GetItemsFrom(UElementusInventoryComponent* OtherInventory, const TArray<FElementusItemInfo>& Items);
+    void GetItemsFrom(URancInventoryComponent* OtherInventory, const TArray<FElementusItemInfo>& Items);
 
     /* Give items to another inventory */
     UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Elementus Inventory")
-    void GiveItemsTo(UElementusInventoryComponent* OtherInventory, const TArray<FElementusItemInfo>& Items);
+    void GiveItemsTo(URancInventoryComponent* OtherInventory, const TArray<FElementusItemInfo>& Items);
 
     /* Discard items from this inventory */
     UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Elementus Inventory")
@@ -192,7 +191,7 @@ public:
     void AddItems(const TArray<FElementusItemInfo>& Items);
 
     UFUNCTION(BlueprintCallable, Category = "Elementus Inventory")
-    void SortInventory(const EElementusInventorySortingMode Mode, const EElementusInventorySortingOrientation Orientation);
+    void SortInventory(const ERancInventorySortingMode Mode, const ERancInventorySortingOrientation Orientation);
 
 protected:
     /* Items that this inventory have */
@@ -222,7 +221,7 @@ private:
 
 public:
     /* Add a item to this inventory */
-    void UpdateElementusItems(const TArray<FElementusItemInfo>& Modifiers, const EElementusInventoryUpdateOperation Operation);
+    void UpdateElementusItems(const TArray<FElementusItemInfo>& Modifiers, const ERancInventoryUpdateOperation Operation);
 
 private:
     UFUNCTION(Server, Reliable)

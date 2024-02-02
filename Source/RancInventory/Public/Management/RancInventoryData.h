@@ -1,17 +1,16 @@
 // Author: Lucas Vilas-Boas
 // Year: 2023
-// Repo: https://github.com/lucoiso/UEElementusInventory
 
 #pragma once
 
 #include <CoreMinimal.h>
 #include <GameplayTagContainer.h>
 #include <Engine/DataAsset.h>
-#include "ElementusInventoryData.generated.h"
+#include "RancInventoryData.generated.h"
 
 class UTexture2D;
 
-constexpr auto ElementusItemDataType = TEXT("ElementusInventory_ItemData");
+constexpr auto ElementusItemDataType = TEXT("RancInventory_ItemData");
 
 UENUM(BlueprintType, Category = "Elementus Inventory | Enumerations")
 enum class EElementusItemType : uint8
@@ -120,7 +119,7 @@ struct FElementusItemInfo
 };
 
 UCLASS(NotBlueprintable, NotPlaceable, Category = "Elementus Inventory | Classes | Data")
-class ELEMENTUSINVENTORY_API UElementusItemData final : public UPrimaryDataAsset
+class RANCINVENTORY_API UElementusItemData final : public UPrimaryDataAsset
 {
     GENERATED_BODY()
 
@@ -129,7 +128,7 @@ public:
 
     FORCEINLINE virtual FPrimaryAssetId GetPrimaryAssetId() const override
     {
-        return FPrimaryAssetId(TEXT("ElementusInventory_ItemData"), *("Item_" + FString::FromInt(ItemId)));
+        return FPrimaryAssetId(TEXT("RancInventory_ItemData"), *("Item_" + FString::FromInt(ItemId)));
     }
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Elementus Inventory", meta = (AssetBundles = "Data"))
