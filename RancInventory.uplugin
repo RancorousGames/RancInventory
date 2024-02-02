@@ -1,14 +1,14 @@
 {
-	"FileVersion": 3,
-	"Version": 7,
-	"VersionName": "1.1.9",
-	"FriendlyName": "Elementus Inventory",
+	"FileVersion": 1,
+	"Version": 1,
+	"VersionName": "1.0",
+	"FriendlyName": "Rancorous Inventory",
 	"Description": "Plugin that provides a Data-Driven Inventory & Items system based on FPrimaryAssetIds and the Asset Manager.",
 	"Category": "Game Features",
-	"CreatedBy": "Lucas Vilas-Boas",
-	"CreatedByURL": "https://github.com/lucoiso",
-	"DocsURL": "https://github.com/lucoiso/UEElementusInventory/wiki",
-	"MarketplaceURL": "com.epicgames.launcher://ue/marketplace/product/ed47993a6b8a49bdb04dfe83939b6361",
+	"CreatedBy": "Rancorous Games",
+	"CreatedByURL": "https://github.com/RancorousGames/RancInventory",
+	"DocsURL": "",
+	"MarketplaceURL": "",
 	"SupportURL": "https://github.com/lucoiso/UEElementusInventory/issues",
 	"CanContainContent": false,
 	"IsBetaVersion": true,
@@ -16,7 +16,7 @@
 	"Installed": false,
 	"Modules": [
 		{
-			"Name": "ElementusInventory",
+			"Name": "RancInventory",
 			"Type": "Runtime",
 			"LoadingPhase": "Default",
 			"WhitelistPlatforms": [
@@ -28,7 +28,7 @@
 			]
 		},
 		{
-			"Name": "ElementusInventoryEditor",
+			"Name": "RancInventoryEditor",
 			"Type": "Editor",
 			"LoadingPhase": "Default",
 			"PlatformAllowList": [
