@@ -10,7 +10,7 @@
 static const FName ColumnId_PrimaryIdLabel("PrimaryAssetId");
 static const FName ColumnId_ItemIdLabel("Id");
 static const FName ColumnId_NameLabel("Name");
-static const FName ColumnId_TypeLabel("Type");
+static const FName ColumnId_TypeLabel("Primary Type");
 static const FName ColumnId_ObjectLabel("Object");
 static const FName ColumnId_ClassLabel("Class");
 static const FName ColumnId_ValueLabel("Value");
@@ -56,7 +56,7 @@ protected:
 
         if (ColumnName == ColumnId_ItemIdLabel)
         {
-            return TextBlockCreator_Lambda(FText::FromString(FString::FromInt(Item->Id)));
+            return TextBlockCreator_Lambda(FText::FromString(*Item->Id.ToString()));
         }
 
         if (ColumnName == ColumnId_NameLabel)
@@ -66,7 +66,7 @@ protected:
 
         if (ColumnName == ColumnId_TypeLabel)
         {
-            return TextBlockCreator_Lambda(FText::FromString(URancInventoryFunctions::RancItemEnumTypeToString(Item->Type)));
+            return TextBlockCreator_Lambda(FText::FromString(*Item->Id.ToString()));
         }
 
         if (ColumnName == ColumnId_ObjectLabel)
@@ -110,15 +110,24 @@ void SFRancInventoryTable::Construct([[maybe_unused]] const FArguments&)
                 .OnSort(this, &SFRancInventoryTable::OnColumnSort)
                 .HeaderComboVisibility(EHeaderComboVisibility::OnHover);
         };
+    
+    const auto HeaderColumnCreatorNoSort_Lambda = [this](const FName& ColumnId, const FString& ColumnText, const float InWidth = 1.f) -> const SHeaderRow::FColumn::FArguments
+    {
+        return SHeaderRow::Column(ColumnId)
+            .DefaultLabel(FText::FromString(ColumnText))
+            .FillWidth(InWidth)
+            .SortMode(EColumnSortMode::None)
+            .HeaderComboVisibility(EHeaderComboVisibility::OnHover);
+    };
 
-    HeaderRow->AddColumn(HeaderColumnCreator_Lambda(ColumnId_PrimaryIdLabel, "Primary Asset Id", 0.75f));
-    HeaderRow->AddColumn(HeaderColumnCreator_Lambda(ColumnId_ItemIdLabel, "Id"));
+    //HeaderRow->AddColumn(HeaderColumnCreator_Lambda(ColumnId_PrimaryIdLabel, "Primary Asset Id", 0.75f));
+    HeaderRow->AddColumn(HeaderColumnCreator_Lambda(ColumnId_ItemIdLabel, "Id", 1.25f));
     HeaderRow->AddColumn(HeaderColumnCreator_Lambda(ColumnId_NameLabel, "Name"));
-    HeaderRow->AddColumn(HeaderColumnCreator_Lambda(ColumnId_TypeLabel, "Type"));
+    HeaderRow->AddColumn(HeaderColumnCreator_Lambda(ColumnId_TypeLabel, "Primary Type"));
     HeaderRow->AddColumn(HeaderColumnCreator_Lambda(ColumnId_ObjectLabel, "Object"));
     HeaderRow->AddColumn(HeaderColumnCreator_Lambda(ColumnId_ClassLabel, "Class"));
-    HeaderRow->AddColumn(HeaderColumnCreator_Lambda(ColumnId_ValueLabel, "Value"));
-    HeaderRow->AddColumn(HeaderColumnCreator_Lambda(ColumnId_WeightLabel, "Weight"));
+    HeaderRow->AddColumn(HeaderColumnCreator_Lambda(ColumnId_ValueLabel, "Value", 0.6f));
+    HeaderRow->AddColumn(HeaderColumnCreator_Lambda(ColumnId_WeightLabel, "Weight", 0.6f));
 
     ChildSlot
         [
@@ -157,7 +166,7 @@ void SFRancInventoryTable::OnTableItemDoubleClicked(const FRancItemPtr RancItemR
 {
     if (const UAssetManager* const AssetManager = UAssetManager::GetIfValid())
     {
-        UAssetEditorSubsystem* const AssetEditorSubsystem = NewObject<UAssetEditorSubsystem>();
+        UAssetEditorSubsystem* const AssetEditorSubsystem = GEditor->GetEditorSubsystem<UAssetEditorSubsystem>();
         const FSoftObjectPath AssetPath = AssetManager->GetPrimaryAssetPath(RancItemRowData->PrimaryAssetId);
 
         AssetEditorSubsystem->OpenEditorForAsset(AssetPath.ToString());
@@ -171,15 +180,18 @@ EVisibility SFRancInventoryTable::GetIsVisible(const FRancItemPtr InItem) const
     if ([&InItem](const FString& InText) -> const bool
         {
             return InText.IsEmpty()
-                || InItem->PrimaryAssetId.ToString().Contains(InText, ESearchCase::IgnoreCase)
-                || FString::FromInt(InItem->Id).Contains(InText, ESearchCase::IgnoreCase)
+                || InItem->Id.ToString().Contains(InText, ESearchCase::IgnoreCase)
                 || InItem->Name.ToString().Contains(InText, ESearchCase::IgnoreCase)
-                || URancInventoryFunctions::RancItemEnumTypeToString(InItem->Type).Contains(InText, ESearchCase::IgnoreCase)
+                || InItem->Type.ToString().Contains(InText, ESearchCase::IgnoreCase)
+                || InItem->Categories.ToString().Contains(InText, ESearchCase::IgnoreCase)
                 || InItem->Class.ToString().Contains(InText, ESearchCase::IgnoreCase)
                 || FString::SanitizeFloat(InItem->Value).Contains(InText, ESearchCase::IgnoreCase)
                 || FString::SanitizeFloat(InItem->Weight).Contains(InText, ESearchCase::IgnoreCase);
         }(SearchText.IsValid() ? SearchText->ToString() : FString())
-                && (AllowedTypes.Contains(static_cast<uint8>(InItem->Type)) || URancInventoryFunctions::HasEmptyParam(AllowedTypes)))
+                && (InItem->Categories.HasAny(AllowedTypes) ||
+                    AllowedTypes.IsEmpty() ||
+                    AllowedTypes.HasTag(InItem->Id) ||
+                    AllowedTypes.HasTag(InItem->Type)))
     {
         Output = EVisibility::Visible;
     }
@@ -197,21 +209,9 @@ void SFRancInventoryTable::OnSearchTextModified(const FText& InText)
     EdListView->RebuildList();
 }
 
-void SFRancInventoryTable::OnSearchTypeModified(const ECheckBoxState InState, const int32 InType)
+void SFRancInventoryTable::OnSearchCategoriesModified(FGameplayTagContainer InCategories)
 {
-    switch (InState)
-    {
-    case ECheckBoxState::Checked:
-        AllowedTypes.Add(InType);
-        break;
-    case ECheckBoxState::Unchecked:
-        AllowedTypes.Remove(InType);
-        break;
-    case ECheckBoxState::Undetermined:
-        AllowedTypes.Remove(InType);
-        break;
-    }
-
+    AllowedTypes = InCategories;
     EdListView->RequestListRefresh();
 }
 
@@ -269,7 +269,7 @@ void SFRancInventoryTable::OnColumnSort([[maybe_unused]] const EColumnSortPriori
 
             if (ColumnName == ColumnId_ItemIdLabel)
             {
-                return Compare_Lambda(Val1->Id, Val2->Id);
+                return Compare_Lambda(Val1->Id.ToString(), Val2->Id.ToString());
             }
 
             if (ColumnName == ColumnId_NameLabel)
@@ -279,9 +279,9 @@ void SFRancInventoryTable::OnColumnSort([[maybe_unused]] const EColumnSortPriori
 
             if (ColumnName == ColumnId_TypeLabel)
             {
-                const auto ItemTypeToString_Lambda = [&](const ERancItemType& InType) -> FString
+                const auto ItemTypeToString_Lambda = [&](const FGameplayTag InType) -> FString
                     {
-                        return *URancInventoryFunctions::RancItemEnumTypeToString(InType);
+                        return InType.ToString();
                     };
 
                 return Compare_Lambda(ItemTypeToString_Lambda(Val1->Type), ItemTypeToString_Lambda(Val2->Type));

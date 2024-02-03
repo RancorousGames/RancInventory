@@ -13,6 +13,7 @@
 #include <Widgets/Input/SNumericEntryBox.h>
 #include <Widgets/Input/SMultiLineEditableTextBox.h>
 #include <Widgets/Input/STextComboBox.h>
+#include <SGameplayTagContainerCombo.h>
 #include <Widgets/Layout/SScrollBox.h>
 #include <Widgets/Layout/SGridPanel.h>
 
@@ -22,7 +23,6 @@
 
 void SRancItemCreator::Construct([[maybe_unused]] const FArguments&)
 {
-    ItemTypesArr = GetEnumValuesAsStringArray();
     UpdateFolders();
 
     ChildSlot
@@ -72,16 +72,10 @@ TSharedRef<SWidget> SRancItemCreator::ConstructContent()
                 + SGridPanel::Slot(1, 0)
                 .Padding(SlotPadding)
                 [
-                    SNew(SNumericEntryBox<int32>)
-                        .AllowSpin(false)
-                        .MinValue(1)
-                        .Value_Lambda([this] { return ItemId; })
-                        .OnValueChanged_Lambda(
-                            [this](const int32 InValue)
-                            {
-                                ItemId = InValue;
-                            }
-                        )
+                    SNew(SGameplayTagContainerCombo)
+                    .Filter(FString("Item, Items, RancInventory, Inventory"))
+		            .TagContainer(this, &SRancItemCreator::GetIdTagContainer)
+		            .OnTagContainerChanged(this, &SRancItemCreator::OnIdTagContainerChanged)
                 ]
                 + SGridPanel::Slot(0, 1)
                 .Padding(SlotPadding)
@@ -161,16 +155,28 @@ TSharedRef<SWidget> SRancItemCreator::ConstructContent()
                 + SGridPanel::Slot(1, 5)
                 .Padding(SlotPadding)
                 [
-                    SNew(STextComboBox)
-                        .OptionsSource(&ItemTypesArr)
-                        .OnSelectionChanged_Lambda(
-                            [this](const FTextDisplayStringPtr& InStr, [[maybe_unused]] ESelectInfo::Type)
-                            {
-                                ItemType = ItemTypesArr.Find(InStr);
-                            }
-                        )
+                    SNew(SGameplayTagContainerCombo)
+                    .Filter(FString("Item, Items, RancInventory, Inventory, Types, ItemTypes"))
+                    .TagContainer(this, &SRancItemCreator::GetTypeTagContainer)
+                    .OnTagContainerChanged(this, &SRancItemCreator::OnTypeTagContainerChanged)
                 ]
                 + SGridPanel::Slot(0, 6)
+                .Padding(SlotPadding)
+                [
+                    SNew(STextBlock)
+                        .Text(FText::FromString(TEXT("Categories")))
+                        .TextStyle(FAppStyle::Get(), "PropertyEditor.AssetClass")
+                        .Font(FAppStyle::Get().GetFontStyle("PropertyWindow.NormalFont"))
+                ]
+                + SGridPanel::Slot(1, 6)
+                .Padding(SlotPadding)
+                [
+                    SNew(SGameplayTagContainerCombo)
+                    .Filter(FString("Item, Items, RancInventory, Inventory, Categories, ItemCategories"))
+                    .TagContainer(this, &SRancItemCreator::GetCategoryTagContainer)
+                    .OnTagContainerChanged(this, &SRancItemCreator::OnCategoryTagContainerChanged)
+                ]
+                + SGridPanel::Slot(0, 7)
                 .Padding(SlotPadding)
                 [
                     SNew(STextBlock)
@@ -178,7 +184,7 @@ TSharedRef<SWidget> SRancItemCreator::ConstructContent()
                         .TextStyle(FAppStyle::Get(), "PropertyEditor.AssetClass")
                         .Font(FAppStyle::Get().GetFontStyle("PropertyWindow.NormalFont"))
                 ]
-                + SGridPanel::Slot(1, 6)
+                + SGridPanel::Slot(1, 7)
                 .Padding(SlotPadding)
                 [
                     SNew(SCheckBox)
@@ -190,7 +196,7 @@ TSharedRef<SWidget> SRancItemCreator::ConstructContent()
                             }
                         )
                 ]
-                + SGridPanel::Slot(0, 7)
+                + SGridPanel::Slot(0, 8)
                 .Padding(SlotPadding)
                 [
                     SNew(STextBlock)
@@ -198,7 +204,7 @@ TSharedRef<SWidget> SRancItemCreator::ConstructContent()
                         .TextStyle(FAppStyle::Get(), "PropertyEditor.AssetClass")
                         .Font(FAppStyle::Get().GetFontStyle("PropertyWindow.NormalFont"))
                 ]
-                + SGridPanel::Slot(1, 7)
+                + SGridPanel::Slot(1, 8)
                 .Padding(SlotPadding)
                 [
                     SNew(SNumericEntryBox<float>)
@@ -212,7 +218,7 @@ TSharedRef<SWidget> SRancItemCreator::ConstructContent()
                             }
                         )
                 ]
-                + SGridPanel::Slot(0, 8)
+                + SGridPanel::Slot(0, 9)
                 .Padding(SlotPadding)
                 [
                     SNew(STextBlock)
@@ -220,7 +226,7 @@ TSharedRef<SWidget> SRancItemCreator::ConstructContent()
                         .TextStyle(FAppStyle::Get(), "PropertyEditor.AssetClass")
                         .Font(FAppStyle::Get().GetFontStyle("PropertyWindow.NormalFont"))
                 ]
-                + SGridPanel::Slot(1, 8)
+                + SGridPanel::Slot(1, 9)
                 .Padding(SlotPadding)
                 [
                     SNew(SNumericEntryBox<float>)
@@ -234,7 +240,7 @@ TSharedRef<SWidget> SRancItemCreator::ConstructContent()
                             }
                         )
                 ]
-                + SGridPanel::Slot(0, 9)
+                + SGridPanel::Slot(0, 10)
                 .Padding(SlotPadding)
                 [
                     SNew(STextBlock)
@@ -242,23 +248,10 @@ TSharedRef<SWidget> SRancItemCreator::ConstructContent()
                         .TextStyle(FAppStyle::Get(), "PropertyEditor.AssetClass")
                         .Font(FAppStyle::Get().GetFontStyle("PropertyWindow.NormalFont"))
                 ]
-                + SGridPanel::Slot(1, 9)
-                .Padding(SlotPadding)
-                [
-                    ObjEntryBoxCreator_Lambda(UTexture2D::StaticClass(), 1)
-                ]
-                + SGridPanel::Slot(0, 10)
-                .Padding(SlotPadding)
-                [
-                    SNew(STextBlock)
-                        .Text(FText::FromString(TEXT("Image")))
-                        .TextStyle(FAppStyle::Get(), "PropertyEditor.AssetClass")
-                        .Font(FAppStyle::Get().GetFontStyle("PropertyWindow.NormalFont"))
-                ]
                 + SGridPanel::Slot(1, 10)
                 .Padding(SlotPadding)
                 [
-                    ObjEntryBoxCreator_Lambda(UTexture2D::StaticClass(), 2)
+                    ObjEntryBoxCreator_Lambda(UTexture2D::StaticClass(), 1)
                 ]
                 + SGridPanel::Slot(0, 11)
                 .Padding(SlotPadding)
@@ -342,6 +335,56 @@ TSharedRef<SWidget> SRancItemCreator::ConstructContent()
         ];
 }
 
+void SRancItemCreator::OnIdTagContainerChanged(const FGameplayTagContainer& NewTagContainer)
+{
+    const auto FirstTag = NewTagContainer.First();
+    if (FirstTag.IsValid())
+    {
+        ItemId = FirstTag;
+    }
+    else
+    {
+        ItemId = FGameplayTag();
+    }
+}
+
+FGameplayTagContainer SRancItemCreator::GetIdTagContainer() const
+{
+    FGameplayTagContainer  ItemTypeAsContainer;
+    ItemTypeAsContainer.AddTag(ItemId);
+    return ItemTypeAsContainer;
+}
+
+void SRancItemCreator::OnTypeTagContainerChanged(const FGameplayTagContainer& NewTagContainer)
+{
+    const auto FirstTag = NewTagContainer.First();
+    if (FirstTag.IsValid())
+    {
+        ItemType = FirstTag;
+    }
+    else
+    {
+        ItemType = FGameplayTag();
+    }
+}
+
+FGameplayTagContainer SRancItemCreator::GetTypeTagContainer() const
+{
+    FGameplayTagContainer  ItemIdAsContainer;
+    ItemIdAsContainer.AddTag(ItemType);
+    return ItemIdAsContainer;
+}
+
+void SRancItemCreator::OnCategoryTagContainerChanged(const FGameplayTagContainer& NewItemCategories)
+{
+    ItemCategories = NewItemCategories;
+}
+
+FGameplayTagContainer SRancItemCreator::GetCategoryTagContainer() const
+{
+    return ItemCategories;
+}
+
 void SRancItemCreator::OnObjChanged(const FAssetData& AssetData, const int32 ObjId)
 {
     ObjectMap.FindOrAdd(ObjId) = AssetData.GetAsset();
@@ -406,12 +449,12 @@ FReply SRancItemCreator::HandleCreateItemButtonClicked() const
         ItemData->ItemClass = TSoftClassPtr<UClass>(ItemClass.Get());
         ItemData->ItemName = ItemName;
         ItemData->ItemDescription = ItemDescription;
-        ItemData->ItemType = static_cast<ERancItemType>(ItemType);
+        ItemData->ItemPrimaryType = ItemType;
+        ItemData->ItemCategories = ItemCategories;
         ItemData->bIsStackable = bIsStackable;
         ItemData->ItemValue = ItemValue;
         ItemData->ItemWeight = ItemWeight;
         ItemData->ItemIcon = Cast<UTexture2D>(ObjectMap.FindRef(1));
-        ItemData->ItemImage = Cast<UTexture2D>(ObjectMap.FindRef(2));
 
         TArray<FAssetData> SyncAssets;
         SyncAssets.Add(FAssetData(ItemData));
@@ -434,21 +477,10 @@ FReply SRancItemCreator::HandleCreateItemButtonClicked() const
 
 bool SRancItemCreator::IsCreateEnabled() const
 {
-    if (const UAssetManager* const AssetManager = UAssetManager::GetIfValid())
+    if (const UAssetManager* const AssetManager = UAssetManager::GetIfInitialized())
     {
-        return ItemId != 0 && !AssetManager->GetPrimaryAssetPath(FPrimaryAssetId(RancItemDataType, *("Item_" + FString::FromInt(ItemId)))).IsValid();
+        return ItemId.IsValid() && !AssetManager->GetPrimaryAssetPath(FPrimaryAssetId(RancItemDataType, *ItemId.ToString())).IsValid();
     }
 
     return false;
-}
-
-TArray<FTextDisplayStringPtr> SRancItemCreator::GetEnumValuesAsStringArray() const
-{
-    TArray<FTextDisplayStringPtr> EnumValues;
-    for (uint32 iterator = 0; iterator < static_cast<uint32>(ERancItemType::MAX); iterator++)
-    {
-        EnumValues.Add(MakeShared<FString>(URancInventoryFunctions::RancItemEnumTypeToString(static_cast<ERancItemType>(iterator))));
-    }
-
-    return EnumValues;
 }

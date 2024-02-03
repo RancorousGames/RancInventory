@@ -3,19 +3,29 @@
 
 #include "SFRancInventorySearch.h"
 #include <Management/RancInventoryData.h>
-#include <Management/RancInventoryFunctions.h>
 #include <Widgets/Input/SSearchBox.h>
-#include <Widgets/Layout/SUniformGridPanel.h>
+
+#include "SGameplayTagContainerCombo.h"
 
 void SFRancInventorySearch::Construct(const FArguments& InArgs)
 {
-    OnCheckStateChanged = InArgs._OnCheckboxStateChanged;
+    OnCategoriesChangedEvent = InArgs._OnCategoriesChanged;
     OnTextChangedDelegate = InArgs._OnSearchTextChanged;
 
     ChildSlot
         [
             ConstructContent()
         ];
+}
+
+FGameplayTagContainer SFRancInventorySearch::GetSearchTypesTagContainer() const
+{
+    return SearchCategories;
+}
+
+void SFRancInventorySearch::OnSearchTypesTagContainerChanged(const FGameplayTagContainer& GameplayTags)
+{
+    SearchCategories = GameplayTags;
 }
 
 TSharedRef<SWidget> SFRancInventorySearch::ConstructContent()
@@ -25,22 +35,6 @@ TSharedRef<SWidget> SFRancInventorySearch::ConstructContent()
 #endif
 
     constexpr float SlotPadding = 4.f;
-
-    const auto CheckBoxCreator_Lambda = [this](const ERancItemType& InType) -> const TSharedRef<SCheckBox>
-        {
-            constexpr float CheckBoxPadding = 2.f;
-            const int32 Index = static_cast<int32>(InType);
-
-            return SNew(SCheckBox)
-                .Padding(CheckBoxPadding)
-                .OnCheckStateChanged(this, &SFRancInventorySearch::TriggerOnCheckboxStateChanged, Index)
-                .Content()
-                [
-                    SNew(STextBlock)
-                        .Text(FText::FromString(URancInventoryFunctions::RancItemEnumTypeToString(static_cast<ERancItemType>(Index))))
-                        .Margin(CheckBoxPadding)
-                ];
-        };
 
     return SNew(SVerticalBox)
         + SVerticalBox::Slot()
@@ -59,68 +53,19 @@ TSharedRef<SWidget> SFRancInventorySearch::ConstructContent()
         ]
         + SVerticalBox::Slot()
         .AutoHeight()
-        .Padding(SlotPadding)
-        [
-            SNew(SUniformGridPanel)
-                .SlotPadding(1.f)
-                + SUniformGridPanel::Slot(0, 0)
-                [
-                    CheckBoxCreator_Lambda(ERancItemType::Accessory)
-                ]
-                + SUniformGridPanel::Slot(1, 0)
-                [
-                    CheckBoxCreator_Lambda(ERancItemType::Armor)
-                ]
-                + SUniformGridPanel::Slot(0, 1)
-                [
-                    CheckBoxCreator_Lambda(ERancItemType::Weapon)
-                ]
-                + SUniformGridPanel::Slot(1, 1)
-                [
-                    CheckBoxCreator_Lambda(ERancItemType::Consumable)
-                ]
-                + SUniformGridPanel::Slot(0, 2)
-                [
-                    CheckBoxCreator_Lambda(ERancItemType::Material)
-                ]
-                + SUniformGridPanel::Slot(1, 2)
-                [
-                    CheckBoxCreator_Lambda(ERancItemType::Crafting)
-                ]
-                + SUniformGridPanel::Slot(0, 3)
-                [
-                    CheckBoxCreator_Lambda(ERancItemType::Information)
-                ]
-                + SUniformGridPanel::Slot(1, 3)
-                [
-                    CheckBoxCreator_Lambda(ERancItemType::Event)
-                ]
-                + SUniformGridPanel::Slot(0, 4)
-                [
-                    CheckBoxCreator_Lambda(ERancItemType::Quest)
-                ]
-                + SUniformGridPanel::Slot(1, 4)
-                [
-                    CheckBoxCreator_Lambda(ERancItemType::Junk)
-                ]
-                + SUniformGridPanel::Slot(0, 5)
-                [
-                    CheckBoxCreator_Lambda(ERancItemType::Special)
-                ]
-                + SUniformGridPanel::Slot(1, 5)
-                [
-                    CheckBoxCreator_Lambda(ERancItemType::Other)
-                ]
-                + SUniformGridPanel::Slot(0, 6)
-                [
-                    CheckBoxCreator_Lambda(ERancItemType::None)
-                ]
-        ];
+       .Padding(SlotPadding)
+       [
+           SNew(SGameplayTagContainerCombo)
+           .Filter(FString("Item, Items, RancInventory, Inventory, ItemTypes, Types"))
+           .TagContainer(this, &SFRancInventorySearch::GetSearchTypesTagContainer)
+           .OnTagContainerChanged(this, &SFRancInventorySearch::TriggerOnCategoriesChanged)
+       ];
 }
 
-void SFRancInventorySearch::TriggerOnCheckboxStateChanged(const ECheckBoxState NewState, const int32 InType) const
+void SFRancInventorySearch::TriggerOnCategoriesChanged(const FGameplayTagContainer& Categories)
 {
-    OnCheckStateChanged.ExecuteIfBound(NewState, InType);
+    SearchCategories = Categories;
+    OnCategoriesChangedEvent.ExecuteIfBound(Categories);
 }
 
 void SFRancInventorySearch::TriggerOnSearchTextChanged(const FText& InText) const

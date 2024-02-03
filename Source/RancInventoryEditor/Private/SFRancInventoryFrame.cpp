@@ -36,7 +36,7 @@ TSharedRef<SWidget> SFRancInventoryFrame::ConstructContent()
                         [
                             SNew(SFRancInventorySearch)
                                 .OnSearchTextChanged(Table.ToSharedRef(), &SFRancInventoryTable::OnSearchTextModified)
-                                .OnCheckboxStateChanged(Table.ToSharedRef(), &SFRancInventoryTable::OnSearchTypeModified)
+                                .OnCategoriesChanged(Table.ToSharedRef(), &SFRancInventoryTable::OnSearchCategoriesModified)
                         ]
                         + SVerticalBox::Slot()
                         .Padding(SlotPadding)

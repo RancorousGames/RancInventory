@@ -128,11 +128,11 @@ public:
 
     FORCEINLINE virtual FPrimaryAssetId GetPrimaryAssetId() const override
     {
-        return FPrimaryAssetId(TEXT("RancInventory_ItemData"), *("Item_" + FString::FromInt(ItemId)));
+        return FPrimaryAssetId(TEXT("RancInventory_ItemData"), *(ItemId.ToString()));
     }
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ranc Inventory", meta = (AssetBundles = "Data"))
-    int32 ItemId;
+    FGameplayTag ItemId;
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ranc Inventory", meta = (AssetBundles = "SoftData"))
     TSoftObjectPtr<UObject> ItemObject;
@@ -147,7 +147,7 @@ public:
     FText ItemDescription;
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ranc Inventory", meta = (AssetBundles = "Data"))
-    ERancItemType ItemType;
+    FGameplayTag ItemPrimaryType;
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ranc Inventory", meta = (AssetBundles = "Data"))
     bool bIsStackable = true;
@@ -161,9 +161,9 @@ public:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ranc Inventory", meta = (AssetBundles = "UI"))
     TSoftObjectPtr<UTexture2D> ItemIcon;
 
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ranc Inventory", meta = (AssetBundles = "UI"))
-    TSoftObjectPtr<UTexture2D> ItemImage;
-
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ranc Inventory", meta = (AssetBundles = "Data"))
+    FGameplayTagContainer ItemCategories;
+    
     /* Allows to implement custom properties in this item data */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ranc Inventory", meta = (DisplayName = "Custom Metadatas", AssetBundles = "Custom"))
     TMap<FGameplayTag, FName> Metadatas;

@@ -5,9 +5,11 @@
 
 #include <CoreMinimal.h>
 
+#include "GameplayTagContainer.h"
+
 enum class ERancItemType : uint8;
 
-DECLARE_DELEGATE_TwoParams(FOnRancItemCheckStateChanged, ECheckBoxState, int32 ItemType);
+DECLARE_DELEGATE_OneParam(FOnRancItemSearchCategoriesChanged, FGameplayTagContainer);
 
 class SFRancInventorySearch final : public SCompoundWidget
 {
@@ -15,7 +17,7 @@ public:
     SLATE_USER_ARGS(SFRancInventorySearch)
         {
         }
-        SLATE_EVENT(FOnRancItemCheckStateChanged, OnCheckboxStateChanged)
+        SLATE_EVENT(FOnRancItemSearchCategoriesChanged, OnCategoriesChanged)
         SLATE_EVENT(FOnTextChanged, OnSearchTextChanged)
 
     SLATE_END_ARGS()
@@ -23,11 +25,15 @@ public:
     void Construct(const FArguments& InArgs);
 
 private:
+    FGameplayTagContainer GetSearchTypesTagContainer() const;
+    void OnSearchTypesTagContainerChanged(const FGameplayTagContainer& GameplayTags);
+    
     TSharedRef<SWidget> ConstructContent();
 
-    void TriggerOnCheckboxStateChanged(ECheckBoxState NewState, int32 InType) const;
+    void TriggerOnCategoriesChanged(const FGameplayTagContainer& Categories);
     void TriggerOnSearchTextChanged(const FText& InText) const;
 
-    FOnRancItemCheckStateChanged OnCheckStateChanged;
+    FOnRancItemSearchCategoriesChanged OnCategoriesChangedEvent;
     FOnTextChanged OnTextChangedDelegate;
+    FGameplayTagContainer SearchCategories;
 };

@@ -5,6 +5,8 @@
 
 #include <CoreMinimal.h>
 
+#include "GameplayTagContainer.h"
+
 class SRancItemCreator final : public SCompoundWidget
 {
 public:
@@ -18,6 +20,15 @@ public:
 
 private:
     TSharedRef<SWidget> ConstructContent();
+    
+    void OnIdTagContainerChanged(const FGameplayTagContainer& NewTagContainer);
+    FGameplayTagContainer GetIdTagContainer() const;
+    
+    void OnTypeTagContainerChanged(const FGameplayTagContainer& NewTagContainer);
+    FGameplayTagContainer GetTypeTagContainer() const;
+    
+    void OnCategoryTagContainerChanged(const FGameplayTagContainer& NewTagContainer);
+    FGameplayTagContainer GetCategoryTagContainer() const;
 
     FString GetObjPath(const int32 ObjId) const;
     void OnObjChanged(const struct FAssetData& AssetData, const int32 ObjId);
@@ -34,16 +45,16 @@ private:
 
     TMap<int32, TWeakObjectPtr<class UObject>> ObjectMap;
     TSharedPtr<class FAssetThumbnailPool> ImageIcon_ThumbnailPool;
-    TArray<FTextDisplayStringPtr> ItemTypesArr;
     TArray<FTextDisplayStringPtr> AssetFoldersArr;
 
     FName AssetName;
     FName AssetFolder;
-    int32 ItemId = 1;
+    FGameplayTag ItemId;
     TWeakObjectPtr<const class UClass> ItemClass;
     FName ItemName;
     FText ItemDescription;
-    uint8 ItemType = 0;
+    FGameplayTag ItemType;
+    FGameplayTagContainer ItemCategories;
     bool bIsStackable = false;
     float ItemValue = 0.f;
     float ItemWeight = 0.f;

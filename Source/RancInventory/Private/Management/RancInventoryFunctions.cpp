@@ -104,7 +104,7 @@ TArray<URancItemData*> URancInventoryFunctions::SearchRancItemData(const ERancIt
 
         for (URancItemData* const& Iterator : ReturnedValues)
         {
-            UE_LOG(LogRancInventory_Internal, Display, TEXT("%s: Filtering items. Current iteration: id %s and name %s"), *FString(__func__), *FString::FromInt(Iterator->ItemId), *Iterator->ItemName.ToString());
+            UE_LOG(LogRancInventory_Internal, Display, TEXT("%s: Filtering items. Current iteration: id %s and name %s"), *FString(__func__), *Iterator->ItemId.ToString(), *Iterator->ItemName.ToString());
 
             bool bAddItem = false;
             switch (SearchType)
@@ -114,11 +114,11 @@ TArray<URancItemData*> URancInventoryFunctions::SearchRancItemData(const ERancIt
                 break;
 
             case ERancItemSearchType::ID:
-                bAddItem = FString::FromInt(Iterator->ItemId).Contains(SearchString, ESearchCase::IgnoreCase);
+                bAddItem = Iterator->ItemId.ToString().Contains(SearchString, ESearchCase::IgnoreCase);
                 break;
 
             case ERancItemSearchType::Type:
-                bAddItem = RancItemEnumTypeToString(Iterator->ItemType).Contains(SearchString, ESearchCase::IgnoreCase);
+                bAddItem = Iterator->ItemId.ToString().Contains(SearchString, ESearchCase::IgnoreCase);
                 break;
 
             default:
@@ -127,7 +127,7 @@ TArray<URancItemData*> URancInventoryFunctions::SearchRancItemData(const ERancIt
 
             if (bAddItem)
             {
-                UE_LOG(LogRancInventory_Internal, Display, TEXT("%s: Item with id %s and name %s matches the search parameters"), *FString(__func__), *FString::FromInt(Iterator->ItemId), *Iterator->ItemName.ToString());
+                UE_LOG(LogRancInventory_Internal, Display, TEXT("%s: Item with id %s and name %s matches the search parameters"), *FString(__func__), *Iterator->ItemId.ToString(), *Iterator->ItemName.ToString());
 
                 Output.Add(Iterator);
             }

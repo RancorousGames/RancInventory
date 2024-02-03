@@ -162,8 +162,9 @@ void URancInventoryComponent::SortInventory(const ERancInventorySortingMode Mode
         break;
 
     case ERancInventorySortingMode::Type:
+        // A simple sort based on FString´not using SortByOrientation
         RancItems.Sort(
-            [SortByOrientation](const FRancItemInfo& A, const FRancItemInfo& B)
+            [](const FRancItemInfo& A, const FRancItemInfo& B)
             {
                 if (!URancInventoryFunctions::IsItemValid(A))
                 {
@@ -174,7 +175,7 @@ void URancInventoryComponent::SortInventory(const ERancInventorySortingMode Mode
                 {
                     if (const URancItemData* const ItemDataB = URancInventoryFunctions::GetSingleItemDataById(B.ItemId, { "Data" }))
                     {
-                        return SortByOrientation(ItemDataA->ItemType, ItemDataB->ItemType);
+                        return ItemDataA->ItemPrimaryType < ItemDataB->ItemPrimaryType;
                     }
                 }
 

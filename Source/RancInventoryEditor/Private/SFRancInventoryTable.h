@@ -16,7 +16,8 @@ struct FRancItemRowData
         PrimaryAssetId = InPrimaryAssetId;
         Id = ItemData->ItemId;
         Name = ItemData->ItemName;
-        Type = ItemData->ItemType;
+        Type = ItemData->ItemPrimaryType;
+        Categories = ItemData->ItemCategories;
         Class = ItemData->ItemClass.IsValid() ? *ItemData->ItemClass.LoadSynchronous()->GetName() : FName();
         Object = ItemData->ItemObject.IsValid() ? *ItemData->ItemObject.LoadSynchronous()->GetName() : FName();
         Value = ItemData->ItemValue;
@@ -30,9 +31,10 @@ struct FRancItemRowData
     }
 
     FPrimaryAssetId PrimaryAssetId;
-    int32 Id = -1;
+    FGameplayTag Id;
     FName Name = NAME_None;
-    ERancItemType Type = ERancItemType::None;
+    FGameplayTag Type;
+    FGameplayTagContainer Categories;
     FName Class = NAME_None;
     FName Object = NAME_None;
     float Value = -1.f;
@@ -64,12 +66,12 @@ private:
     EColumnSortMode::Type GetColumnSort(const FName ColumnId) const;
     EVisibility GetIsVisible(const FRancItemPtr InItem) const;
     void OnSearchTextModified(const FText& InText);
-    void OnSearchTypeModified(const ECheckBoxState InState, const int32 InType);
+    void OnSearchCategoriesModified(FGameplayTagContainer InCategories);
     void UpdateItemList();
     TArray<FRancItemPtr> GetSelectedItems() const;
 
     TArray<FRancItemPtr> ItemArr;
-    TArray<int32> AllowedTypes;
+    FGameplayTagContainer AllowedTypes;
     TSharedPtr<FText> SearchText;
     FName ColumnBeingSorted = NAME_None;
     EColumnSortMode::Type CurrentSortMode = EColumnSortMode::None;
