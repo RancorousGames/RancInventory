@@ -1,5 +1,4 @@
-// Author: Lucas Vilas-Boas
-// Year: 2023
+// Copyright Rancorous Games, 2023
 
 #include "SFRancInventorySearch.h"
 #include <Management/RancInventoryData.h>
@@ -21,11 +20,6 @@ void SFRancInventorySearch::Construct(const FArguments& InArgs)
 FGameplayTagContainer SFRancInventorySearch::GetSearchTypesTagContainer() const
 {
     return SearchCategories;
-}
-
-void SFRancInventorySearch::OnSearchTypesTagContainerChanged(const FGameplayTagContainer& GameplayTags)
-{
-    SearchCategories = GameplayTags;
 }
 
 TSharedRef<SWidget> SFRancInventorySearch::ConstructContent()
@@ -65,10 +59,12 @@ TSharedRef<SWidget> SFRancInventorySearch::ConstructContent()
 void SFRancInventorySearch::TriggerOnCategoriesChanged(const FGameplayTagContainer& Categories)
 {
     SearchCategories = Categories;
+    // ReSharper disable once CppExpressionWithoutSideEffects
     OnCategoriesChangedEvent.ExecuteIfBound(Categories);
 }
 
 void SFRancInventorySearch::TriggerOnSearchTextChanged(const FText& InText) const
 {
+    // ReSharper disable once CppExpressionWithoutSideEffects
     OnTextChangedDelegate.ExecuteIfBound(InText);
 }

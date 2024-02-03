@@ -66,7 +66,7 @@ private:
     EColumnSortMode::Type GetColumnSort(const FName ColumnId) const;
     EVisibility GetIsVisible(const FRancItemPtr InItem) const;
     void OnSearchTextModified(const FText& InText);
-    void OnSearchCategoriesModified(FGameplayTagContainer InCategories);
+    void OnSearchCategoriesModified(const FGameplayTagContainer& InCategories);
     void UpdateItemList();
     TArray<FRancItemPtr> GetSelectedItems() const;
 

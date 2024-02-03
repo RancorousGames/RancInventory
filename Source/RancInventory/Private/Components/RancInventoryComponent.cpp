@@ -47,7 +47,7 @@ int32 URancInventoryComponent::GetCurrentNumItems() const
 
 int32 URancInventoryComponent::GetMaxNumItems() const
 {
-    return MaxNumItems <= 0 ? MAX_int32 : MaxNumItems;
+    return MaxNumItems <= 0 ? 50 : MaxNumItems;
 }
 
 TArray<FRancItemInfo> URancInventoryComponent::GetItemsArray() const

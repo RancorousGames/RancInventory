@@ -9,7 +9,7 @@
 
 enum class ERancItemType : uint8;
 
-DECLARE_DELEGATE_OneParam(FOnRancItemSearchCategoriesChanged, FGameplayTagContainer);
+DECLARE_DELEGATE_OneParam(FOnRancItemSearchCategoriesChanged, const FGameplayTagContainer&);
 
 class SFRancInventorySearch final : public SCompoundWidget
 {
@@ -26,7 +26,6 @@ public:
 
 private:
     FGameplayTagContainer GetSearchTypesTagContainer() const;
-    void OnSearchTypesTagContainerChanged(const FGameplayTagContainer& GameplayTags);
     
     TSharedRef<SWidget> ConstructContent();
 

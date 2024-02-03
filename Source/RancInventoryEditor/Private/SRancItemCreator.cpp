@@ -350,9 +350,7 @@ void SRancItemCreator::OnIdTagContainerChanged(const FGameplayTagContainer& NewT
 
 FGameplayTagContainer SRancItemCreator::GetIdTagContainer() const
 {
-    FGameplayTagContainer  ItemTypeAsContainer;
-    ItemTypeAsContainer.AddTag(ItemId);
-    return ItemTypeAsContainer;
+    return ItemId.GetSingleTagContainer();
 }
 
 void SRancItemCreator::OnTypeTagContainerChanged(const FGameplayTagContainer& NewTagContainer)
@@ -370,9 +368,7 @@ void SRancItemCreator::OnTypeTagContainerChanged(const FGameplayTagContainer& Ne
 
 FGameplayTagContainer SRancItemCreator::GetTypeTagContainer() const
 {
-    FGameplayTagContainer  ItemIdAsContainer;
-    ItemIdAsContainer.AddTag(ItemType);
-    return ItemIdAsContainer;
+    return ItemType.GetSingleTagContainer();
 }
 
 void SRancItemCreator::OnCategoryTagContainerChanged(const FGameplayTagContainer& NewItemCategories)

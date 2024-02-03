@@ -1,5 +1,4 @@
-// Author: Lucas Vilas-Boas
-// Year: 2023
+// Copyright Rancorous Games, 2023
 
 #include "SFRancInventoryTable.h"
 #include <Management/RancInventoryFunctions.h>
@@ -110,24 +109,15 @@ void SFRancInventoryTable::Construct([[maybe_unused]] const FArguments&)
                 .OnSort(this, &SFRancInventoryTable::OnColumnSort)
                 .HeaderComboVisibility(EHeaderComboVisibility::OnHover);
         };
-    
-    const auto HeaderColumnCreatorNoSort_Lambda = [this](const FName& ColumnId, const FString& ColumnText, const float InWidth = 1.f) -> const SHeaderRow::FColumn::FArguments
-    {
-        return SHeaderRow::Column(ColumnId)
-            .DefaultLabel(FText::FromString(ColumnText))
-            .FillWidth(InWidth)
-            .SortMode(EColumnSortMode::None)
-            .HeaderComboVisibility(EHeaderComboVisibility::OnHover);
-    };
 
     //HeaderRow->AddColumn(HeaderColumnCreator_Lambda(ColumnId_PrimaryIdLabel, "Primary Asset Id", 0.75f));
     HeaderRow->AddColumn(HeaderColumnCreator_Lambda(ColumnId_ItemIdLabel, "Id", 1.25f));
     HeaderRow->AddColumn(HeaderColumnCreator_Lambda(ColumnId_NameLabel, "Name"));
-    HeaderRow->AddColumn(HeaderColumnCreator_Lambda(ColumnId_TypeLabel, "Primary Type"));
+    HeaderRow->AddColumn(HeaderColumnCreator_Lambda(ColumnId_TypeLabel, "Primary Type", 1.25f));
     HeaderRow->AddColumn(HeaderColumnCreator_Lambda(ColumnId_ObjectLabel, "Object"));
     HeaderRow->AddColumn(HeaderColumnCreator_Lambda(ColumnId_ClassLabel, "Class"));
-    HeaderRow->AddColumn(HeaderColumnCreator_Lambda(ColumnId_ValueLabel, "Value", 0.6f));
-    HeaderRow->AddColumn(HeaderColumnCreator_Lambda(ColumnId_WeightLabel, "Weight", 0.6f));
+    HeaderRow->AddColumn(HeaderColumnCreator_Lambda(ColumnId_ValueLabel, "Value", 0.5f));
+    HeaderRow->AddColumn(HeaderColumnCreator_Lambda(ColumnId_WeightLabel, "Weight", 0.5f));
 
     ChildSlot
         [
@@ -162,9 +152,10 @@ TSharedRef<ITableRow> SFRancInventoryTable::OnGenerateWidgetForList(const FRancI
         .HightlightTextSource(SearchText);
 }
 
+// ReSharper disable once CppMemberFunctionMayBeStatic - This function is used by the Slate UI system
 void SFRancInventoryTable::OnTableItemDoubleClicked(const FRancItemPtr RancItemRowData) const
 {
-    if (const UAssetManager* const AssetManager = UAssetManager::GetIfValid())
+    if (const UAssetManager* const AssetManager = UAssetManager::GetIfInitialized())
     {
         UAssetEditorSubsystem* const AssetEditorSubsystem = GEditor->GetEditorSubsystem<UAssetEditorSubsystem>();
         const FSoftObjectPath AssetPath = AssetManager->GetPrimaryAssetPath(RancItemRowData->PrimaryAssetId);
@@ -209,7 +200,7 @@ void SFRancInventoryTable::OnSearchTextModified(const FText& InText)
     EdListView->RebuildList();
 }
 
-void SFRancInventoryTable::OnSearchCategoriesModified(FGameplayTagContainer InCategories)
+void SFRancInventoryTable::OnSearchCategoriesModified(const FGameplayTagContainer& InCategories)
 {
     AllowedTypes = InCategories;
     EdListView->RequestListRefresh();
@@ -226,7 +217,7 @@ void SFRancInventoryTable::UpdateItemList()
 
     EdListView->RequestListRefresh();
 
-    if (const UAssetManager* const AssetManager = UAssetManager::GetIfValid(); IsValid(AssetManager) && AssetManager->HasInitialScanCompleted() && URancInventoryFunctions::HasEmptyParam(ItemArr))
+    if (const UAssetManager* const AssetManager = UAssetManager::GetIfInitialized(); IsValid(AssetManager) && AssetManager->HasInitialScanCompleted() && URancInventoryFunctions::HasEmptyParam(ItemArr))
     {
         FMessageDialog::Open(EAppMsgType::Ok, FText::FromString(TEXT("Asset Manager could not find any Ranc Items. Please check your Asset Manager settings.")));
     }

@@ -1,5 +1,4 @@
-// Author: Lucas Vilas-Boas
-// Year: 2023
+// Copyright Rancorous Games, 2023
 
 #pragma once
 
@@ -119,7 +118,7 @@ struct FRancItemInfo
 };
 
 UCLASS(NotBlueprintable, NotPlaceable, Category = "Ranc Inventory | Classes | Data")
-class RANCINVENTORY_API URancItemData final : public UPrimaryDataAsset
+class RANCINVENTORY_API URancItemData : public UPrimaryDataAsset
 {
     GENERATED_BODY()
 
@@ -171,4 +170,21 @@ public:
     /* Map containing a tag as key and a ID container as value to add relations to other items such as crafting requirements, etc. */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ranc Inventory", meta = (DisplayName = "Item Relations", AssetBundles = "Custom"))
     TMap<FGameplayTag, FPrimaryRancItemIdContainer> Relations;
+};
+
+UCLASS(Blueprintable, Category = "Ranc Inventory | Classes | Data")
+class RANCINVENTORY_API UUsableRancItemData : public URancItemData
+{
+    GENERATED_BODY()
+
+public:
+    // Constructor
+    UUsableRancItemData(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer), UseValue(25)
+    {
+        // ItemPrimaryType = FGameplayTag::RequestGameplayTag(TEXT("RancInventory.ItemType.Usable"));
+    }
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ranc Inventory", meta = (UIMin = 0, ClampMin = 0, AssetBundles = "Data"))
+    float UseValue;
+
 };
