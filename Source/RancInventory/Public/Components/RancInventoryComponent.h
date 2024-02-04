@@ -189,6 +189,9 @@ public:
     /* Add items to this inventory */
     UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Ranc Inventory")
     void AddItems(const TArray<FRancItemInfo>& Items);
+    
+    UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Ranc Inventory")
+    void AddItem(const FRancItemInfo& Item);
 
     UFUNCTION(BlueprintCallable, Category = "Ranc Inventory")
     void SortInventory(const ERancInventorySortingMode Mode, const ERancInventorySortingOrientation Orientation);

@@ -677,6 +677,17 @@ void URancInventoryComponent::AddItems_Implementation(const TArray<FRancItemInfo
     UpdateRancItems(Items, ERancInventoryUpdateOperation::Add);
 }
 
+void URancInventoryComponent::AddItem_Implementation(const FRancItemInfo& Item)
+{
+    if (GetOwnerRole() != ROLE_Authority)
+    {
+        return;
+    }
+
+    const TArray ItemsToAdd = {Item};
+    UpdateRancItems(ItemsToAdd, ERancInventoryUpdateOperation::Add);
+}
+
 void URancInventoryComponent::UpdateRancItems(const TArray<FRancItemInfo>& Modifiers, const ERancInventoryUpdateOperation Operation)
 {
     TArray<FItemModifierData> ModifierDataArr;
