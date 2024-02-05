@@ -19,6 +19,7 @@ public:
     void Construct(const FArguments& InArgs);
 
 private:
+    
     TSharedRef<SWidget> ConstructContent();
     
     void OnIdTagContainerChanged(const FGameplayTagContainer& NewTagContainer);
@@ -43,6 +44,7 @@ private:
 
     TArray<FTextDisplayStringPtr> GetEnumValuesAsStringArray() const;
 
+    void OnSetArriveTangent(float value, ETextCommit::Type CommitType, EAxis::Type Axis);
     TMap<int32, TWeakObjectPtr<class UObject>> ObjectMap;
     TSharedPtr<class FAssetThumbnailPool> ImageIcon_ThumbnailPool;
     TArray<FTextDisplayStringPtr> AssetFoldersArr;
@@ -58,4 +60,5 @@ private:
     bool bIsStackable = false;
     float ItemValue = 0.f;
     float ItemWeight = 0.f;
+    FVector ItemWorldScale = FVector(1,1,1);
 };

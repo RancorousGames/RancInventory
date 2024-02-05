@@ -130,15 +130,15 @@ public:
         return FPrimaryAssetId(TEXT("RancInventory_ItemData"), *(ItemId.ToString()));
     }
 
+/*
+ To add:
+ MaxStackSize
+ 
+ */
+    
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ranc Inventory", meta = (AssetBundles = "Data"))
     FGameplayTag ItemId;
-
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ranc Inventory", meta = (AssetBundles = "SoftData"))
-    TSoftObjectPtr<UObject> ItemObject;
-
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ranc Inventory", meta = (AssetBundles = "SoftData"))
-    TSoftClassPtr<UObject> ItemClass;
-
+    
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ranc Inventory", meta = (AssetBundles = "Data"))
     FName ItemName;
 
@@ -162,7 +162,13 @@ public:
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ranc Inventory", meta = (AssetBundles = "Data"))
     FGameplayTagContainer ItemCategories;
-    
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ranc Inventory", meta = (AssetBundles = "Data"))
+    UStaticMesh* ItemWorldMesh = nullptr;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ranc Inventory", meta = (UIMin = 0, ClampMin = 0, AssetBundles = "Data"))
+    FVector ItemWorldScale = FVector(1.0f, 1.0f, 1.0f);
+
     /* Allows to implement custom properties in this item data */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ranc Inventory", meta = (DisplayName = "Custom Metadatas", AssetBundles = "Custom"))
     TMap<FGameplayTag, FName> Metadatas;
@@ -170,21 +176,4 @@ public:
     /* Map containing a tag as key and a ID container as value to add relations to other items such as crafting requirements, etc. */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ranc Inventory", meta = (DisplayName = "Item Relations", AssetBundles = "Custom"))
     TMap<FGameplayTag, FPrimaryRancItemIdContainer> Relations;
-};
-
-UCLASS(Blueprintable, Category = "Ranc Inventory | Classes | Data")
-class RANCINVENTORY_API UUsableRancItemData : public URancItemData
-{
-    GENERATED_BODY()
-
-public:
-    // Constructor
-    UUsableRancItemData(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer), UseValue(25)
-    {
-        // ItemPrimaryType = FGameplayTag::RequestGameplayTag(TEXT("RancInventory.ItemType.Usable"));
-    }
-
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ranc Inventory", meta = (UIMin = 0, ClampMin = 0, AssetBundles = "Data"))
-    float UseValue;
-
 };

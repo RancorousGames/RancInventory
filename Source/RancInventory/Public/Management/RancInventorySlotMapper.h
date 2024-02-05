@@ -53,6 +53,14 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Inventory Mapping")
 	void DiscardItems(const TArray<int32>& SlotIndexes);
 
+	// Removes a number of items from the inventory, if it has enough, potentially removing from several slots
+	UFUNCTION(BlueprintCallable, Category="Inventory Mapping")
+	bool RemoveItemCount(const FRancItemInfo& ItemInfo);
+	
+	// Removes a number of items from the inventory from the specified slot index if it has enough
+	UFUNCTION(BlueprintCallable, Category="Inventory Mapping")
+	bool RemoveItemCountFromSlot(const FRancItemInfo& ItemInfo, int32 SlotIndex);
+
 	UFUNCTION(BlueprintCallable, Category="Inventory Mapping")
 	void SortInventory(ERancInventorySortingMode Mode, ERancInventorySortingOrientation Orientation);
 

@@ -8,6 +8,8 @@
 #include <Engine/AssetManager.h>
 #include <Algo/Copy.h>
 
+#include "UObject/SavePackage.h"
+
 #ifdef UE_INLINE_GENERATED_CPP_BY_NAME
 #include UE_INLINE_GENERATED_CPP_BY_NAME(RancInventoryFunctions)
 #endif
@@ -61,8 +63,17 @@ URancItemData* URancInventoryFunctions::GetSingleItemDataById(const FPrimaryRanc
             StreamableHandle->WaitUntilComplete(5.f);
             Output = Cast<URancItemData>(StreamableHandle->GetLoadedAsset());
         }
-        else // The object is already loaded
+        else  // Original author wrote: "-> The object is already loaded"
         {
+            // but ive seen it not be loaded, LoadPrimaryAsset and GetPrimaryAssetObject GetPrimaryAssetHandle all return null
+            // I didn't manage to fix it but the issue stopped appearing apparently when i added more Items
+            const TSharedPtr<FStreamableHandle> StreamableHandleProgress = AssetManager->GetPrimaryAssetHandle(InID);
+
+            if (StreamableHandleProgress.IsValid())
+            {
+                StreamableHandle->WaitUntilComplete(5.f);
+            }
+            
             Output = AssetManager->GetPrimaryAssetObject<URancItemData>(InID);
         }
 

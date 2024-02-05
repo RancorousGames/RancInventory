@@ -128,6 +128,58 @@ void URancInventorySlotMapper::DiscardItems(const TArray<int32>& SlotIndexes)
     LinkedInventoryComponent->DiscardItemIndexes(InventoryIndexes);
 }
 
+bool URancInventorySlotMapper::RemoveItemCount(const FRancItemInfo& ItemInfo)
+{
+    if (!LinkedInventoryComponent) return false;
+
+    // Validation Step: Check if there are enough items to remove
+    int32 TotalCount = 0;
+    for (const FRancItemInfo& InventoryItem : LinkedInventoryComponent->GetItemsArray())
+    {
+        if (InventoryItem.ItemId == ItemInfo.ItemId)
+        {
+            TotalCount += InventoryItem.Quantity;
+        }
+    }
+
+    if (TotalCount < ItemInfo.Quantity)
+    {
+        // Not enough items available for removal
+        return false;
+    }
+
+    // Enough items available, proceed with removal
+    TArray<FRancItemInfo> Modifiers;
+    Modifiers.Add(ItemInfo); // Assuming ItemInfo.Quantity specifies the total amount to remove
+    LinkedInventoryComponent->UpdateRancItems(Modifiers, ERancInventoryUpdateOperation::Remove);
+
+    return true;
+}
+
+bool URancInventorySlotMapper::RemoveItemCountFromSlot(const FRancItemInfo& ItemInfo, int32 SlotIndex)
+{
+    if (!LinkedInventoryComponent || SlotIndex < 0 || SlotIndex >= SlotMappings.Num()) return false;
+
+    int32 InventoryIndex = GetInventoryIndexBySlot(SlotIndex);
+    if (InventoryIndex == -1) return false; // Slot is empty, nothing to remove
+
+    FRancItemInfo& InventoryItem = LinkedInventoryComponent->GetItemReferenceAt(InventoryIndex);
+    if (InventoryItem.ItemId != ItemInfo.ItemId || InventoryItem.Quantity < ItemInfo.Quantity)
+    {
+        // Not enough items in the specified slot or different item
+        return false;
+    }
+
+    // Validation passed, enough items in the slot, proceed with removal
+    TArray<FRancItemInfo> Modifiers;
+    FRancItemInfo ModifiedItem = InventoryItem;
+    ModifiedItem.Quantity = ItemInfo.Quantity; // Set the quantity to be removed
+    Modifiers.Add(ModifiedItem);
+    LinkedInventoryComponent->UpdateRancItems(Modifiers, ERancInventoryUpdateOperation::Remove);
+
+    return true;
+}
+
 void URancInventorySlotMapper::SortInventory(ERancInventorySortingMode Mode, ERancInventorySortingOrientation Orientation)
 {
     if (!LinkedInventoryComponent) return;

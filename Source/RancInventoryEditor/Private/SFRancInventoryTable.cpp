@@ -10,8 +10,7 @@ static const FName ColumnId_PrimaryIdLabel("PrimaryAssetId");
 static const FName ColumnId_ItemIdLabel("Id");
 static const FName ColumnId_NameLabel("Name");
 static const FName ColumnId_TypeLabel("Primary Type");
-static const FName ColumnId_ObjectLabel("Object");
-static const FName ColumnId_ClassLabel("Class");
+static const FName ColumnId_WorldMeshLabel("World Mesh");
 static const FName ColumnId_ValueLabel("Value");
 static const FName ColumnId_WeightLabel("Weight");
 
@@ -68,14 +67,9 @@ protected:
             return TextBlockCreator_Lambda(FText::FromString(*Item->Id.ToString()));
         }
 
-        if (ColumnName == ColumnId_ObjectLabel)
+        if (ColumnName == ColumnId_WorldMeshLabel)
         {
-            return TextBlockCreator_Lambda(FText::FromString(Item->Object.ToString()));
-        }
-
-        if (ColumnName == ColumnId_ClassLabel)
-        {
-            return TextBlockCreator_Lambda(FText::FromString(Item->Class.ToString()));
+            return TextBlockCreator_Lambda(FText::FromString(Item->WorldMesh.ToString()));
         }
 
         if (ColumnName == ColumnId_ValueLabel)
@@ -114,8 +108,7 @@ void SFRancInventoryTable::Construct([[maybe_unused]] const FArguments&)
     HeaderRow->AddColumn(HeaderColumnCreator_Lambda(ColumnId_ItemIdLabel, "Id", 1.25f));
     HeaderRow->AddColumn(HeaderColumnCreator_Lambda(ColumnId_NameLabel, "Name"));
     HeaderRow->AddColumn(HeaderColumnCreator_Lambda(ColumnId_TypeLabel, "Primary Type", 1.25f));
-    HeaderRow->AddColumn(HeaderColumnCreator_Lambda(ColumnId_ObjectLabel, "Object"));
-    HeaderRow->AddColumn(HeaderColumnCreator_Lambda(ColumnId_ClassLabel, "Class"));
+    HeaderRow->AddColumn(HeaderColumnCreator_Lambda(ColumnId_WorldMeshLabel, "World Mesh"));
     HeaderRow->AddColumn(HeaderColumnCreator_Lambda(ColumnId_ValueLabel, "Value", 0.5f));
     HeaderRow->AddColumn(HeaderColumnCreator_Lambda(ColumnId_WeightLabel, "Weight", 0.5f));
 
@@ -175,7 +168,7 @@ EVisibility SFRancInventoryTable::GetIsVisible(const FRancItemPtr InItem) const
                 || InItem->Name.ToString().Contains(InText, ESearchCase::IgnoreCase)
                 || InItem->Type.ToString().Contains(InText, ESearchCase::IgnoreCase)
                 || InItem->Categories.ToString().Contains(InText, ESearchCase::IgnoreCase)
-                || InItem->Class.ToString().Contains(InText, ESearchCase::IgnoreCase)
+                || InItem->WorldMesh.ToString().Contains(InText, ESearchCase::IgnoreCase)
                 || FString::SanitizeFloat(InItem->Value).Contains(InText, ESearchCase::IgnoreCase)
                 || FString::SanitizeFloat(InItem->Weight).Contains(InText, ESearchCase::IgnoreCase);
         }(SearchText.IsValid() ? SearchText->ToString() : FString())
@@ -278,9 +271,9 @@ void SFRancInventoryTable::OnColumnSort([[maybe_unused]] const EColumnSortPriori
                 return Compare_Lambda(ItemTypeToString_Lambda(Val1->Type), ItemTypeToString_Lambda(Val2->Type));
             }
 
-            if (ColumnName == ColumnId_ClassLabel)
+            if (ColumnName == ColumnId_WorldMeshLabel)
             {
-                return Compare_Lambda(Val1->Class.ToString(), Val2->Class.ToString());
+                return Compare_Lambda(Val1->WorldMesh.ToString(), Val2->WorldMesh.ToString());
             }
 
             if (ColumnName == ColumnId_ValueLabel)

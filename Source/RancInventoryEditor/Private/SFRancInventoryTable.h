@@ -18,8 +18,7 @@ struct FRancItemRowData
         Name = ItemData->ItemName;
         Type = ItemData->ItemPrimaryType;
         Categories = ItemData->ItemCategories;
-        Class = ItemData->ItemClass.IsValid() ? *ItemData->ItemClass.LoadSynchronous()->GetName() : FName();
-        Object = ItemData->ItemObject.IsValid() ? *ItemData->ItemObject.LoadSynchronous()->GetName() : FName();
+        WorldMesh = ItemData->ItemWorldMesh ? *ItemData->ItemWorldMesh->GetName() : FName();
         Value = ItemData->ItemValue;
         Weight = ItemData->ItemWeight;
 
@@ -35,8 +34,7 @@ struct FRancItemRowData
     FName Name = NAME_None;
     FGameplayTag Type;
     FGameplayTagContainer Categories;
-    FName Class = NAME_None;
-    FName Object = NAME_None;
+    FName WorldMesh = NAME_None;
     float Value = -1.f;
     float Weight = -1.f;
 };

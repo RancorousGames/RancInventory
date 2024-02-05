@@ -17,6 +17,8 @@
 #include <Widgets/Layout/SScrollBox.h>
 #include <Widgets/Layout/SGridPanel.h>
 
+#include "Widgets/Input/SVectorInputBox.h"
+
 #if ENGINE_MAJOR_VERSION >= 5
 #include <UObject/SavePackage.h>
 #endif
@@ -81,24 +83,38 @@ TSharedRef<SWidget> SRancItemCreator::ConstructContent()
                 .Padding(SlotPadding)
                 [
                     SNew(STextBlock)
-                        .Text(FText::FromString(TEXT("Object")))
+                        .Text(FText::FromString(TEXT("WorldMesh")))
                         .TextStyle(FAppStyle::Get(), "PropertyEditor.AssetClass")
                         .Font(FAppStyle::Get().GetFontStyle("PropertyWindow.NormalFont"))
                 ]
                 + SGridPanel::Slot(1, 1)
                 .Padding(SlotPadding)
                 [
-                    ObjEntryBoxCreator_Lambda(UObject::StaticClass(), 0)
+                    ObjEntryBoxCreator_Lambda(UStaticMesh::StaticClass(), 0)
                 ]
                 + SGridPanel::Slot(0, 2)
                 .Padding(SlotPadding)
                 [
                     SNew(STextBlock)
-                        .Text(FText::FromString(TEXT("Class")))
+                        .Text(FText::FromString(TEXT("WorldScale")))
                         .TextStyle(FAppStyle::Get(), "PropertyEditor.AssetClass")
                         .Font(FAppStyle::Get().GetFontStyle("PropertyWindow.NormalFont"))
                 ]
                 + SGridPanel::Slot(1, 2)
+                .Padding(SlotPadding)
+                [
+                    SNew(SVectorInputBox)
+                    .X(ItemWorldScale.X)
+                    .Y(ItemWorldScale.Y)
+                    .Z(ItemWorldScale.Z)
+                    .AllowSpin(false)
+                    .bColorAxisLabels(false)
+                    .OnXCommitted(this, &SRancItemCreator::OnSetArriveTangent, EAxis::X)
+                    .OnYCommitted(this, &SRancItemCreator::OnSetArriveTangent, EAxis::Y)
+                    .OnZCommitted(this, &SRancItemCreator::OnSetArriveTangent, EAxis::Z)
+                    .Font(FAppStyle::Get().GetFontStyle("PropertyWindow.NormalFont"))
+                ]
+                /*  
                 .Padding(SlotPadding)
                 [
                     SNew(SClassPropertyEntryBox)
@@ -106,6 +122,7 @@ TSharedRef<SWidget> SRancItemCreator::ConstructContent()
                         .SelectedClass(this, &SRancItemCreator::GetSelectedEntryClass)
                         .OnSetClass(this, &SRancItemCreator::HandleNewEntryClassSelected)
                 ]
+                */
                 + SGridPanel::Slot(0, 3)
                 .Padding(SlotPadding)
                 [
@@ -441,8 +458,8 @@ FReply SRancItemCreator::HandleCreateItemButtonClicked() const
     {
         URancItemData* const ItemData = Cast<URancItemData>(NewData);
         ItemData->ItemId = ItemId;
-        ItemData->ItemObject = TSoftObjectPtr<UObject>(Cast<UObject>(ObjectMap.FindRef(0)));
-        ItemData->ItemClass = TSoftClassPtr<UClass>(ItemClass.Get());
+        ItemData->ItemWorldMesh = Cast<UStaticMesh>(ObjectMap.FindRef(0)); ;
+        ItemData->ItemWorldScale = ItemWorldScale;
         ItemData->ItemName = ItemName;
         ItemData->ItemDescription = ItemDescription;
         ItemData->ItemPrimaryType = ItemType;
@@ -479,4 +496,22 @@ bool SRancItemCreator::IsCreateEnabled() const
     }
 
     return false;
+}
+
+void SRancItemCreator::OnSetArriveTangent(float value, ETextCommit::Type CommitType, EAxis::Type Axis)
+{
+    switch (Axis)
+    {
+    case EAxis::X:
+        ItemWorldScale.X = value;
+        break;
+    case EAxis::Y:
+        ItemWorldScale.Y = value;
+        break;
+    case EAxis::Z:
+        ItemWorldScale.Z = value;
+        break;
+    default:
+        break;
+    }
 }
