@@ -40,7 +40,7 @@ void ARancInventoryPackage::BeginPlay()
 
     SetDestroyOnEmpty(bDestroyWhenInventoryIsEmpty);
 
-    if (bDestroyWhenInventoryIsEmpty && URancInventoryFunctions::HasEmptyParam(PackageInventory->GetItemsArray()))
+    if (bDestroyWhenInventoryIsEmpty && PackageInventory->IsEmpty())
     {
         Destroy();
     }
@@ -76,7 +76,7 @@ void ARancInventoryPackage::SetDestroyOnEmpty(const bool bDestroy)
     }
 
     bDestroyWhenInventoryIsEmpty = bDestroy;
-    FRancInventoryEmpty Delegate = PackageInventory->OnInventoryEmpty;
+   /* FRancInventoryEmpty Delegate = PackageInventory->OnInventoryEmpty;
 
     if (const bool bIsAlreadyBound = Delegate.IsAlreadyBound(this, &ARancInventoryPackage::BeginPackageDestruction); bDestroy && !bIsAlreadyBound)
     {
@@ -85,7 +85,7 @@ void ARancInventoryPackage::SetDestroyOnEmpty(const bool bDestroy)
     else if (!bDestroy && bIsAlreadyBound)
     {
         Delegate.RemoveDynamic(this, &ARancInventoryPackage::BeginPackageDestruction);
-    }
+    }*/
 }
 
 bool ARancInventoryPackage::GetDestroyOnEmpty() const

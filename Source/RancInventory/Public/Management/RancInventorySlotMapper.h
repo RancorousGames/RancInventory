@@ -1,84 +1,74 @@
 ﻿#pragma once
 
 #include "CoreMinimal.h"
-#include "Net/UnrealNetwork.h"
+#include "Actors/AWorldItem.h"
+#include "UObject/Object.h"
 #include "RancInventorySlotMapper.generated.h"
+
+class RancInventoryComponent;
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnSlotUpdated, int32, SlotIndex);
+
 
 UCLASS(Blueprintable)
 class RANCINVENTORY_API URancInventorySlotMapper : public UObject
 {
-	GENERATED_BODY()
+    GENERATED_BODY()
 
 protected:
-	// Directly maps a UI slot index to an inventory array index. -1 indicates an empty slot.
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, ReplicatedUsing=OnRep_SlotMappings)
-	TArray<int32> SlotMappings;
+    // Maps a UI slot to item information (ID and quantity)
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+    TArray<FRancItemInfo> SlotMappings;
+    
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+    int32 NumberOfSlots;
+    
+    // Linked inventory component for direct interaction
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+    URancInventoryComponent* LinkedInventoryComponent;
+    
+    UPROPERTY(BlueprintAssignable, Category="Inventory Mapping")
+    FOnSlotUpdated OnSlotUpdated;
+    
+    UPROPERTY(EditAnywhere, BlueprintReadWrite)
+    float DropDistance;
+    
+    UPROPERTY(EditAnywhere, BlueprintReadWrite)
+    TSubclassOf<AWorldItem> DropItemClass = AWorldItem::StaticClass();
 
 public:
-	URancInventorySlotMapper();
+    URancInventorySlotMapper();
 
-	UFUNCTION(BlueprintCallable, Category="Inventory Mapping")
-	void Initialize(URancInventoryComponent* InventoryComponent);
+    // Initializes the slot mapper with a given inventory component, setting up initial mappings
+    UFUNCTION(BlueprintCallable, Category="Inventory Mapping")
+    void Initialize(URancInventoryComponent* InventoryComponent, int32 numSlots);
 
-	
-	// Sets the inventory array index for a given UI slot index
-	UFUNCTION(BlueprintCallable, Category="Inventory Mapping")
-	void SetSlotIndex(int32 SlotIndex, int32 InventoryIndex);
+    // Checks if a given slot is empty
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category="Inventory Mapping")
+    bool IsSlotEmpty(int32 SlotIndex) const;
 
-	// Gets the inventory array index for a given UI slot index, returns -1 if the slot is empty
-	UFUNCTION(BlueprintCallable, BlueprintPure, Category="Inventory Mapping")
-	int32 GetInventoryIndexBySlot(int32 SlotIndex) const;
+    // Retrieves the item information for a given slot index
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category="Inventory Mapping")
+    FRancItemInfo GetItem(int32 SlotIndex) const;
 
-	// Finds the slot index for a given inventory index, returns -1 if not found
-	UFUNCTION(BlueprintCallable, BlueprintPure, Category="Inventory Mapping")
-	int32 GetSlotIndexByInventoryIndex(int32 InventoryIndex) const;
+    // Removes a specified number of items from a given slot
+    UFUNCTION(BlueprintCallable, Category="Inventory Mapping")
+    void RemoveItemsFromSlot(const FRancItemInfo& ItemToRemove, int32 SlotIndex);
 
-	// Checks if a given slot is empty
-	UFUNCTION(BlueprintCallable, BlueprintPure, Category="Inventory Mapping")
-	bool IsSlotEmpty(int32 SlotIndex) const;
+    // Removes items from the inventory, starting from any slot that contains the item, until the count is met
+    UFUNCTION(BlueprintCallable, Category="Inventory Mapping")
+    void RemoveItems(const FRancItemInfo& ItemToRemove);
 
-	// Forwarded Methods
-	UFUNCTION(BlueprintCallable, Category="Inventory Mapping")
-	FRancItemInfo GetItem(int32 SlotIndex);
-
-	UFUNCTION(BlueprintCallable, Category="Inventory Mapping")
-	int32 FindFirstSlotIndexWithTags(const FGameplayTagContainer& Tags) const;
-
-	UFUNCTION(BlueprintCallable, Category="Inventory Mapping")
-	int32 FindFirstSlotIndexWithId(const FPrimaryRancItemId& ItemId) const;
-
-	UFUNCTION(BlueprintCallable, Category="Inventory Mapping")
-	void GiveItemsTo(URancInventoryComponent* OtherInventory, const TArray<int32>& SlotIndexes);
-
-	UFUNCTION(BlueprintCallable, Category="Inventory Mapping")
-	void DiscardItems(const TArray<int32>& SlotIndexes);
-
-	// Removes a number of items from the inventory, if it has enough, potentially removing from several slots
-	UFUNCTION(BlueprintCallable, Category="Inventory Mapping")
-	bool RemoveItemCount(const FRancItemInfo& ItemInfo);
-	
-	// Removes a number of items from the inventory from the specified slot index if it has enough
-	UFUNCTION(BlueprintCallable, Category="Inventory Mapping")
-	bool RemoveItemCountFromSlot(const FRancItemInfo& ItemInfo, int32 SlotIndex);
-
-	UFUNCTION(BlueprintCallable, Category="Inventory Mapping")
-	void SortInventory(ERancInventorySortingMode Mode, ERancInventorySortingOrientation Orientation);
-
-	// New Methods
-	UFUNCTION(BlueprintCallable, Category="Inventory Mapping")
-	bool AddItemToSlot(const FRancItemInfo& ItemInfo, int32 SlotIndex);
-
-	UFUNCTION(BlueprintCallable, Category="Inventory Mapping")
-	bool SplitItem(int32 SourceSlotIndex, int32 TargetSlotIndex, int32 SplitAmount);
-	
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Replicated, Category="Inventory Mapping")
-	URancInventoryComponent* LinkedInventoryComponent;
-	
-	// Network replication setup
-	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
-	
-protected:
-	// Replication notification function
-	UFUNCTION()
-	void OnRep_SlotMappings();
+    // Splits a specified quantity of items from one slot to another, creating a new slot if necessary
+    UFUNCTION(BlueprintCallable, Category="Inventory Mapping")
+    void SplitItem(int32 SourceSlotIndex, int32 TargetSlotIndex, int32 Quantity);
+    
+    UFUNCTION(BlueprintCallable, Category="Inventory Mapping")
+    bool DropItem(int32 SlotIndex, int32 Count);
+    
+    UFUNCTION(BlueprintCallable, Category="Inventory Mapping")
+    void MoveItem(int32 SourceSlotIndex, int32 TargetSlotIndex);
+    void AddItems(const FRancItemInfo& ItemInfo);
+    void AddItemToSlot(const FRancItemInfo& ItemInfo, int32 SlotIndex);
+    bool CanAddItemToSlot(const FRancItemInfo& ItemInfo, int32 SlotIndex) const;
 };

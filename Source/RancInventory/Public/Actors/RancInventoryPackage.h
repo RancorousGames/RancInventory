@@ -1,5 +1,4 @@
-// Author: Lucas Vilas-Boas
-// Year: 2023
+// Copyright Rancorous Games, 2024
 
 #pragma once
 
@@ -8,6 +7,7 @@
 #include <Components/RancInventoryComponent.h>
 #include "RancInventoryPackage.generated.h"
 
+// A stash/box/chest that can hold items
 UCLASS(Category = "Ranc Inventory | Classes")
 class RANCINVENTORY_API ARancInventoryPackage : public AActor
 {

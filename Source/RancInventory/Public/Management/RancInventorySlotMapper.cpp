@@ -1,252 +1,316 @@
 ﻿#include "RancInventorySlotMapper.h"
 
-#include "Components/RancInventoryComponent.h"
-#include "Net/UnrealNetwork.h"
+#include "RancInventoryFunctions.h"
+#include "Actors/AWorldItem.h"
+#include "RancInventory/public/Components/RancInventoryComponent.h"
+#include "WarTribes/InventorySystem/AWTWorldItem.h"
 
-URancInventorySlotMapper::URancInventorySlotMapper()
+URancInventorySlotMapper::URancInventorySlotMapper(): LinkedInventoryComponent(nullptr)
 {
-}
-
-int32 URancInventorySlotMapper::GetInventoryIndexBySlot(int32 SlotIndex) const
-{
-    if(SlotMappings.IsValidIndex(SlotIndex))
-    {
-        return SlotMappings[SlotIndex];
-    }
-    return -1; // Return -1 if the slot index is invalid or the slot is empty
-}
-
-int32 URancInventorySlotMapper::GetSlotIndexByInventoryIndex(int32 InventoryIndex) const
-{
-    // Find the first slot index that matches the given inventory index
-    return SlotMappings.IndexOfByKey(InventoryIndex);
-}
-
-void URancInventorySlotMapper::Initialize(URancInventoryComponent* InventoryComponent)
-{
-    if (!InventoryComponent) return;
-    LinkedInventoryComponent = InventoryComponent;
-
-    const TArray<FRancItemInfo>& Items = LinkedInventoryComponent->GetItemsArray();
-    SlotMappings.Init(-1, Items.Num());
-    for (int32 i = 0; i < Items.Num(); ++i)
-    {
-        SlotMappings[i] = i; // Direct 1-to-1 mapping
-    }
-}
-
-void URancInventorySlotMapper::SetSlotIndex(int32 SlotIndex, int32 InventoryIndex)
-{
-    // Ensure the slot index is within bounds and the inventory index is valid
-    if (SlotIndex < 0 || InventoryIndex < -1 || !LinkedInventoryComponent) return;
-
-    // Resize SlotMappings if needed to accommodate the SlotIndex
-    if (SlotIndex >= SlotMappings.Num())
-    {
-        SlotMappings.SetNum(SlotIndex + 1, false); // False to not initialize new elements, keeping them at default int32 value which is 0, not -1. Adjust accordingly.
-    }
-
-    // Update the mapping for the specified slot
-    SlotMappings[SlotIndex] = InventoryIndex;
+	// Initialize any necessary members if needed
 }
 
 
-void URancInventorySlotMapper::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+void URancInventorySlotMapper::Initialize(URancInventoryComponent* InventoryComponent, int32 NumSlots = 9)
 {
-    Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-    DOREPLIFETIME(URancInventorySlotMapper, LinkedInventoryComponent);
-    DOREPLIFETIME(URancInventorySlotMapper, SlotMappings);
+	NumberOfSlots = NumSlots;
+	LinkedInventoryComponent = InventoryComponent;
+	SlotMappings.Empty();
+
+	if (!LinkedInventoryComponent)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Inventory Component is null"));
+		return;
+	}
+
+	// Initialize SlotMappings with empty item info for the specified number of slots
+	for(int32 i = 0; i < NumSlots; i++)
+	{
+		SlotMappings.Add(FRancItemInfo());
+	}
+
+	// Retrieve all items from the linked inventory component
+	TArray<FRancItemInfo> Items = LinkedInventoryComponent->GetAllItems();
+
+	// Assuming a helper function exists that can get item data by ID
+	for(FRancItemInfo Item : Items)
+	{
+		const URancItemData* ItemData = URancInventoryFunctions::GetSingleItemDataById(Item.ItemId, { "Data" });
+		if(ItemData != nullptr)
+		{
+			int32 CurrentIndex = 0;
+			while(Item.Quantity > 0 && CurrentIndex < NumSlots)
+			{
+				// Check if the slot is empty or contains the same item, and it's not full
+				if(IsSlotEmpty(CurrentIndex) || 
+				  (SlotMappings[CurrentIndex].ItemId == Item.ItemId && SlotMappings[CurrentIndex].Quantity < ItemData->MaxStackSize))
+				{
+					int32 AvailableSpace = ItemData->MaxStackSize - SlotMappings[CurrentIndex].Quantity;
+					int32 TransferAmount = FMath::Min(AvailableSpace, Item.Quantity);
+                    
+					// Update SlotMapping and Item quantities
+					SlotMappings[CurrentIndex].ItemId = Item.ItemId;
+					SlotMappings[CurrentIndex].Quantity += TransferAmount;
+					Item.Quantity -= TransferAmount;
+				}
+				CurrentIndex++;
+			}
+		}
+	}
 }
 
-void URancInventorySlotMapper::OnRep_SlotMappings()
-{
-    // React to replication: Possibly trigger UI update or other logic
-}
 
 bool URancInventorySlotMapper::IsSlotEmpty(int32 SlotIndex) const
 {
-    // Check if the slot index is valid and within the bounds of SlotMappings
-    if (SlotIndex >= 0 && SlotIndex < SlotMappings.Num())
-    {
-        // A slot is considered empty if its mapping is -1
-        return SlotMappings[SlotIndex] == -1;
-    }
-
-    // Return true by default if the slot index is out of bounds, indicating it's effectively "empty"
-    return true;
+	return SlotMappings.IsValidIndex(SlotIndex) && !SlotMappings[SlotIndex].ItemId.IsValid();
 }
 
-FRancItemInfo URancInventorySlotMapper::GetItem(int32 SlotIndex)
+FRancItemInfo URancInventorySlotMapper::GetItem(int32 SlotIndex) const
 {
-    int32 InventoryIndex = GetInventoryIndexBySlot(SlotIndex);
-    return LinkedInventoryComponent->GetItemCopyAt(InventoryIndex);
+	if (SlotMappings.IsValidIndex(SlotIndex))
+	{
+		return SlotMappings[SlotIndex];
+	}
+
+	// Return an empty item info if the slot index is invalid
+	return FRancItemInfo();
 }
 
-int32 URancInventorySlotMapper::FindFirstSlotIndexWithTags(const FGameplayTagContainer& Tags) const
+void URancInventorySlotMapper::RemoveItemsFromSlot(const FRancItemInfo& ItemToRemove, int32 SlotIndex)
 {
-    int32 OutIndex = -1;
-    if (LinkedInventoryComponent->FindFirstItemIndexWithTags(Tags, OutIndex, FGameplayTagContainer(), 0))
-    {
-        return GetSlotIndexByInventoryIndex(OutIndex);
-    }
-    return -1;
+	if (!LinkedInventoryComponent || !SlotMappings.IsValidIndex(SlotIndex)) return;
+
+	FRancItemInfo& SlotItem = SlotMappings[SlotIndex];
+	if (SlotItem.ItemId == ItemToRemove.ItemId && SlotItem.Quantity >= ItemToRemove.Quantity)
+	{
+		SlotItem.Quantity -= ItemToRemove.Quantity;
+		LinkedInventoryComponent->RemoveItems(ItemToRemove);
+
+		// If all items are removed, reset the slot
+		if (SlotItem.Quantity <= 0)
+		{
+			SlotItem = FRancItemInfo(); // Reset the slot to empty
+		}
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Slot %d does not contain enough items to remove."), SlotIndex);
+	}
+
+	OnSlotUpdated.Broadcast(SlotIndex);
 }
 
-int32 URancInventorySlotMapper::FindFirstSlotIndexWithId(const FPrimaryRancItemId& ItemId) const
+void URancInventorySlotMapper::RemoveItems(const FRancItemInfo& ItemToRemove)
 {
-    int32 OutIndex = -1;
-    if (LinkedInventoryComponent->FindFirstItemIndexWithId(ItemId, OutIndex, FGameplayTagContainer(), 0))
-    {
-        return GetSlotIndexByInventoryIndex(OutIndex);
-    }
-    return -1;
+	if (!LinkedInventoryComponent) return;
+
+	int32 RemainingToRemove = ItemToRemove.Quantity;
+
+	for (int32 i = 0; i < SlotMappings.Num(); ++i)
+	{
+		auto& SlotItem = SlotMappings[i];
+		if (RemainingToRemove <= 0) break; // Stop if we've removed the required quantity
+
+		if (SlotItem.ItemId == ItemToRemove.ItemId && SlotItem.Quantity > 0)
+		{
+			int32 RemoveCount = FMath::Min(SlotItem.Quantity, RemainingToRemove);
+			SlotItem.Quantity -= RemoveCount;
+			RemainingToRemove -= RemoveCount;
+
+			if (SlotItem.Quantity <= 0)
+			{
+				SlotItem = FRancItemInfo(); // Reset the slot to empty if all items are removed
+			}
+		}
+		OnSlotUpdated.Broadcast(i);
+	}
+
+	if (RemainingToRemove > 0)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Not enough items to remove. %d remaining."), RemainingToRemove);
+	}
+	else
+	{
+		// If we successfully removed items, update the linked inventory
+		LinkedInventoryComponent->RemoveItems(FRancItemInfo(ItemToRemove.ItemId,
+		                                                    ItemToRemove.Quantity - RemainingToRemove));
+	}
 }
 
-void URancInventorySlotMapper::GiveItemsTo(URancInventoryComponent* OtherInventory, const TArray<int32>& SlotIndexes)
+void URancInventorySlotMapper::SplitItem(int32 SourceSlotIndex, int32 TargetSlotIndex, int32 Quantity)
 {
-    if (!LinkedInventoryComponent || !OtherInventory) return;
+	if (!LinkedInventoryComponent) return;
+	if (!SlotMappings.IsValidIndex(SourceSlotIndex)) return;
+	if (Quantity <= 0) return;
 
-    TArray<int32> InventoryIndexes;
-    for (int32 SlotIndex : SlotIndexes)
-    {
-        int32 InventoryIndex = GetInventoryIndexBySlot(SlotIndex);
-        if (InventoryIndex >= 0) InventoryIndexes.Add(InventoryIndex);
-    }
-    LinkedInventoryComponent->GiveItemIndexesTo(OtherInventory, InventoryIndexes);
+	FRancItemInfo& SourceItem = SlotMappings[SourceSlotIndex];
+	if (SourceItem.Quantity < Quantity) return; // Not enough items in the source slot to split
+
+	if (SlotMappings.IsValidIndex(TargetSlotIndex))
+	{
+		// If the target slot is valid and matches the item type, add to it
+		FRancItemInfo& TargetItem = SlotMappings[TargetSlotIndex];
+		if (TargetItem.ItemId == SourceItem.ItemId)
+		{
+			TargetItem.Quantity += Quantity;
+		}
+		else if (!TargetItem.ItemId.IsValid())
+		{
+			// If the target slot is empty, move the specified quantity
+			TargetItem = FRancItemInfo(SourceItem.ItemId, Quantity);
+		}
+		else
+		{
+			// Can't split into a different, non-empty item type
+			return;
+		}
+	}
+	else
+	{
+		// If the target slot is beyond the current array, add a new slot with the item
+		FRancItemInfo NewItem(SourceItem.ItemId, Quantity);
+		SlotMappings.Add(NewItem);
+	}
+
+	// Update the source slot quantity
+	SourceItem.Quantity -= Quantity;
+	if (SourceItem.Quantity <= 0)
+	{
+		// If all items have been moved, reset the source slot
+		SourceItem = FRancItemInfo();
+	}
+	
+	OnSlotUpdated.Broadcast(SourceSlotIndex);
+	OnSlotUpdated.Broadcast(TargetSlotIndex); 
 }
 
-void URancInventorySlotMapper::DiscardItems(const TArray<int32>& SlotIndexes)
+bool URancInventorySlotMapper::DropItem(int32 SlotIndex, int32 Count)
 {
-    if (!LinkedInventoryComponent) return;
+	if (!LinkedInventoryComponent || !SlotMappings.IsValidIndex(SlotIndex)) return false;
 
-    TArray<int32> InventoryIndexes;
-    for (int32 SlotIndex : SlotIndexes)
-    {
-        int32 InventoryIndex = GetInventoryIndexBySlot(SlotIndex);
-        if (InventoryIndex >= 0) InventoryIndexes.Add(InventoryIndex);
-    }
-    LinkedInventoryComponent->DiscardItemIndexes(InventoryIndexes);
+	auto& ItemInfo = SlotMappings[SlotIndex];
+	Count = FMath::Min(Count, ItemInfo.Quantity); // Ensure we don't drop more than we have
+
+	// Adjust the quantity or clear the slot if necessary
+	if (ItemInfo.Quantity > Count)
+	{
+		ItemInfo.Quantity -= Count;
+	}
+	else
+	{
+		Count = ItemInfo.Quantity;
+		ItemInfo = FRancItemInfo(); // Reset the slot if all items are dropped
+	}
+
+	// Spawn the world item
+	if (UWorld* World = GetWorld())
+	{
+		auto* owner = LinkedInventoryComponent->GetOwner();
+		if (AWorldItem* WorldItem = World->SpawnActor<AWorldItem>(AWorldItem::StaticClass(),
+		                                                          owner->
+		                                                          GetActorLocation() + owner->GetActorForwardVector() * DropDistance, FRotator::ZeroRotator))
+		{
+			WorldItem->Item = ItemInfo;
+			WorldItem->SetReplicates(true);
+
+			OnSlotUpdated.Broadcast(SlotIndex);
+			return true;
+		}
+	}
+
+	return false;
 }
 
-bool URancInventorySlotMapper::RemoveItemCount(const FRancItemInfo& ItemInfo)
-{
-    if (!LinkedInventoryComponent) return false;
+void URancInventorySlotMapper::MoveItem(int32 SourceSlotIndex, int32 TargetSlotIndex) {
+	if (!LinkedInventoryComponent || !SlotMappings.IsValidIndex(SourceSlotIndex) || !SlotMappings.IsValidIndex(TargetSlotIndex) || SourceSlotIndex == TargetSlotIndex) {
+		return; // Validate indices and ensure they are not the same
+	}
 
-    // Validation Step: Check if there are enough items to remove
-    int32 TotalCount = 0;
-    for (const FRancItemInfo& InventoryItem : LinkedInventoryComponent->GetItemsArray())
-    {
-        if (InventoryItem.ItemId == ItemInfo.ItemId)
-        {
-            TotalCount += InventoryItem.Quantity;
-        }
-    }
+	auto& SourceItem = SlotMappings[SourceSlotIndex];
+	auto& TargetItem = SlotMappings[TargetSlotIndex];
+	const URancItemData* SourceData = URancInventoryFunctions::GetSingleItemDataById(SourceItem.ItemId, { "Data" });
+	const URancItemData* TargetData = URancInventoryFunctions::GetSingleItemDataById(TargetItem.ItemId, { "Data" });
 
-    if (TotalCount < ItemInfo.Quantity)
-    {
-        // Not enough items available for removal
-        return false;
-    }
+	if (!SourceData) return; // Ensure source data is valid
 
-    // Enough items available, proceed with removal
-    TArray<FRancItemInfo> Modifiers;
-    Modifiers.Add(ItemInfo); // Assuming ItemInfo.Quantity specifies the total amount to remove
-    LinkedInventoryComponent->UpdateRancItems(Modifiers, ERancInventoryUpdateOperation::Remove);
+	if (IsSlotEmpty(TargetSlotIndex))
+	{
+		SlotMappings[TargetSlotIndex] = SourceItem;
+		SlotMappings[SourceSlotIndex] = FRancItemInfo(); // Clear source slot
+	}
+	else if (SourceItem.ItemId != TargetItem.ItemId ||  !TargetData->bIsStackable)
+	{
+		SlotMappings[TargetSlotIndex] = SourceItem;
+		SlotMappings[SourceSlotIndex] = TargetItem;
+	}
+	else
+	{
+		// Stack items up to max capacity
+		int32 AvailableSpace = TargetData->MaxStackSize - TargetItem.Quantity;
+		int32 TransferAmount = FMath::Min(AvailableSpace, SourceItem.Quantity);
+		TargetItem.Quantity += TransferAmount;
+		SourceItem.Quantity -= TransferAmount;
 
-    return true;
+		if (SourceItem.Quantity <= 0) {
+			SlotMappings[SourceSlotIndex] = FRancItemInfo(); // Clear source slot if emptied
+		}
+	}
+
+	OnSlotUpdated.Broadcast(SourceSlotIndex);
+	OnSlotUpdated.Broadcast(TargetSlotIndex);
 }
 
-bool URancInventorySlotMapper::RemoveItemCountFromSlot(const FRancItemInfo& ItemInfo, int32 SlotIndex)
-{
-    if (!LinkedInventoryComponent || SlotIndex < 0 || SlotIndex >= SlotMappings.Num()) return false;
-
-    int32 InventoryIndex = GetInventoryIndexBySlot(SlotIndex);
-    if (InventoryIndex == -1) return false; // Slot is empty, nothing to remove
-
-    FRancItemInfo& InventoryItem = LinkedInventoryComponent->GetItemReferenceAt(InventoryIndex);
-    if (InventoryItem.ItemId != ItemInfo.ItemId || InventoryItem.Quantity < ItemInfo.Quantity)
-    {
-        // Not enough items in the specified slot or different item
-        return false;
-    }
-
-    // Validation passed, enough items in the slot, proceed with removal
-    TArray<FRancItemInfo> Modifiers;
-    FRancItemInfo ModifiedItem = InventoryItem;
-    ModifiedItem.Quantity = ItemInfo.Quantity; // Set the quantity to be removed
-    Modifiers.Add(ModifiedItem);
-    LinkedInventoryComponent->UpdateRancItems(Modifiers, ERancInventoryUpdateOperation::Remove);
-
-    return true;
+void URancInventorySlotMapper::AddItems(const FRancItemInfo& ItemInfo) {
+	for (int32 Index = 0; Index < SlotMappings.Num(); ++Index) {
+		if (CanAddItemToSlot(ItemInfo, Index)) {
+			AddItemToSlot(ItemInfo, Index);
+			return;
+		}
+	}
 }
 
-void URancInventorySlotMapper::SortInventory(ERancInventorySortingMode Mode, ERancInventorySortingOrientation Orientation)
-{
-    if (!LinkedInventoryComponent) return;
+void URancInventorySlotMapper::AddItemToSlot(const FRancItemInfo& ItemInfo, int32 SlotIndex) {
+	if (!SlotMappings.IsValidIndex(SlotIndex)) return;
 
-    LinkedInventoryComponent->SortInventory(Mode, Orientation);
+	const URancItemData* ItemData = URancInventoryFunctions::GetSingleItemDataById(ItemInfo.ItemId, { "Data" });
+	if (!ItemData || !ItemData->bIsStackable) {
+		SlotMappings[SlotIndex] = ItemInfo; // Non-stackable items or new items replace the slot content
+	} else {
+		// Stackable items logic
+		auto& SlotItem = SlotMappings[SlotIndex];
+		if (SlotItem.ItemId == ItemInfo.ItemId) {
+			int32 TotalQuantity = SlotItem.Quantity + ItemInfo.Quantity;
+			if (TotalQuantity <= ItemData->MaxStackSize) {
+				SlotItem.Quantity = TotalQuantity;
+			} else {
+				SlotItem.Quantity = ItemData->MaxStackSize;
+				// Handle overflow logic if needed
+			}
+		} else {
+			SlotMappings[SlotIndex] = ItemInfo; // Replace if different items
+		}
+	}
+	
+	OnSlotUpdated.Broadcast(SlotIndex);
 }
 
-bool URancInventorySlotMapper::AddItemToSlot(const FRancItemInfo& ItemInfo, int32 SlotIndex)
-{
-    // Validate the slot index and linked inventory component
-    if (!LinkedInventoryComponent || SlotIndex < 0 || SlotIndex >= SlotMappings.Num()) return false;
+bool URancInventorySlotMapper::CanAddItemToSlot(const FRancItemInfo& ItemInfo, int32 SlotIndex) const {
+	if (!SlotMappings.IsValidIndex(SlotIndex)) {
+		return false; // Slot index out of bounds
+	}
 
-    // Check if the slot is already mapped (indicating it's not empty)
-    int32 CurrentInventoryIndex = GetInventoryIndexBySlot(SlotIndex);
-    if (CurrentInventoryIndex != -1) 
-    {
-        // Slot is not empty; you may want to handle this differently, such as allowing or disallowing stacking
-        return false;
-    }
+	bool TargetSlotEmpty = IsSlotEmpty(SlotIndex);
 
-    // Check if the item can be received by the inventory
-    if (!LinkedInventoryComponent->CanReceiveItem(ItemInfo)) return false;
+	const FRancItemInfo& TargetSlotItem = SlotMappings[SlotIndex];
+	if (TargetSlotEmpty || TargetSlotItem.ItemId == ItemInfo.ItemId) {
+		const URancItemData* ItemData = URancInventoryFunctions::GetSingleItemDataById(ItemInfo.ItemId, { "Data" });
+		if (!ItemData) {
+			return false; // Item data not found
+		}
 
-    // Add the item to the inventory
-    // that adds the item to the end of the inventory list and returns the new item's index
-    LinkedInventoryComponent->AddItem(ItemInfo); // Assuming this adds to the end and doesn't need an index
+		int32 AvailableSpace = ItemData->bIsStackable ? ItemData->MaxStackSize - TargetSlotItem.Quantity : 0;
+		return AvailableSpace >= ItemInfo.Quantity;
+	}
 
-    // The new item's index in the inventory is the last position after addition
-    int32 NewInventoryIndex = LinkedInventoryComponent->GetItemsArray().Num() - 1;
-
-    // Ensure the slot mappings array is large enough to include this new slot index
-    if (SlotMappings.Num() <= SlotIndex) 
-    {
-        SlotMappings.SetNum(SlotIndex + 1, true); // Resize with default value -1 for new elements
-    }
-
-    // Update the mapping to reflect the new item's position in the inventory
-    SlotMappings[SlotIndex] = NewInventoryIndex;
-
-    return true;
-}
-
-bool URancInventorySlotMapper::SplitItem(int32 SourceSlotIndex, int32 TargetSlotIndex, int32 SplitAmount)
-{
-    if (!LinkedInventoryComponent || SourceSlotIndex < 0 || SourceSlotIndex >= SlotMappings.Num() || SlotMappings[TargetSlotIndex] < 0) return false;
-
-    int32 InventoryIndex = GetInventoryIndexBySlot(SourceSlotIndex);
-    FRancItemInfo& ItemToSplit = LinkedInventoryComponent->GetItemReferenceAt(InventoryIndex);
-
-    // Check if the item exists and has enough quantity to split
-    if (ItemToSplit.Quantity > SplitAmount)
-    {
-        // Create a new item with the split quantity
-        FRancItemInfo NewItem = ItemToSplit; // Copy constructor or similar logic to clone the item
-        NewItem.Quantity = SplitAmount;
-
-        // Reduce the original item's quantity
-        ItemToSplit.Quantity -= SplitAmount;
-
-        // Add the new item to the inventory. This might involve finding the next empty slot or expanding the inventory.
-        // Assume URancInventoryComponent has a method to add a new item and return its index
-        LinkedInventoryComponent->AddItem(NewItem);
-        int32 NewInventoryIndex = LinkedInventoryComponent->GetItemsArray().Num() - 1;
-
-        SlotMappings[TargetSlotIndex] = NewInventoryIndex; // Or other logic to maintain the slot to index mapping
-        return true;
-    }
-
-    return false;
+	return false; // Different item types or slot not stackable
 }

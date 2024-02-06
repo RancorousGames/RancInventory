@@ -71,7 +71,7 @@ URancItemData* URancInventoryFunctions::GetSingleItemDataById(const FPrimaryRanc
 
             if (StreamableHandleProgress.IsValid())
             {
-                StreamableHandle->WaitUntilComplete(5.f);
+                StreamableHandleProgress->WaitUntilComplete(5.f);
             }
             
             Output = AssetManager->GetPrimaryAssetObject<URancItemData>(InID);
@@ -270,7 +270,7 @@ TArray<FRancItemInfo> URancInventoryFunctions::FilterTradeableItems(URancInvento
                 return false;
             }
 
-            bool bCanTradeIterator = FromInventory->CanGiveItem(Iterator) && ToInventory->CanReceiveItem(Iterator);
+            bool bCanTradeIterator = FromInventory->ContainsItem(Iterator.ItemId) && ToInventory->CanReceiveItem(Iterator);
 
             if (bCanTradeIterator)
             {
@@ -315,7 +315,26 @@ void URancInventoryFunctions::TradeRancItem(TArray<FRancItemInfo> ItemsToTrade, 
         return;
     }
 
-    FromInventory->GiveItemsTo(ToInventory, ItemsToTrade);
+    // first check if frominventory has the items:
+    for (const FRancItemInfo& Iterator : ItemsToTrade)
+    {
+        if (!FromInventory->ContainsItem(Iterator.ItemId, Iterator.Quantity))
+        {
+            UE_LOG(LogRancInventory_Internal, Warning, TEXT("TradeRancItem: FromInventory does not contain the item %s"), *Iterator.ItemId.ToString());
+            return;
+        }
+    }
+
+    
+    for (FRancItemInfo& Iterator : ItemsToTrade)
+    {
+        if (!FromInventory->RemoveItems(Iterator))
+        {
+            UE_LOG(LogRancInventory_Internal, Warning, TEXT("TradeRancItem: Failed to remove item %s from FromInventory"), *Iterator.ItemId.ToString());
+            continue;
+        }
+        ToInventory->AddItems(Iterator);
+    }   
 }
 
 bool URancInventoryFunctions::IsItemValid(const FRancItemInfo InItemInfo)

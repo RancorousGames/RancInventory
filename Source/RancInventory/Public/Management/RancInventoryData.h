@@ -1,4 +1,4 @@
-// Copyright Rancorous Games, 2023
+// Copyright Rancorous Games, 2024
 
 #pragma once
 
@@ -150,7 +150,12 @@ public:
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ranc Inventory", meta = (AssetBundles = "Data"))
     bool bIsStackable = true;
+    
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ranc Inventory", meta = (AssetBundles = "Data"))
+    int32 MaxStackSize = 5;
 
+    
+    
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ranc Inventory", meta = (UIMin = 0, ClampMin = 0, AssetBundles = "Data"))
     float ItemValue;
 

@@ -12,7 +12,7 @@ public class RancInventory : ModuleRules
 
         PublicDependencyModuleNames.AddRange(new[]
         {
-            "Core"
+            "Core", "WarTribes"
         });
 
         PrivateDependencyModuleNames.AddRange(new[]
