@@ -11,26 +11,6 @@ class UTexture2D;
 
 constexpr auto RancItemDataType = TEXT("RancInventory_ItemData");
 
-UENUM(BlueprintType, Category = "Ranc Inventory | Enumerations")
-enum class ERancItemType : uint8
-{
-    None,
-    Consumable,
-    Armor,
-    Weapon,
-    Accessory,
-    Crafting,
-    Material,
-    Information,
-    Special,
-    Event,
-    Quest,
-    Junk,
-    Other,
-
-    MAX
-};
-
 USTRUCT(BlueprintType, Category = "Ranc Inventory | Structs")
 struct FPrimaryRancItemId : public FPrimaryAssetId
 {
@@ -77,21 +57,17 @@ struct FRancItemInfo
 
     FRancItemInfo() = default;
 
-    explicit FRancItemInfo(const FPrimaryRancItemId& InItemId) : ItemId(InItemId)
+    explicit FRancItemInfo(const FGameplayTag& InItemId) : ItemId(InItemId)
     {
     }
 
-    explicit FRancItemInfo(const FPrimaryRancItemId& InItemId, const int32& InQuant) : ItemId(InItemId), Quantity(InQuant)
-    {
-    }
-
-    explicit FRancItemInfo(const FPrimaryRancItemId& InItemId, const int32& InQuant, const FGameplayTagContainer& InTags) : ItemId(InItemId), Quantity(InQuant), Tags(InTags)
+    explicit FRancItemInfo(const FGameplayTag& InItemId, const int32& InQuant) : ItemId(InItemId), Quantity(InQuant)
     {
     }
 
     bool operator==(const FRancItemInfo& Other) const
     {
-        return ItemId == Other.ItemId && Tags == Other.Tags && Level == Other.Level;
+        return ItemId == Other.ItemId;
     }
 
     bool operator!=(const FRancItemInfo& Other) const
@@ -105,16 +81,37 @@ struct FRancItemInfo
     }
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ranc Inventory")
-    FPrimaryRancItemId ItemId;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ranc Inventory")
-    int32 Level = 1;
-
+    FGameplayTag ItemId;
+    
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ranc Inventory")
     int32 Quantity = 1;
+};
 
+USTRUCT(BlueprintType, Category = "Ranc Inventory | Structs")
+struct FRancInitialItem
+{
+    GENERATED_BODY()
+
+    static const FRancInitialItem EmptyItemInfo;
+
+    FRancInitialItem() = default;
+
+    explicit FRancInitialItem(const URancItemData* InItemData) : ItemData(InItemData)
+    {
+    }
+
+    explicit FRancInitialItem(const URancItemData* InItemData, const int32& InQuant) : ItemData(InItemData), Quantity(InQuant)
+    {
+    }
+    
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ranc Inventory")
-    FGameplayTagContainer Tags;
+    const URancItemData* ItemData;
+    
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ranc Inventory")
+    FPrimaryRancItemId ItemId;
+    
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ranc Inventory")
+    int32 Quantity = 1;
 };
 
 UCLASS(NotBlueprintable, NotPlaceable, Category = "Ranc Inventory | Classes | Data")
@@ -129,12 +126,6 @@ public:
     {
         return FPrimaryAssetId(TEXT("RancInventory_ItemData"), *(ItemId.ToString()));
     }
-
-/*
- To add:
- MaxStackSize
- 
- */
     
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ranc Inventory", meta = (AssetBundles = "Data"))
     FGameplayTag ItemId;

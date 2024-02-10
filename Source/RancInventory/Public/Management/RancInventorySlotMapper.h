@@ -30,11 +30,6 @@ protected:
     UPROPERTY(BlueprintAssignable, Category="Inventory Mapping")
     FOnSlotUpdated OnSlotUpdated;
     
-    UPROPERTY(EditAnywhere, BlueprintReadWrite)
-    float DropDistance;
-    
-    UPROPERTY(EditAnywhere, BlueprintReadWrite)
-    TSubclassOf<AWorldItem> DropItemClass = AWorldItem::StaticClass();
 
 public:
     URancInventorySlotMapper();
@@ -64,11 +59,26 @@ public:
     void SplitItem(int32 SourceSlotIndex, int32 TargetSlotIndex, int32 Quantity);
     
     UFUNCTION(BlueprintCallable, Category="Inventory Mapping")
-    bool DropItem(int32 SlotIndex, int32 Count);
+    int32 DropItem(int32 SlotIndex, int32 Count);
     
     UFUNCTION(BlueprintCallable, Category="Inventory Mapping")
     void MoveItem(int32 SourceSlotIndex, int32 TargetSlotIndex);
-    void AddItems(const FRancItemInfo& ItemInfo);
-    void AddItemToSlot(const FRancItemInfo& ItemInfo, int32 SlotIndex);
+    
+    UFUNCTION(BlueprintCallable, Category="Inventory Mapping")
+    int32 AddItems(const FRancItemInfo& ItemInfo);
+
+    // returns remaining items that we could not add
+    UFUNCTION(BlueprintCallable, Category="Inventory Mapping")
+    int32 AddItemToSlot(const FRancItemInfo& ItemInfo, int32 SlotIndex);
+    
+    UFUNCTION(BlueprintCallable, Category="Inventory Mapping")
     bool CanAddItemToSlot(const FRancItemInfo& ItemInfo, int32 SlotIndex) const;
+
+private:
+    bool SuppressCallback = false;
+    
+    UFUNCTION()
+    void HandleItemAdded(const FRancItemInfo& ItemInfo);
+    UFUNCTION()
+    void HandleItemRemoved(const FRancItemInfo& ItemInfo);
 };

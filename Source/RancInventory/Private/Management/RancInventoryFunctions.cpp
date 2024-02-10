@@ -15,6 +15,7 @@
 #endif
 
 TMap<FGameplayTag, URancItemData*> URancInventoryFunctions::AllLoadedItemsByTag;
+TArray<FGameplayTag> URancInventoryFunctions::AllItemIds;
 
 void URancInventoryFunctions::UnloadAllRancItems()
 {
@@ -121,7 +122,7 @@ TArray<URancItemData*> URancInventoryFunctions::SearchRancItemData(const ERancIt
 #endif
 	{
 		TArray<URancItemData*> ReturnedValues = LoadRancItemDatas_Internal(
-			AssetManager, GetAllRancItemIds(), InBundles, bAutoUnload);
+			AssetManager, GetAllRancItemPrimaryIds(), InBundles, bAutoUnload);
 
 		for (URancItemData* const& Iterator : ReturnedValues)
 		{
@@ -165,10 +166,9 @@ TArray<URancItemData*> URancInventoryFunctions::SearchRancItemData(const ERancIt
 TMap<FGameplayTag, FName> URancInventoryFunctions::GetItemMetadatas(const FRancItemInfo InItemInfo)
 {
 	TMap<FGameplayTag, FName> Output;
-	if (URancItemData* const Data = GetSingleItemDataById(InItemInfo.ItemId, TArray<FName>{"Custom"}))
+	if (const URancItemData* const Data = URancInventoryFunctions::GetItemById(InItemInfo.ItemId))
 	{
 		Output = Data->Metadatas;
-		UnloadRancItem(InItemInfo.ItemId);
 	}
 
 	return Output;
@@ -178,10 +178,9 @@ TMap<FGameplayTag, FPrimaryRancItemIdContainer> URancInventoryFunctions::GetItem
 	const FRancItemInfo InItemInfo)
 {
 	TMap<FGameplayTag, FPrimaryRancItemIdContainer> Output;
-	if (URancItemData* const Data = GetSingleItemDataById(InItemInfo.ItemId, TArray<FName>{"Custom"}))
+	if (const URancItemData* const Data = URancInventoryFunctions::GetItemById(InItemInfo.ItemId))
 	{
 		Output = Data->Relations;
-		UnloadRancItem(InItemInfo.ItemId);
 	}
 
 	return Output;
@@ -288,22 +287,21 @@ TArray<FRancItemInfo> URancInventoryFunctions::FilterTradeableItems(URancInvento
 	float VirtualWeight = ToInventory->GetCurrentWeight();
 
 	Algo::CopyIf(Items, Output,
-	             [&](const FRancItemInfo& Iterator)
+	             [&](const FRancItemInfo& ItemInfo)
 	             {
 		             if (VirtualWeight >= ToInventory->GetMaxWeight())
 		             {
 			             return false;
 		             }
 
-		             bool bCanTradeIterator = FromInventory->ContainsItem(Iterator.ItemId) && ToInventory->
-			             CanReceiveItem(Iterator);
+		             bool bCanTradeIterator = FromInventory->ContainsItem(ItemInfo.ItemId) && ToInventory->
+			             CanReceiveItem(ItemInfo);
 
 		             if (bCanTradeIterator)
 		             {
-			             if (const URancItemData* const ItemData = URancInventoryFunctions::GetSingleItemDataById(
-				             Iterator.ItemId, {"Data"}))
+		             	if (const URancItemData* const ItemData = URancInventoryFunctions::GetItemById(ItemInfo.ItemId))
 			             {
-				             VirtualWeight += Iterator.Quantity * ItemData->ItemWeight;
+				             VirtualWeight += ItemInfo.Quantity * ItemData->ItemWeight;
 				             bCanTradeIterator = bCanTradeIterator && VirtualWeight <= ToInventory->GetMaxWeight();
 			             }
 			             else
@@ -319,7 +317,7 @@ TArray<FRancItemInfo> URancInventoryFunctions::FilterTradeableItems(URancInvento
 	return Output;
 }
 
-TArray<FPrimaryAssetId> URancInventoryFunctions::GetAllRancItemIds()
+TArray<FPrimaryAssetId> URancInventoryFunctions::GetAllRancItemPrimaryIds()
 {
 	TArray<FPrimaryAssetId> Output;
 
@@ -335,12 +333,15 @@ TArray<FPrimaryAssetId> URancInventoryFunctions::GetAllRancItemIds()
 	return Output;
 }
 
+TArray<FGameplayTag> URancInventoryFunctions::GetAllRancItemIds()
+{
+	return AllItemIds;
+}
+
 void URancInventoryFunctions::AllItemsLoadedCallback()
 {
 	if (UAssetManager* const AssetManager = UAssetManager::GetIfInitialized())
 	{
-		const TArray<FPrimaryAssetId> AllItemIds = GetAllRancItemIds();
-		
 		TArray<UObject*> LoadedAssets;
 		if (AssetManager->GetPrimaryAssetObjectList(FPrimaryAssetType(RancItemDataType), LoadedAssets))
 		{
@@ -351,7 +352,8 @@ void URancInventoryFunctions::AllItemsLoadedCallback()
 			}
 		}
 
-		
+		// fill AllItemIds
+		AllLoadedItemsByTag.GenerateKeyArray(AllItemIds);
 	}
 }
 
@@ -361,8 +363,8 @@ void URancInventoryFunctions::PermanentlyLoadAllItemsAsync()
 
 	if (UAssetManager* const AssetManager = UAssetManager::GetIfInitialized())
 	{
-		const TArray<FPrimaryAssetId> AllItemIds = GetAllRancItemIds();
-		AssetManager->LoadPrimaryAssets(AllItemIds, TArray<FName>{},
+		const TArray<FPrimaryAssetId> AllItemPrimaryIds = GetAllRancItemPrimaryIds();
+		AssetManager->LoadPrimaryAssets(AllItemPrimaryIds, TArray<FName>{},
 		                                FStreamableDelegate::CreateStatic(AllItemsLoadedCallback));
 	}
 }
@@ -377,6 +379,17 @@ URancItemData* URancInventoryFunctions::GetItemById(FGameplayTag TagId)
 	if (const auto* ItemData = AllLoadedItemsByTag.Find(TagId))
 	{
 		return *ItemData;
+	}
+
+	if (UAssetManager* const AssetManager = UAssetManager::GetIfInitialized())
+	{
+		auto IDToLoad = FPrimaryAssetId(TEXT("RancInventory_ItemData"), *(TagId.ToString()));
+		if (const TSharedPtr<FStreamableHandle> StreamableHandle = AssetManager->LoadPrimaryAsset(IDToLoad);
+			StreamableHandle.IsValid())
+		{
+			StreamableHandle->WaitUntilComplete(5.f);
+			return Cast<URancItemData>(StreamableHandle->GetLoadedAsset());
+		}
 	}
 
 	return nullptr;
@@ -419,82 +432,17 @@ bool URancInventoryFunctions::IsItemValid(const FRancItemInfo InItemInfo)
 	return InItemInfo.ItemId.IsValid() && InItemInfo != FRancItemInfo::EmptyItemInfo && InItemInfo.Quantity > 0;
 }
 
-bool URancInventoryFunctions::IsItemStackable(const FRancItemInfo InItemInfo)
+bool URancInventoryFunctions::IsItemStackable(const FRancItemInfo ItemInfo)
 {
-	if (!IsItemValid(InItemInfo))
+	if (!IsItemValid(ItemInfo))
 	{
 		return false;
 	}
 
-	if (const URancItemData* const ItemData = GetSingleItemDataById(InItemInfo.ItemId, {"Data"}))
+	if (const URancItemData* const ItemData = URancInventoryFunctions::GetItemById(ItemInfo.ItemId))
 	{
 		return ItemData->bIsStackable;
 	}
 
 	return true;
-}
-
-FGameplayTagContainer URancInventoryFunctions::GetItemTagsWithParentTag(const FRancItemInfo InItemInfo,
-                                                                        const FGameplayTag FromParentTag)
-{
-	FGameplayTagContainer Output;
-	for (const FGameplayTag& Iterator : InItemInfo.Tags)
-	{
-		if (Iterator.MatchesTag(FromParentTag))
-		{
-			Output.AddTag(Iterator);
-		}
-	}
-
-	return Output;
-}
-
-FString URancInventoryFunctions::RancItemEnumTypeToString(const ERancItemType InEnumName)
-{
-	switch (InEnumName)
-	{
-	case ERancItemType::None:
-		return "None";
-
-	case ERancItemType::Consumable:
-		return "Consumable";
-
-	case ERancItemType::Armor:
-		return "Armor";
-
-	case ERancItemType::Weapon:
-		return "Weapon";
-
-	case ERancItemType::Accessory:
-		return "Accessory";
-
-	case ERancItemType::Crafting:
-		return "Crafting";
-
-	case ERancItemType::Material:
-		return "Material";
-
-	case ERancItemType::Information:
-		return "Information";
-
-	case ERancItemType::Special:
-		return "Special";
-
-	case ERancItemType::Event:
-		return "Event";
-
-	case ERancItemType::Quest:
-		return "Quest";
-
-	case ERancItemType::Junk:
-		return "Junk";
-
-	case ERancItemType::Other:
-		return "Other";
-
-	default:
-		break;
-	}
-
-	return FString();
 }

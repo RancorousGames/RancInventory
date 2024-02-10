@@ -60,7 +60,10 @@ public:
     
     /* Get the primary asset ids of all registered items */
     UFUNCTION(BlueprintPure, Category = "Ranc Inventory")
-    static TArray<FPrimaryAssetId> GetAllRancItemIds();
+    static TArray<FPrimaryAssetId> GetAllRancItemPrimaryIds();
+    
+    UFUNCTION(BlueprintPure, Category = "Ranc Inventory")
+    static TArray<FGameplayTag> GetAllRancItemIds();
     
     /* Loads all item data, removing the need for GetSingleItemDataById and instead allowing use of GetItemById */
     UFUNCTION(BlueprintCallable, Category = "Ranc Inventory")
@@ -69,7 +72,7 @@ public:
     UFUNCTION(BlueprintPure, Category = "Ranc Inventory")
     static bool AreAllItemsLoaded();
     
-    /* Uses static map from GameplayTag to URancItemData, requires having called PermanentlyLoadAllItems */
+    /* Uses static map from GameplayTag to URancItemData, works faster after having called PermanentlyLoadAllItems */
     UFUNCTION(BlueprintPure, Category = "Ranc Inventory")
     static URancItemData* GetItemById(FGameplayTag TagId);
     
@@ -84,14 +87,6 @@ public:
     /* Check if the given item info represents a stackable item */
     UFUNCTION(BlueprintPure, Category = "Ranc Inventory")
     static bool IsItemStackable(const FRancItemInfo InItemInfo);
-
-    /* Get item tags providing a parent tag */
-    UFUNCTION(BlueprintPure, Category = "Ranc Inventory")
-    static FGameplayTagContainer GetItemTagsWithParentTag(const FRancItemInfo InItemInfo, const FGameplayTag FromParentTag);
-
-    /* Convert an item type enum value to string */
-    UFUNCTION(BlueprintPure, Category = "Ranc Inventory")
-    static FString RancItemEnumTypeToString(const ERancItemType InEnumName);
 
     template<typename Ty>
     constexpr static const bool HasEmptyParam(const Ty& Arg1)
@@ -127,6 +122,8 @@ private:
 
     
     static TMap<FGameplayTag, URancItemData*> AllLoadedItemsByTag;
+   // static TMap<FGameplayTag, FName> AllLoadedItemAssetNamesByTag;
+    static TArray<FGameplayTag> AllItemIds;
 
 public:
     /* Filter the container and return only items that can be traded at the current context */

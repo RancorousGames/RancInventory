@@ -203,7 +203,7 @@ void SFRancInventoryTable::UpdateItemList()
 {
     ItemArr.Empty();
 
-    for (const FPrimaryAssetId& Iterator : URancInventoryFunctions::GetAllRancItemIds())
+    for (const FPrimaryAssetId& Iterator : URancInventoryFunctions::GetAllRancItemPrimaryIds())
     {
         ItemArr.Add(MakeShared<FRancItemRowData>(Iterator));
     }

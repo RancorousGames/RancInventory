@@ -19,13 +19,35 @@ URancInventoryComponent::URancInventoryComponent(const FObjectInitializer& Objec
 {
     PrimaryComponentTick.bCanEverTick = false;
     PrimaryComponentTick.bStartWithTickEnabled = false;
-
+    bWantsInitializeComponent = true;
     SetIsReplicatedByDefault(true);
 
     if (const URancInventorySettings* const Settings = URancInventorySettings::Get())
     {
         MaxWeight = Settings->MaxWeight;
         MaxNumItems = Settings->MaxNumItems;
+    }
+}
+
+void URancInventoryComponent::InitializeComponent()
+{
+    Super::InitializeComponent();
+
+    // add all initial items to items
+    if (GetOwnerRole() == ROLE_Authority)
+    {
+        for (const FRancInitialItem& InitialItem : InitialItems)
+        {
+            const URancItemData* Data = URancInventoryFunctions::GetSingleItemDataById(InitialItem.ItemId, {}, false);
+            
+            if (Data && Data->ItemId.IsValid())
+                Items.Add(FRancItemInfo(Data->ItemId, InitialItem.Quantity));
+        }
+    }
+
+    if (DropItemClass == nullptr)
+    {
+        DropItemClass = AWorldItem::StaticClass();
     }
 }
 
@@ -92,8 +114,7 @@ void URancInventoryComponent::AddItems(const FRancItemInfo& ItemInfo)
     // Update the current weight of the inventory
     UpdateWeight();
 
-    // Replicate changes to clients
-    OnInventoryUpdated.Broadcast();
+    OnInventoryItemAdded.Broadcast(ItemInfo);
 
     // Mark the Items array as dirty to ensure replication
     MARK_PROPERTY_DIRTY_FROM_NAME(URancInventoryComponent, Items, this);
@@ -129,17 +150,57 @@ bool URancInventoryComponent::RemoveItems(const FRancItemInfo& ItemInfo)
             }
         }
     }
-
+    
     // Update the current weight of the inventory
     UpdateWeight();
 
-    // Replicate changes to clients
-    OnInventoryUpdated.Broadcast();
-
+    OnInventoryItemRemoved.Broadcast(ItemInfo);
+    
     // Mark the Items array as dirty to ensure replication
     MARK_PROPERTY_DIRTY_FROM_NAME(URancInventoryComponent, Items, this);
 
     return true;
+}
+
+int32 URancInventoryComponent::DropItems(const FRancItemInfo& ItemInfo)
+{
+    auto ContainedItemInfo = FindItemById(ItemInfo.ItemId);
+    int32 CountToDrop = FMath::Min(ItemInfo.Quantity, ContainedItemInfo.Quantity);
+
+    if (CountToDrop <= 0)
+    {
+        return false;
+    }
+
+    if (GetOwnerRole() != ROLE_Authority)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("DropItems called on non-authority!"));
+        return false;
+    }
+
+    if (UWorld* World = GetWorld())
+    {
+        FActorSpawnParameters SpawnParams;
+        if (AWorldItem* WorldItem = World->SpawnActorDeferred<AWorldItem>(DropItemClass,
+                                                                  FTransform( GetOwner()->
+                                                                  GetActorLocation() + GetOwner()->GetActorForwardVector() *
+                                                                  DropDistance)))
+        {
+            WorldItem->SetItem(ItemInfo);
+            WorldItem->FinishSpawning(FTransform(GetOwner()->GetActorLocation() + GetOwner()->GetActorForwardVector() * DropDistance));
+            
+            ContainedItemInfo.Quantity -= CountToDrop;
+            if (ContainedItemInfo.Quantity <= 0)
+            {
+                Items.Remove(ContainedItemInfo);
+            }
+            OnInventoryItemRemoved.Broadcast(ItemInfo);
+
+            return CountToDrop;
+        }
+    }
+    
+    return 0;
 }
 
 float URancInventoryComponent::GetCurrentWeight() const
@@ -152,7 +213,7 @@ float URancInventoryComponent::GetMaxWeight() const
     return MaxWeight <= 0.f ? MAX_flt : MaxWeight;
 }
 
-const FRancItemInfo& URancInventoryComponent::FindItemById(const FPrimaryRancItemId& ItemId) const
+const FRancItemInfo& URancInventoryComponent::FindItemById(const FGameplayTag& ItemId) const
 {
     for (const auto& Item : Items)
     {
@@ -178,7 +239,7 @@ bool URancInventoryComponent::CanReceiveItem(const FRancItemInfo& ItemInfo) cons
     }
 
     // Calculate the additional weight this item would add
-    if (const URancItemData* const ItemData = URancInventoryFunctions::GetSingleItemDataById(ItemInfo.ItemId, { "Data" }))
+    if (const URancItemData* const ItemData = URancInventoryFunctions::GetItemById(ItemInfo.ItemId))
     {
         float AdditionalWeight = ItemData->ItemWeight * ItemInfo.Quantity;
         if (CurrentWeight + AdditionalWeight > MaxWeight)
@@ -196,7 +257,7 @@ bool URancInventoryComponent::CanReceiveItem(const FRancItemInfo& ItemInfo) cons
     return true;
 }
 
-bool URancInventoryComponent::ContainsItem(const FPrimaryRancItemId& ItemId, int32 Quantity) const
+bool URancInventoryComponent::ContainsItem(const FGameplayTag& ItemId, int32 Quantity) const
 {
     int32 TotalQuantity = 0;
     for (const auto& Item : Items)
@@ -236,11 +297,11 @@ bool URancInventoryComponent::IsEmpty()
 void URancInventoryComponent::UpdateWeight()
 {
     CurrentWeight = 0.0f; // Reset weight
-    for (const auto& Item : Items)
+    for (const auto& ItemInfo : Items)
     {
-        if (const URancItemData* const ItemData = URancInventoryFunctions::GetSingleItemDataById(Item.ItemId, { "Data" }))
+        if (const URancItemData* const ItemData = URancInventoryFunctions::GetItemById(ItemInfo.ItemId))
         {
-            CurrentWeight += ItemData->ItemWeight * Item.Quantity;
+            CurrentWeight += ItemData->ItemWeight * ItemInfo.Quantity;
         }
     }
 
