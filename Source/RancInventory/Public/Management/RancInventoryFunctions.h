@@ -57,11 +57,22 @@ public:
     /* Search all registered items and return a array of item data that match with the given parameters */
     UFUNCTION(BlueprintCallable, Category = "Ranc Inventory")
     static TArray<URancItemData*> SearchRancItemData(const ERancItemSearchType SearchType, const FString& SearchString, const TArray<FName>& InBundles, const bool bAutoUnload = true);
-
+    
     /* Get the primary asset ids of all registered items */
     UFUNCTION(BlueprintPure, Category = "Ranc Inventory")
     static TArray<FPrimaryAssetId> GetAllRancItemIds();
-
+    
+    /* Loads all item data, removing the need for GetSingleItemDataById and instead allowing use of GetItemById */
+    UFUNCTION(BlueprintCallable, Category = "Ranc Inventory")
+    static void PermanentlyLoadAllItemsAsync();
+    
+    UFUNCTION(BlueprintPure, Category = "Ranc Inventory")
+    static bool AreAllItemsLoaded();
+    
+    /* Uses static map from GameplayTag to URancItemData, requires having called PermanentlyLoadAllItems */
+    UFUNCTION(BlueprintPure, Category = "Ranc Inventory")
+    static URancItemData* GetItemById(FGameplayTag TagId);
+    
     /* Trade items between two inventory components */
     UFUNCTION(BlueprintCallable, Category = "Ranc Inventory")
     static void TradeRancItem(TArray<FRancItemInfo> ItemsToTrade, URancInventoryComponent* FromInventory, URancInventoryComponent* ToInventory);
@@ -109,9 +120,13 @@ public:
     UFUNCTION(BlueprintPure, Category = "Ranc Inventory")
     static TMap<FGameplayTag, FPrimaryRancItemIdContainer> GetItemRelations(const FRancItemInfo InItemInfo);
 
+    static void AllItemsLoadedCallback();
 private:
     static TArray<URancItemData*> LoadRancItemDatas_Internal(UAssetManager* InAssetManager, const TArray<FPrimaryAssetId>& InIDs, const TArray<FName>& InBundles, const bool bAutoUnload);
     static TArray<URancItemData*> LoadRancItemDatas_Internal(UAssetManager* InAssetManager, const TArray<FPrimaryRancItemId>& InIDs, const TArray<FName>& InBundles, const bool bAutoUnload);
+
+    
+    static TMap<FGameplayTag, URancItemData*> AllLoadedItemsByTag;
 
 public:
     /* Filter the container and return only items that can be traded at the current context */

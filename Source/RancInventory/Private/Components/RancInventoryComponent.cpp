@@ -15,7 +15,7 @@
 #include UE_INLINE_GENERATED_CPP_BY_NAME(RancInventoryComponent)
 #endif
 
-URancInventoryComponent::URancInventoryComponent(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer), CurrentWeight(0.f), MaxWeight(0.f), MaxNumItems(0)
+URancInventoryComponent::URancInventoryComponent(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer), MaxWeight(0.f), MaxNumItems(0), CurrentWeight(0.f)
 {
     PrimaryComponentTick.bCanEverTick = false;
     PrimaryComponentTick.bStartWithTickEnabled = false;
