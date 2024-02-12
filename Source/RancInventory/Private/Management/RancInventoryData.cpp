@@ -12,3 +12,7 @@ const FRancItemInfo FRancItemInfo::EmptyItemInfo(FGameplayTag(), -1);
 URancItemData::URancItemData(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
 }
+
+URancItemRecipe::URancItemRecipe(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
+{
+}

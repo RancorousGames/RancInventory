@@ -338,6 +338,17 @@ TArray<FGameplayTag> URancInventoryFunctions::GetAllRancItemIds()
 	return AllItemIds;
 }
 
+TArray<FPrimaryAssetId> URancInventoryFunctions::GetAllRancItemRecipeIds()
+{
+	TArray<FPrimaryAssetId> AllItemRecipeIds;
+	if (const UAssetManager* const AssetManager = UAssetManager::GetIfInitialized())
+	{
+		AssetManager->GetPrimaryAssetIdList(FPrimaryAssetType(RancItemRecipeType), AllItemRecipeIds);
+	}
+
+	return AllItemRecipeIds;
+}
+
 void URancInventoryFunctions::AllItemsLoadedCallback()
 {
 	if (UAssetManager* const AssetManager = UAssetManager::GetIfInitialized())

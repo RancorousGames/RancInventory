@@ -1,20 +1,13 @@
 #pragma once
 
 #include <CoreMinimal.h>
-#include <GameplayTagContainer.h>
 #include <Components/ActorComponent.h>
-
-#include "Actors/AWorldItem.h"
-#include "Management/RancInventoryData.h"
+#include "RancItemContainerComponent.h"
 #include "RancInventoryComponent.generated.h"
 
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE(FRancInventoryUpdate);
-
-DECLARE_DYNAMIC_MULTICAST_DELEGATE(FRancInventoryEmpty);
-
 UCLASS(Blueprintable, ClassGroup = (Custom), Category = "Ranc Inventory | Classes", EditInlineNew, meta = (BlueprintSpawnableComponent))
-class RANCINVENTORY_API URancInventoryComponent : public UActorComponent
+class RANCINVENTORY_API URancInventoryComponent : public URancItemContainerComponent
 {
     GENERATED_BODY()
 
@@ -22,86 +15,58 @@ public:
     explicit URancInventoryComponent(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
 
     virtual void InitializeComponent() override;
-    
-    UFUNCTION(BlueprintPure, Category="Ranc Inventory")
-    float GetCurrentWeight() const;
-
-    UFUNCTION(BlueprintPure, Category="Ranc Inventory")
-    float GetMaxWeight() const;
-
-    UFUNCTION(BlueprintPure, Category="Ranc Inventory")
-    int32 GetCurrentItemCount() const;
-
-    UFUNCTION(BlueprintPure, Category="Ranc Inventory")
-    const FRancItemInfo& FindItemById(const FGameplayTag& ItemId) const;
-
-    UFUNCTION(BlueprintCallable, Category="Ranc Inventory")
-    void AddItems(const FRancItemInfo& ItemInfo);
-
-    UFUNCTION(BlueprintCallable, Category="Ranc Inventory")
-    bool RemoveItems(const FRancItemInfo& ItemInfo);
-    
-    UFUNCTION(BlueprintCallable, Category="Ranc Inventory")
-    int32 DropItems(const FRancItemInfo& ItemInfo);
-
-    UFUNCTION(BlueprintCallable, Category="Ranc Inventory")
-    bool CanReceiveItem(const FRancItemInfo& ItemInfo) const;
-    
-    UFUNCTION(BlueprintPure, Category="Ranc Inventory")
-    bool ContainsItem(const FGameplayTag& ItemId, int32 Quantity = 1) const;
-
-    UFUNCTION(BlueprintPure, Category="Ranc Inventory")
-    TArray<FRancItemInfo> GetAllItems() const;
-    
-    UFUNCTION(BlueprintPure, Category="Ranc Inventory")
-    bool IsEmpty();
-
-    DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnInventoryUpdated);
-    UPROPERTY(BlueprintAssignable, Category="Ranc Inventory")
-    FOnInventoryUpdated OnInventoryUpdated;
-    
-    DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnInventoryItemAdded, const FRancItemInfo&, ItemInfo);
-    UPROPERTY(BlueprintAssignable, Category="Ranc Inventory")
-    FOnInventoryItemAdded OnInventoryItemAdded;
-    
-    DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnInventoryItemRemoved, const FRancItemInfo&, ItemInfo);
-    UPROPERTY(BlueprintAssignable, Category="Ranc Inventory")
-    FOnInventoryItemRemoved OnInventoryItemRemoved;
-
-    DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnInventoryEmptied);
-    UPROPERTY(BlueprintAssignable, Category="Ranc Inventory")
-    FOnInventoryEmptied OnInventoryEmptied;
 
     
-    UPROPERTY(EditAnywhere, BlueprintReadWrite)
-    float DropDistance = 100;
+    UFUNCTION(BlueprintCallable, Category="Ranc Inventory | Crafting")
+    bool CanCraftRecipeId(const FPrimaryAssetId& RecipeId) const;
+
+    UFUNCTION(BlueprintCallable, Category="Ranc Inventory | Crafting")
+    bool CanCraftRecipe(const URancItemRecipe* Recipe) const;
     
-    UPROPERTY(EditAnywhere, BlueprintReadWrite)
-    TSubclassOf<AWorldItem> DropItemClass = AWorldItem::StaticClass();
+    UFUNCTION(BlueprintCallable, Category="Ranc Inventory | Crafting")
+    bool CanCraftCraftingRecipe(const FPrimaryAssetId& RecipeId) const;
+
+    DECLARE_DYNAMIC_DELEGATE_OneParam(FOnCraftingSuccessOptionalDelegate, TSubclassOf<UObject>, CraftedObjectClass);
+    UFUNCTION(BlueprintCallable, Category="Ranc Inventory | Crafting")
+    bool CraftRecipeId(const FPrimaryAssetId& RecipeId, FOnCraftingSuccessOptionalDelegate OptionalSuccessDelegate);
+    UFUNCTION(BlueprintCallable, Category="Ranc Inventory | Crafting")
+    bool CraftRecipe(const URancItemRecipe* Recipe, FOnCraftingSuccessOptionalDelegate OptionalSuccessDelegate);
+    
+    UFUNCTION(BlueprintCallable, Category="Ranc Inventory | Crafting")
+    FRancItemInfo CraftCraftingRecipe(const FPrimaryAssetId& RecipeId, bool& bSuccess);
+
+    UFUNCTION(BlueprintCallable, Category="Ranc Inventory | Recipes")
+    void UnlockRecipe(const FPrimaryAssetId& RecipeId);
+
+    UFUNCTION(BlueprintCallable, Category="Ranc Inventory | Recipes")
+    void LockRecipe(const FPrimaryAssetId& RecipeId);
+
+    UFUNCTION(BlueprintCallable, Category="Ranc Inventory | Recipes")
+    TArray<URancItemRecipe*> GetRecipes(FGameplayTag Category);
+
+    
+    // Adjusted delegate type to match the UObject crafting context
+    
+    // Delegate for successful crafting, now provides a class reference instead of item info
+    DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnCraftingSuccess, TSubclassOf<UObject>, CraftedObjectClass);
+    UPROPERTY(BlueprintAssignable, Category="Ranc Inventory | Crafting")
+    FOnCraftingSuccess OnCraftingSuccess;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Ranc Inventory | Recipes")
+    FGameplayTagContainer RecipeCategories;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Ranc Inventory | Recipes")
+    TArray<URancItemRecipe*> AllAvailableRecipes;
+    
+    UFUNCTION()
+    void OnInventoryItemAddedHandler(const FRancItemInfo& ItemInfo);
+    UFUNCTION()
+    void OnInventoryItemRemovedHandler(const FRancItemInfo& ItemInfo);
 
 protected:
 
-
-    UPROPERTY(EditAnywhere, Category="Ranc Inventory")
-    TArray<FRancInitialItem> InitialItems;
-    
-    UPROPERTY(ReplicatedUsing=OnRep_Items, BlueprintReadOnly, Category="Ranc Inventory")
-    TArray<FRancItemInfo> Items;
-
-    /* Max weight allowed for this inventory */
-    UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Ranc Inventory", meta = (AllowPrivateAccess = "true", ClampMin = "0", UIMin = "0"))
-    float MaxWeight;
-
-    /* Max num of items allowed for this inventory */
-    UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Ranc Inventory", meta = (AllowPrivateAccess = "true", ClampMin = "1", UIMin = "1"))
-    int32 MaxNumItems;
+    void CheckAndUpdateRecipeAvailability();
 private:
-    float CurrentWeight;
-
-    UFUNCTION()
-    void OnRep_Items();
-
-    void UpdateWeight();
-
-    virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+    
+    TMap<FGameplayTag, TArray<URancItemRecipe*>> CurrentAvailableRecipes;
 };

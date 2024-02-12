@@ -70,10 +70,13 @@ public:
     // returns remaining items that we could not add
     UFUNCTION(BlueprintCallable, Category="Inventory Mapping")
     int32 AddItemToSlot(const FRancItemInfo& ItemInfo, int32 SlotIndex);
-    
+
     UFUNCTION(BlueprintCallable, Category="Inventory Mapping")
     bool CanAddItemToSlot(const FRancItemInfo& ItemInfo, int32 SlotIndex) const;
 
+protected:
+    int32 AddItemToSlotImplementation(const FRancItemInfo& ItemInfo, int32 SlotIndex, bool PushUpdates);
+    
 private:
     bool SuppressCallback = false;
     

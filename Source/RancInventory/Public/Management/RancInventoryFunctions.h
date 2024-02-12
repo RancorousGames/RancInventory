@@ -64,6 +64,10 @@ public:
     
     UFUNCTION(BlueprintPure, Category = "Ranc Inventory")
     static TArray<FGameplayTag> GetAllRancItemIds();
+
+    /* Includes both RancItemRecipe and RancItemCraftingRecipe (for item to item) */
+    UFUNCTION(BlueprintPure, Category = "Ranc Inventory")
+    static TArray<FPrimaryAssetId> GetAllRancItemRecipeIds();
     
     /* Loads all item data, removing the need for GetSingleItemDataById and instead allowing use of GetItemById */
     UFUNCTION(BlueprintCallable, Category = "Ranc Inventory")

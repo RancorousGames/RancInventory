@@ -10,6 +10,7 @@
 class UTexture2D;
 
 constexpr auto RancItemDataType = TEXT("RancInventory_ItemData");
+constexpr auto RancItemRecipeType = TEXT("RancInventory_ItemRecipe");
 
 USTRUCT(BlueprintType, Category = "Ranc Inventory | Structs")
 struct FPrimaryRancItemId : public FPrimaryAssetId
@@ -96,16 +97,13 @@ struct FRancInitialItem
 
     FRancInitialItem() = default;
 
-    explicit FRancInitialItem(const URancItemData* InItemData) : ItemData(InItemData)
+    explicit FRancInitialItem(FPrimaryRancItemId InItemId) : ItemId(InItemId)
     {
     }
 
-    explicit FRancInitialItem(const URancItemData* InItemData, const int32& InQuant) : ItemData(InItemData), Quantity(InQuant)
+    explicit FRancInitialItem(FPrimaryRancItemId InItemId, const int32& InQuant) : ItemId(InItemId), Quantity(InQuant)
     {
     }
-    
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ranc Inventory")
-    const URancItemData* ItemData;
     
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ranc Inventory")
     FPrimaryRancItemId ItemId;
@@ -144,8 +142,6 @@ public:
     
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ranc Inventory", meta = (AssetBundles = "Data"))
     int32 MaxStackSize = 5;
-
-    
     
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ranc Inventory", meta = (UIMin = 0, ClampMin = 0, AssetBundles = "Data"))
     float ItemValue;
@@ -172,4 +168,69 @@ public:
     /* Map containing a tag as key and a ID container as value to add relations to other items such as crafting requirements, etc. */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ranc Inventory", meta = (DisplayName = "Item Relations", AssetBundles = "Custom"))
     TMap<FGameplayTag, FPrimaryRancItemIdContainer> Relations;
+};
+
+
+UCLASS(NotBlueprintable, NotPlaceable, Category = "Ranc Inventory | Classes | Data")
+class RANCINVENTORY_API URancItemRecipe : public UPrimaryDataAsset
+{
+    GENERATED_BODY()
+
+public:
+    explicit URancItemRecipe(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
+    
+    FORCEINLINE virtual FPrimaryAssetId GetPrimaryAssetId() const override
+    {
+        // Create a string by appending the resulting item ID to each component
+        FString ResultingItemIdString = ResultingObject ? ResultingObject->GetName() : FString("Null-");
+        for (const auto& Component : Components)
+        {
+            ResultingItemIdString += Component.ItemId.ToString();
+        }
+        
+        return FPrimaryAssetId(TEXT("RancInventory_ItemRecipe"), *ResultingItemIdString);
+    }
+    
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ranc Inventory", meta = (AssetBundles = "Data"))
+    TSubclassOf<UObject> ResultingObject;
+    
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ranc Inventory", meta = (AssetBundles = "Data"))
+    int32 AmountCreated = 1;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ranc Inventory", meta = (AssetBundles = "Data"))
+    TArray<FRancItemInfo> Components;
+    
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ranc Inventory", meta = (AssetBundles = "Data"))
+    FGameplayTagContainer Tags;
+    
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ranc Inventory", meta = (AssetBundles = "UI"))
+    TSoftObjectPtr<UTexture2D> Icon;
+
+};
+
+
+
+UCLASS(NotBlueprintable, NotPlaceable, Category = "Ranc Inventory | Classes | Data")
+class RANCINVENTORY_API URancItemCraftingRecipe : public URancItemRecipe
+{
+    GENERATED_BODY()
+
+public:
+    explicit URancItemCraftingRecipe(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get()){}
+    
+    FORCEINLINE virtual FPrimaryAssetId GetPrimaryAssetId() const override
+    {
+        // Create a string by appending the resulting item ID to each component
+        FString ResultingItemIdString = ResultingItem.ItemId.ToString();
+        for (const auto& Component : Components)
+        {
+            ResultingItemIdString += Component.ItemId.ToString();
+        }
+        
+        return FPrimaryAssetId(TEXT("RancInventory_ItemRecipe"), *ResultingItemIdString);
+    }
+public:
+    // Replaces use of ResultingItem
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ranc Inventory", meta = (AssetBundles = "Data"))
+    FRancItemInfo ResultingItem;
 };

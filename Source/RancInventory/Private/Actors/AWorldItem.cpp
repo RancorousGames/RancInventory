@@ -51,6 +51,7 @@ void AWorldItem::Initialize()
 		// cube
 		const FString CubePath = TEXT("StaticMesh'/Engine/BasicShapes/Cube.Cube'");
 		mesh->SetStaticMesh(Cast<UStaticMesh>(StaticLoadObject(UStaticMesh::StaticClass(), NULL, *CubePath)));
+		mesh->SetWorldScale3D(FVector(0.2f, 0.2f, 0.2f));
 	}
 }
 
