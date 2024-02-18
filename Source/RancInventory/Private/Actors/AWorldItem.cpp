@@ -7,11 +7,6 @@
 void AWorldItem::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
-	SetMobility(EComponentMobility::Movable);
-	SetReplicates(true);
-	SetReplicateMovement(true);
-	GetStaticMeshComponent()->SetEnableGravity(true);
-	GetStaticMeshComponent()->SetSimulatePhysics(true);
 }
 
 void AWorldItem::BeginPlay()
@@ -24,7 +19,7 @@ void AWorldItem::BeginPlay()
 	}
 }
 
-void AWorldItem::SetItem(const FRancItemInfo& NewItem)
+void AWorldItem::SetItem(const FRancItemInstance& NewItem)
 {
 	Item = NewItem;
 	Initialize();
@@ -37,7 +32,7 @@ void AWorldItem::OnRep_Item()
 
 void AWorldItem::Initialize()
 {
-	ItemData = URancInventoryFunctions::GetItemById(Item.ItemId);
+	ItemData = URancInventoryFunctions::GetItemDataById(Item.ItemId);
 
 	auto* mesh = GetStaticMeshComponent();
 

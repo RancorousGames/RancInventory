@@ -16,6 +16,7 @@
 
 TMap<FGameplayTag, URancItemData*> URancInventoryFunctions::AllLoadedItemsByTag;
 TArray<FGameplayTag> URancInventoryFunctions::AllItemIds;
+TArray<URancRecipe*> URancInventoryFunctions::AllLoadedRecipes;
 
 void URancInventoryFunctions::UnloadAllRancItems()
 {
@@ -41,7 +42,7 @@ void URancInventoryFunctions::UnloadRancItem(const FPrimaryRancItemId& InItemId)
 	}
 }
 
-bool URancInventoryFunctions::CompareItemInfo(const FRancItemInfo& Info1, const FRancItemInfo& Info2)
+bool URancInventoryFunctions::CompareItemInfo(const FRancItemInstance& Info1, const FRancItemInstance& Info2)
 {
 	return Info1 == Info2;
 }
@@ -103,7 +104,7 @@ TArray<URancItemData*> URancInventoryFunctions::GetItemDataArrayById(const TArra
     if (UAssetManager* const AssetManager = UAssetManager::GetIfValid())
 #endif
 	{
-		Output = LoadRancItemDatas_Internal(AssetManager, InIDs, InBundles, bAutoUnload);
+		Output = LoadRancItemData_Internal(AssetManager, InIDs, InBundles, bAutoUnload);
 	}
 	return Output;
 }
@@ -121,7 +122,7 @@ TArray<URancItemData*> URancInventoryFunctions::SearchRancItemData(const ERancIt
     if (UAssetManager* const AssetManager = UAssetManager::GetIfValid())
 #endif
 	{
-		TArray<URancItemData*> ReturnedValues = LoadRancItemDatas_Internal(
+		TArray<URancItemData*> ReturnedValues = LoadRancItemData_Internal(
 			AssetManager, GetAllRancItemPrimaryIds(), InBundles, bAutoUnload);
 
 		for (URancItemData* const& Iterator : ReturnedValues)
@@ -163,22 +164,12 @@ TArray<URancItemData*> URancInventoryFunctions::SearchRancItemData(const ERancIt
 	return Output;
 }
 
-TMap<FGameplayTag, FName> URancInventoryFunctions::GetItemMetadatas(const FRancItemInfo InItemInfo)
-{
-	TMap<FGameplayTag, FName> Output;
-	if (const URancItemData* const Data = URancInventoryFunctions::GetItemById(InItemInfo.ItemId))
-	{
-		Output = Data->Metadatas;
-	}
-
-	return Output;
-}
 
 TMap<FGameplayTag, FPrimaryRancItemIdContainer> URancInventoryFunctions::GetItemRelations(
-	const FRancItemInfo InItemInfo)
+	const FRancItemInstance InItemInfo)
 {
 	TMap<FGameplayTag, FPrimaryRancItemIdContainer> Output;
-	if (const URancItemData* const Data = URancInventoryFunctions::GetItemById(InItemInfo.ItemId))
+	if (const URancItemData* const Data = URancInventoryFunctions::GetItemDataById(InItemInfo.ItemId))
 	{
 		Output = Data->Relations;
 	}
@@ -186,7 +177,7 @@ TMap<FGameplayTag, FPrimaryRancItemIdContainer> URancInventoryFunctions::GetItem
 	return Output;
 }
 
-TArray<URancItemData*> URancInventoryFunctions::LoadRancItemDatas_Internal(
+TArray<URancItemData*> URancInventoryFunctions::LoadRancItemData_Internal(
 	UAssetManager* InAssetManager, const TArray<FPrimaryAssetId>& InIDs, const TArray<FName>& InBundles,
 	const bool bAutoUnload)
 {
@@ -271,35 +262,36 @@ TArray<URancItemData*> URancInventoryFunctions::LoadRancItemDatas_Internal(
 	return Output;
 }
 
-TArray<URancItemData*> URancInventoryFunctions::LoadRancItemDatas_Internal(
+TArray<URancItemData*> URancInventoryFunctions::LoadRancItemData_Internal(
 	UAssetManager* InAssetManager, const TArray<FPrimaryRancItemId>& InIDs, const TArray<FName>& InBundles,
 	const bool bAutoUnload)
 {
 	const TArray<FPrimaryAssetId> PrimaryAssetIds(InIDs);
-	return LoadRancItemDatas_Internal(InAssetManager, PrimaryAssetIds, InBundles, bAutoUnload);
+	return LoadRancItemData_Internal(InAssetManager, PrimaryAssetIds, InBundles, bAutoUnload);
 }
 
-TArray<FRancItemInfo> URancInventoryFunctions::FilterTradeableItems(URancInventoryComponent* FromInventory,
-                                                                    URancInventoryComponent* ToInventory,
-                                                                    const TArray<FRancItemInfo>& Items)
+TArray<FRancItemInstance> URancInventoryFunctions::FilterTradeableItems(URancInventoryComponent* FromInventory,
+                                                                        URancInventoryComponent* ToInventory,
+                                                                        const TArray<FRancItemInstance>& Items)
 {
-	TArray<FRancItemInfo> Output;
+	TArray<FRancItemInstance> Output;
 	float VirtualWeight = ToInventory->GetCurrentWeight();
 
 	Algo::CopyIf(Items, Output,
-	             [&](const FRancItemInfo& ItemInfo)
+	             [&](const FRancItemInstance& ItemInfo)
 	             {
 		             if (VirtualWeight >= ToInventory->GetMaxWeight())
 		             {
 			             return false;
 		             }
 
-		             bool bCanTradeIterator = FromInventory->ContainsItem(ItemInfo.ItemId) && ToInventory->
+		             bool bCanTradeIterator = FromInventory->ContainsItems(ItemInfo.ItemId) && ToInventory->
 			             CanReceiveItem(ItemInfo);
 
 		             if (bCanTradeIterator)
 		             {
-		             	if (const URancItemData* const ItemData = URancInventoryFunctions::GetItemById(ItemInfo.ItemId))
+			             if (const URancItemData* const ItemData = URancInventoryFunctions::GetItemDataById(
+				             ItemInfo.ItemId))
 			             {
 				             VirtualWeight += ItemInfo.Quantity * ItemData->ItemWeight;
 				             bCanTradeIterator = bCanTradeIterator && VirtualWeight <= ToInventory->GetMaxWeight();
@@ -317,37 +309,13 @@ TArray<FRancItemInfo> URancInventoryFunctions::FilterTradeableItems(URancInvento
 	return Output;
 }
 
-TArray<FPrimaryAssetId> URancInventoryFunctions::GetAllRancItemPrimaryIds()
-{
-	TArray<FPrimaryAssetId> Output;
 
-#if ENGINE_MAJOR_VERSION > 5 || (ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3)
-	if (UAssetManager* const AssetManager = UAssetManager::GetIfInitialized())
-#else
-    if (UAssetManager* const AssetManager = UAssetManager::GetIfValid())
-#endif
-	{
-		AssetManager->GetPrimaryAssetIdList(FPrimaryAssetType(RancItemDataType), Output);
-	}
-
-	return Output;
-}
 
 TArray<FGameplayTag> URancInventoryFunctions::GetAllRancItemIds()
 {
 	return AllItemIds;
 }
 
-TArray<FPrimaryAssetId> URancInventoryFunctions::GetAllRancItemRecipeIds()
-{
-	TArray<FPrimaryAssetId> AllItemRecipeIds;
-	if (const UAssetManager* const AssetManager = UAssetManager::GetIfInitialized())
-	{
-		AssetManager->GetPrimaryAssetIdList(FPrimaryAssetType(RancItemRecipeType), AllItemRecipeIds);
-	}
-
-	return AllItemRecipeIds;
-}
 
 void URancInventoryFunctions::AllItemsLoadedCallback()
 {
@@ -380,12 +348,28 @@ void URancInventoryFunctions::PermanentlyLoadAllItemsAsync()
 	}
 }
 
+TArray<FPrimaryAssetId> URancInventoryFunctions::GetAllRancItemPrimaryIds()
+{
+	TArray<FPrimaryAssetId> Output;
+
+#if ENGINE_MAJOR_VERSION > 5 || (ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3)
+	if (UAssetManager* const AssetManager = UAssetManager::GetIfInitialized())
+#else
+	if (UAssetManager* const AssetManager = UAssetManager::GetIfValid())
+#endif
+	{
+		AssetManager->GetPrimaryAssetIdList(FPrimaryAssetType(RancItemDataType), Output);
+	}
+
+	return Output;
+}
+
 bool URancInventoryFunctions::AreAllItemsLoaded()
 {
 	return AllLoadedItemsByTag.Num() > 0;
 }
 
-URancItemData* URancInventoryFunctions::GetItemById(FGameplayTag TagId)
+URancItemData* URancInventoryFunctions::GetItemDataById(FGameplayTag TagId)
 {
 	if (const auto* ItemData = AllLoadedItemsByTag.Find(TagId))
 	{
@@ -406,8 +390,9 @@ URancItemData* URancInventoryFunctions::GetItemById(FGameplayTag TagId)
 	return nullptr;
 }
 
-void URancInventoryFunctions::TradeRancItem(TArray<FRancItemInfo> ItemsToTrade, URancInventoryComponent* FromInventory,
-                                            URancInventoryComponent* ToInventory)
+void URancInventoryFunctions::TradeRancItem(TArray<FRancItemInstance> ItemsToTrade,
+                                            URancItemContainerComponent* FromInventory,
+                                            URancItemContainerComponent* ToInventory)
 {
 	if (URancInventoryFunctions::HasEmptyParam(ItemsToTrade))
 	{
@@ -415,9 +400,9 @@ void URancInventoryFunctions::TradeRancItem(TArray<FRancItemInfo> ItemsToTrade, 
 	}
 
 	// first check if frominventory has the items:
-	for (const FRancItemInfo& Iterator : ItemsToTrade)
+	for (const FRancItemInstance& Iterator : ItemsToTrade)
 	{
-		if (!FromInventory->ContainsItem(Iterator.ItemId, Iterator.Quantity))
+		if (!FromInventory->ContainsItems(Iterator.ItemId, Iterator.Quantity))
 		{
 			UE_LOG(LogRancInventory_Internal, Warning,
 			       TEXT("TradeRancItem: FromInventory does not contain the item %s"), *Iterator.ItemId.ToString());
@@ -426,34 +411,93 @@ void URancInventoryFunctions::TradeRancItem(TArray<FRancItemInfo> ItemsToTrade, 
 	}
 
 
-	for (FRancItemInfo& Iterator : ItemsToTrade)
+	for (FRancItemInstance& Iterator : ItemsToTrade)
 	{
-		if (!FromInventory->RemoveItems(Iterator))
+		if (!FromInventory->RemoveItems_IfServer(Iterator))
 		{
 			UE_LOG(LogRancInventory_Internal, Warning,
 			       TEXT("TradeRancItem: Failed to remove item %s from FromInventory"), *Iterator.ItemId.ToString());
 			continue;
 		}
-		ToInventory->AddItems(Iterator);
+		ToInventory->AddItems_IfServer(Iterator);
 	}
 }
 
-bool URancInventoryFunctions::IsItemValid(const FRancItemInfo InItemInfo)
+bool URancInventoryFunctions::IsItemValid(const FRancItemInstance InItemInfo)
 {
-	return InItemInfo.ItemId.IsValid() && InItemInfo != FRancItemInfo::EmptyItemInfo && InItemInfo.Quantity > 0;
+	return InItemInfo.ItemId.IsValid() && InItemInfo != FRancItemInstance::EmptyItemInstance && InItemInfo.Quantity > 0;
 }
 
-bool URancInventoryFunctions::IsItemStackable(const FRancItemInfo ItemInfo)
+
+TArray<FPrimaryAssetId> URancInventoryFunctions::GetAllRancItemRecipeIds()
 {
-	if (!IsItemValid(ItemInfo))
+	TArray<FPrimaryAssetId> AllItemRecipeIds;
+	if (const UAssetManager* const AssetManager = UAssetManager::GetIfInitialized())
 	{
-		return false;
+		AssetManager->GetPrimaryAssetIdList(FPrimaryAssetType(RancItemRecipeType), AllItemRecipeIds);
 	}
 
-	if (const URancItemData* const ItemData = URancInventoryFunctions::GetItemById(ItemInfo.ItemId))
+	return AllItemRecipeIds;
+}
+
+void URancInventoryFunctions::AllRecipesLoadedCallback()
+{
+	if (UAssetManager* const AssetManager = UAssetManager::GetIfInitialized())
 	{
-		return ItemData->bIsStackable;
+		TArray<UObject*> LoadedAssets;
+		if (AssetManager->GetPrimaryAssetObjectList(FPrimaryAssetType(RancItemRecipeType), LoadedAssets))
+		{
+			for (UObject* const& Iterator : LoadedAssets)
+			{
+				URancRecipe* const CastedAsset = Cast<URancRecipe>(Iterator);
+				AllLoadedRecipes.Add(CastedAsset);
+			}
+		}
+	}
+}
+
+void URancInventoryFunctions::HardcodeItem(FGameplayTag ItemId, URancItemData* ItemData)
+{
+	if (AllLoadedItemsByTag.Contains(ItemId))
+	{
+		UE_LOG(LogRancInventory_Internal, Warning, TEXT("HardcodeItem: Item with id %s already exists"), *ItemId.ToString());
+		return;
 	}
 
-	return true;
+	AllLoadedItemsByTag.Add(ItemId, ItemData);
+	AllItemIds.Add(ItemId);
+}
+
+void URancInventoryFunctions::HardcodeRecipe(FGameplayTag RecipeId, URancRecipe* RecipeData)
+{
+	if (AllLoadedRecipes.Contains(RecipeData))
+	{
+		UE_LOG(LogRancInventory_Internal, Warning, TEXT("HardcodeRecipe: Recipe with id %s already exists"), *RecipeId.ToString());
+		return;
+	}
+
+	AllLoadedRecipes.Add(RecipeData);
+}
+
+
+void URancInventoryFunctions::PermanentlyLoadAllRecipesAsync()
+{
+	if (AllLoadedItemsByTag.Num() > 0) return;
+
+	if (UAssetManager* const AssetManager = UAssetManager::GetIfInitialized())
+	{
+		const TArray<FPrimaryAssetId> AllRecipeIds = GetAllRancItemRecipeIds();
+		AssetManager->LoadPrimaryAssets(AllRecipeIds, TArray<FName>{},
+		                                FStreamableDelegate::CreateStatic(AllRecipesLoadedCallback));
+	}
+}
+
+TArray<URancRecipe*> URancInventoryFunctions::GetAllRancItemRecipes()
+{
+	return AllLoadedRecipes;
+}
+
+bool URancInventoryFunctions::AreAllRecipesLoaded()
+{
+	return AllLoadedItemsByTag.Num() > 0;
 }

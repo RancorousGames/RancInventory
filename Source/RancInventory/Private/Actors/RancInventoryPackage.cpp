@@ -3,7 +3,6 @@
 
 #include "Actors/RancInventoryPackage.h"
 #include "Components/RancInventoryComponent.h"
-#include "Management/RancInventorySettings.h"
 #include "Management/RancInventoryFunctions.h"
 #include "Management/RancInventoryData.h"
 #include "LogRancInventory.h"
@@ -27,11 +26,6 @@ ARancInventoryPackage::ARancInventoryPackage(const FObjectInitializer& ObjectIni
 
     PackageInventory = CreateDefaultSubobject<URancInventoryComponent>(TEXT("PackageInventory"));
     PackageInventory->SetIsReplicated(true);
-
-    if (const URancInventorySettings* const Settings = URancInventorySettings::Get())
-    {
-        bDestroyWhenInventoryIsEmpty = Settings->bDestroyWhenInventoryIsEmpty;
-    }
 }
 
 void ARancInventoryPackage::BeginPlay()
@@ -56,13 +50,13 @@ void ARancInventoryPackage::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>
     DOREPLIFETIME_WITH_PARAMS_FAST(ARancInventoryPackage, PackageInventory, SharedParams);
 }
 
-void ARancInventoryPackage::PutItemIntoPackage(const TArray<FRancItemInfo> ItemInfo, URancInventoryComponent* FromInventory)
+void ARancInventoryPackage::PutItemIntoPackage(const TArray<FRancItemInstance> ItemInfo, URancInventoryComponent* FromInventory)
 {
     URancInventoryFunctions::TradeRancItem(ItemInfo, FromInventory, PackageInventory);
     MARK_PROPERTY_DIRTY_FROM_NAME(ARancInventoryPackage, PackageInventory, this);
 }
 
-void ARancInventoryPackage::GetItemFromPackage(const TArray<FRancItemInfo> ItemInfo, URancInventoryComponent* ToInventory)
+void ARancInventoryPackage::GetItemFromPackage(const TArray<FRancItemInstance> ItemInfo, URancInventoryComponent* ToInventory)
 {
     URancInventoryFunctions::TradeRancItem(ItemInfo, PackageInventory, ToInventory);
     MARK_PROPERTY_DIRTY_FROM_NAME(ARancInventoryPackage, PackageInventory, this);

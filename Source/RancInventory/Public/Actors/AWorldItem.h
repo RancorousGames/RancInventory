@@ -9,7 +9,7 @@ class RANCINVENTORY_API AWorldItem : public AStaticMeshActor
 GENERATED_BODY()
 public:
 	UPROPERTY(Replicated, BlueprintReadWrite, Meta = (DisplayName = "ItemInstance", ExposeOnSpawn = true), Category = "Item")
-	FRancItemInfo Item;
+	FRancItemInstance Item;
 	
 	UPROPERTY(BlueprintReadOnly, Meta = (DisplayName = "ItemData"), Category = "Item")
 	URancItemData* ItemData = nullptr;
@@ -17,7 +17,7 @@ public:
 	virtual void OnConstruction(const FTransform& Transform) override;
 	
 	virtual void BeginPlay() override;
-void SetItem(const FRancItemInfo& NewItem);
+void SetItem(const FRancItemInstance& NewItem);
 void OnRep_Item();
 void Initialize();
 

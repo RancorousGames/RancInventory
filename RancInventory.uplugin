@@ -36,6 +36,16 @@
 				"Mac",
 				"Linux"
 			]
+		},
+		{
+			"Name": "RancInventoryTest",
+			"Type": "Runtime",
+			"LoadingPhase": "Default",
+			"PlatformAllowList": [
+				"Win64",
+				"Mac",
+				"Linux"
+			]
 		}
 	]
 }

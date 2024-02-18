@@ -40,7 +40,7 @@ public:
 
     /* Check if the ids are equal */
     UFUNCTION(BlueprintPure, Category = "Ranc Inventory")
-    static bool CompareItemInfo(const FRancItemInfo& Info1, const FRancItemInfo& Info2);
+    static bool CompareItemInfo(const FRancItemInstance& Info1, const FRancItemInstance& Info2);
 
     /* Check if the ids of the given item datas are equal */
     UFUNCTION(BlueprintPure, Category = "Ranc Inventory")
@@ -65,11 +65,8 @@ public:
     UFUNCTION(BlueprintPure, Category = "Ranc Inventory")
     static TArray<FGameplayTag> GetAllRancItemIds();
 
-    /* Includes both RancItemRecipe and RancItemCraftingRecipe (for item to item) */
-    UFUNCTION(BlueprintPure, Category = "Ranc Inventory")
-    static TArray<FPrimaryAssetId> GetAllRancItemRecipeIds();
     
-    /* Loads all item data, removing the need for GetSingleItemDataById and instead allowing use of GetItemById */
+    /* Loads all item data assets, removing the need for GetSingleItemDataById and instead allowing use of GetItemById */
     UFUNCTION(BlueprintCallable, Category = "Ranc Inventory")
     static void PermanentlyLoadAllItemsAsync();
     
@@ -78,20 +75,31 @@ public:
     
     /* Uses static map from GameplayTag to URancItemData, works faster after having called PermanentlyLoadAllItems */
     UFUNCTION(BlueprintPure, Category = "Ranc Inventory")
-    static URancItemData* GetItemById(FGameplayTag TagId);
+    static URancItemData* GetItemDataById(FGameplayTag TagId);
     
     /* Trade items between two inventory components */
     UFUNCTION(BlueprintCallable, Category = "Ranc Inventory")
-    static void TradeRancItem(TArray<FRancItemInfo> ItemsToTrade, URancInventoryComponent* FromInventory, URancInventoryComponent* ToInventory);
+    static void TradeRancItem(TArray<FRancItemInstance> ItemsToTrade, URancItemContainerComponent* FromInventory, URancItemContainerComponent* ToInventory);
 
     /* Check if the given item info have a valid id */
     UFUNCTION(BlueprintPure, Category = "Ranc Inventory")
-    static bool IsItemValid(const FRancItemInfo InItemInfo);
+    static bool IsItemValid(const FRancItemInstance InItemInfo);
+    
+    /* Loads all item recipe data assets, allowing use of GetItemById */
+    UFUNCTION(BlueprintCallable, Category = "Ranc Inventory")
+    static void PermanentlyLoadAllRecipesAsync();
+    
+    UFUNCTION(BlueprintCallable, Category = "Ranc Inventory")
+    bool AreAllRecipesLoaded();
+    
+    UFUNCTION(BlueprintCallable, Category = "Ranc Inventory")
+    static TArray<URancRecipe*> GetAllRancItemRecipes();
 
-    /* Check if the given item info represents a stackable item */
+    /* Includes both RancItemRecipe and RancItemCraftingRecipe (for item to item) */
     UFUNCTION(BlueprintPure, Category = "Ranc Inventory")
-    static bool IsItemStackable(const FRancItemInfo InItemInfo);
-
+    static TArray<FPrimaryAssetId> GetAllRancItemRecipeIds();
+    
+    
     template<typename Ty>
     constexpr static const bool HasEmptyParam(const Ty& Arg1)
     {
@@ -114,23 +122,28 @@ public:
     }
 
     UFUNCTION(BlueprintPure, Category = "Ranc Inventory")
-    static TMap<FGameplayTag, FName> GetItemMetadatas(const FRancItemInfo InItemInfo);
-
-    UFUNCTION(BlueprintPure, Category = "Ranc Inventory")
-    static TMap<FGameplayTag, FPrimaryRancItemIdContainer> GetItemRelations(const FRancItemInfo InItemInfo);
+    static TMap<FGameplayTag, FPrimaryRancItemIdContainer> GetItemRelations(const FRancItemInstance InItemInfo);
 
     static void AllItemsLoadedCallback();
+    static void AllRecipesLoadedCallback();
+
+    // Below are used for e.g. unit tests
+    static void HardcodeItem(FGameplayTag ItemId, URancItemData* ItemData);
+    static void HardcodeRecipe(FGameplayTag RecipeId, URancRecipe* RecipeData);
+
 private:
-    static TArray<URancItemData*> LoadRancItemDatas_Internal(UAssetManager* InAssetManager, const TArray<FPrimaryAssetId>& InIDs, const TArray<FName>& InBundles, const bool bAutoUnload);
-    static TArray<URancItemData*> LoadRancItemDatas_Internal(UAssetManager* InAssetManager, const TArray<FPrimaryRancItemId>& InIDs, const TArray<FName>& InBundles, const bool bAutoUnload);
+    static TArray<URancItemData*> LoadRancItemData_Internal(UAssetManager* InAssetManager, const TArray<FPrimaryAssetId>& InIDs, const TArray<FName>& InBundles, const bool bAutoUnload);
+    static TArray<URancItemData*> LoadRancItemData_Internal(UAssetManager* InAssetManager, const TArray<FPrimaryRancItemId>& InIDs, const TArray<FName>& InBundles, const bool bAutoUnload);
 
     
     static TMap<FGameplayTag, URancItemData*> AllLoadedItemsByTag;
    // static TMap<FGameplayTag, FName> AllLoadedItemAssetNamesByTag;
     static TArray<FGameplayTag> AllItemIds;
+    
+    static TArray<URancRecipe*> AllLoadedRecipes;
 
 public:
     /* Filter the container and return only items that can be traded at the current context */
     UFUNCTION(BlueprintPure, Category = "Ranc Inventory")
-    static TArray<FRancItemInfo> FilterTradeableItems(URancInventoryComponent* FromInventory, URancInventoryComponent* ToInventory, const TArray<FRancItemInfo>& Items);
+    static TArray<FRancItemInstance> FilterTradeableItems(URancInventoryComponent* FromInventory, URancInventoryComponent* ToInventory, const TArray<FRancItemInstance>& Items);
 };

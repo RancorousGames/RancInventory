@@ -50,35 +50,40 @@ struct FPrimaryRancItemIdContainer
 };
 
 USTRUCT(BlueprintType, Category = "Ranc Inventory | Structs")
-struct FRancItemInfo
+struct FRancItemInstance
 {
     GENERATED_BODY()
 
-    static const FRancItemInfo EmptyItemInfo;
+    static const FRancItemInstance EmptyItemInstance;
 
-    FRancItemInfo() = default;
+    FRancItemInstance() = default;
 
-    explicit FRancItemInfo(const FGameplayTag& InItemId) : ItemId(InItemId)
+    explicit FRancItemInstance(const FGameplayTag& InItemId) : ItemId(InItemId)
     {
     }
 
-    explicit FRancItemInfo(const FGameplayTag& InItemId, const int32& InQuant) : ItemId(InItemId), Quantity(InQuant)
+    explicit FRancItemInstance(const FGameplayTag& InItemId, const int32& InQuant) : ItemId(InItemId), Quantity(InQuant)
     {
     }
 
-    bool operator==(const FRancItemInfo& Other) const
+    bool operator==(const FRancItemInstance& Other) const
     {
         return ItemId == Other.ItemId;
     }
 
-    bool operator!=(const FRancItemInfo& Other) const
+    bool operator!=(const FRancItemInstance& Other) const
     {
         return !(*this == Other);
     }
 
-    bool operator<(const FRancItemInfo& Other) const
+    bool operator<(const FRancItemInstance& Other) const
     {
         return ItemId.ToString() < Other.ItemId.ToString();
+    }
+
+    bool IsValid() const
+    {
+        return ItemId.IsValid();
     }
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ranc Inventory")
@@ -171,13 +176,33 @@ public:
 };
 
 
-UCLASS(NotBlueprintable, NotPlaceable, Category = "Ranc Inventory | Classes | Data")
-class RANCINVENTORY_API URancItemRecipe : public UPrimaryDataAsset
+UCLASS(Blueprintable, Category = "Ranc Inventory | Classes | Data")
+class RANCINVENTORY_API USpawnableRancItemData : public URancItemData
 {
     GENERATED_BODY()
 
 public:
-    explicit URancItemRecipe(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
+    // Constructor
+    USpawnableRancItemData(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer), SpawnableObjectClass(nullptr)
+    {
+    }
+
+    virtual void PostLoad() override
+    {
+        Super::PostLoad();
+    }
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ranc Inventory", meta = (AssetBundles = "Data"))
+    TSubclassOf<UObject> SpawnableObjectClass;
+};
+
+UCLASS(NotBlueprintable, NotPlaceable, Category = "Ranc Inventory | Classes | Data")
+class RANCINVENTORY_API URancRecipe : public UPrimaryDataAsset
+{
+    GENERATED_BODY()
+
+public:
+    explicit URancRecipe(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
     
     FORCEINLINE virtual FPrimaryAssetId GetPrimaryAssetId() const override
     {
@@ -195,11 +220,12 @@ public:
     TSubclassOf<UObject> ResultingObject;
     
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ranc Inventory", meta = (AssetBundles = "Data"))
-    int32 AmountCreated = 1;
+    int32 QuantityCreated = 1;
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ranc Inventory", meta = (AssetBundles = "Data"))
-    TArray<FRancItemInfo> Components;
-    
+    TArray<FRancItemInstance> Components;
+
+    /* Tags can be used to group recipes, e.g. you might have Recipes.Items and Recipes.Buildings */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ranc Inventory", meta = (AssetBundles = "Data"))
     FGameplayTagContainer Tags;
     
@@ -211,12 +237,12 @@ public:
 
 
 UCLASS(NotBlueprintable, NotPlaceable, Category = "Ranc Inventory | Classes | Data")
-class RANCINVENTORY_API URancItemCraftingRecipe : public URancItemRecipe
+class RANCINVENTORY_API URancItemRecipe : public URancRecipe
 {
     GENERATED_BODY()
 
 public:
-    explicit URancItemCraftingRecipe(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get()){}
+    explicit URancItemRecipe(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get()){}
     
     FORCEINLINE virtual FPrimaryAssetId GetPrimaryAssetId() const override
     {
@@ -232,5 +258,47 @@ public:
 public:
     // Replaces use of ResultingItem
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ranc Inventory", meta = (AssetBundles = "Data"))
-    FRancItemInfo ResultingItem;
+    FRancItemInstance ResultingItem;
+};
+
+USTRUCT(BlueprintType, Category = "Ranc Inventory | Structs")
+struct FRancTaggedItemInstance
+{
+    GENERATED_BODY()
+
+    static const FRancTaggedItemInstance EmptyItemInstance;
+    
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ranc Inventory")
+    FGameplayTag Tag;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ranc Inventory")
+    FRancItemInstance ItemInstance;
+    
+    bool IsValid() const
+    {
+        return Tag.IsValid() && ItemInstance.IsValid();
+    }
+    
+    FRancTaggedItemInstance(){}
+    FRancTaggedItemInstance(FGameplayTag InTag, FRancItemInstance InItemInfo)
+    {
+        ItemInstance = InItemInfo;
+        Tag = InTag;
+    }
+
+    
+    bool operator==(const FRancTaggedItemInstance& Other) const
+    {
+        return Tag == Other.Tag && ItemInstance == Other.ItemInstance;
+    }
+
+    bool operator!=(const FRancTaggedItemInstance& Other) const
+    {
+        return !(*this == Other);
+    }
+
+    bool operator<(const FRancTaggedItemInstance& Other) const
+    {
+        return Tag.ToString() < Other.Tag.ToString();
+    }
 };
