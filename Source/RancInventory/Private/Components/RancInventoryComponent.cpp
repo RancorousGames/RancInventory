@@ -25,6 +25,19 @@ void URancInventoryComponent::InitializeComponent()
 	CheckAndUpdateRecipeAvailability();
 }
 
+int32 URancInventoryComponent::GetItemCountIncludingTaggedSlots(const FGameplayTag& ItemId) const
+{
+	int32 Quantity = GetItemCount(ItemId);
+	for (const FRancTaggedItemInstance& TaggedItem : TaggedSlotItemInstances)
+	{
+		if (TaggedItem.ItemInstance.ItemId == ItemId)
+		{
+			Quantity += TaggedItem.ItemInstance.Quantity;
+		}
+	}
+	return Quantity;
+}
+
 void URancInventoryComponent::UpdateWeight()
 {
 	Super::UpdateWeight();
@@ -37,6 +50,11 @@ void URancInventoryComponent::UpdateWeight()
 			CurrentWeight += ItemData->ItemWeight * TaggedInstance.ItemInstance.Quantity;
 		}
 	}
+}
+
+bool URancInventoryComponent::ContainsItemsImpl(const FGameplayTag& ItemId, int32 Quantity) const
+{
+	return GetItemCountIncludingTaggedSlots(ItemId) >= Quantity;
 }
 
 void URancInventoryComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -52,54 +70,48 @@ void URancInventoryComponent::GetLifetimeReplicatedProps(TArray<FLifetimePropert
 
 
 ////////////////////////////////////////////////////// TAGGED SLOTS ///////////////////////////////////////////////////////
-int32 URancInventoryComponent::AddItemToTaggedSlot_IfServer(const FGameplayTag& SlotTag,
-                                                            const FRancItemInstance& ItemInfo,
+int32 URancInventoryComponent::AddItemsToTaggedSlot_IfServer(const FGameplayTag& SlotTag,
+                                                            const FRancItemInstance& ItemsToAdd,
                                                             bool OverrideExistingItem)
 {
-    if (GetOwnerRole() < ROLE_Authority && GetOwnerRole() != ROLE_None)
-    {
-        return 0;
-    }
+	if (GetOwnerRole() < ROLE_Authority && GetOwnerRole() != ROLE_None)
+	{
+		return 0;
+	}
 
-    if ((!UniversalTaggedSlots.Contains(SlotTag) && !SpecializedTaggedSlots.Contains(SlotTag)) ||
-		(SpecializedTaggedSlots.Contains(SlotTag) && !IsItemCompatibleWithSlot(ItemInfo.ItemId, SlotTag)))
-    {
-        return 0;
-    }
+	// New check for slot item compatibility and weight capacity
+	if (!CanSlotReceiveItem(ItemsToAdd, SlotTag))
+	{
+		return 0; // Either the slot is incompatible or adding the item would exceed weight capacity
+	}
 
-    FRancTaggedItemInstance& ExistingItem = const_cast<FRancTaggedItemInstance&>(GetItemForTaggedSlot(SlotTag));
-    URancItemData* ItemData = URancInventoryFunctions::GetItemDataById(ItemInfo.ItemId);
+	// Locate the existing item in the tagged slot
+	FRancTaggedItemInstance& ExistingItem = const_cast<FRancTaggedItemInstance&>(GetItemForTaggedSlot(SlotTag));
+	URancItemData* ItemData = URancInventoryFunctions::GetItemDataById(ItemsToAdd.ItemId);
 
-    if (ExistingItem.IsValid() && !OverrideExistingItem && !(ExistingItem.ItemInstance.ItemId == ItemInfo.ItemId && ItemData->bIsStackable))
-    {
-        return 0;
-    }
+	// Determine the quantity to add
+	int32 QuantityToAdd = ItemsToAdd.Quantity;
+	if (ExistingItem.IsValid() && ExistingItem.ItemInstance.ItemId == ItemsToAdd.ItemId && ItemData->bIsStackable)
+	{
+		// For stackable items, calculate the available space in the slot
+		QuantityToAdd = FMath::Min(QuantityToAdd, ItemData->MaxStackSize - ExistingItem.ItemInstance.Quantity);
+		ExistingItem.ItemInstance.Quantity += QuantityToAdd; // Update quantity directly
+	}
+	else if (OverrideExistingItem || !ExistingItem.IsValid())
+	{
+		// If overriding or slot is empty, clear existing and add new
+		if (ExistingItem.IsValid())
+		{
+			RemoveItemsFromTaggedSlot_IfServer(SlotTag, MAX_int32, true); // Remove existing item
+		}
+		TaggedSlotItemInstances.Add(FRancTaggedItemInstance(SlotTag, FRancItemInstance(ItemsToAdd.ItemId, QuantityToAdd)));
+	}
 
-    int32 QuantityToAdd = ItemInfo.Quantity;
+	UpdateWeight(); // Recalculate the current weight
+	OnItemAddedToTaggedSlot.Broadcast(SlotTag, FRancItemInstance(ItemsToAdd.ItemId, QuantityToAdd)); // Broadcast addition event
+	MARK_PROPERTY_DIRTY_FROM_NAME(URancInventoryComponent, TaggedSlotItemInstances, this);
 
-    if (ExistingItem.IsValid())
-    {
-        if (ExistingItem.ItemInstance.ItemId == ItemInfo.ItemId && ItemData->bIsStackable)
-        {
-            QuantityToAdd = FMath::Min(QuantityToAdd, ItemData->MaxStackSize - ExistingItem.ItemInstance.Quantity);
-            ExistingItem.ItemInstance.Quantity += QuantityToAdd;
-        }
-        else if (OverrideExistingItem)
-        {
-            RemoveItemsFromTaggedSlot_IfServer(SlotTag, MAX_int32, true);
-            TaggedSlotItemInstances.Add(FRancTaggedItemInstance(SlotTag, FRancItemInstance(ItemInfo.ItemId, QuantityToAdd)));
-        }
-    }
-    else
-    {
-        TaggedSlotItemInstances.Add(FRancTaggedItemInstance(SlotTag, FRancItemInstance(ItemInfo.ItemId, QuantityToAdd)));
-    }
-
-    UpdateWeight();
-    OnItemAddedToTaggedSlot.Broadcast(SlotTag, FRancItemInstance(ItemInfo.ItemId, QuantityToAdd));
-    MARK_PROPERTY_DIRTY_FROM_NAME(URancInventoryComponent, TaggedSlotItemInstances, this);
-
-    return QuantityToAdd;
+	return QuantityToAdd;
 }
 
 int32 URancInventoryComponent::RemoveItemsFromTaggedSlot_IfServer(const FGameplayTag& SlotTag, int32 QuantityToRemove,
@@ -143,6 +155,24 @@ int32 URancInventoryComponent::RemoveItemsFromTaggedSlot_IfServer(const FGamepla
 	return ActualRemovedQuantity;
 }
 
+int32 URancInventoryComponent::RemoveItemsFromAnyTaggedSlots_IfServer(FGameplayTag ItemId, int32 QuantityToRemove)
+{
+	int32 RemovedCount = 0;
+	for (int i = TaggedSlotItemInstances.Num() - 1; i >= 0; i--)
+	{
+		if (TaggedSlotItemInstances[i].ItemInstance.ItemId == ItemId)
+		{
+			RemovedCount += RemoveItemsFromTaggedSlot_IfServer(TaggedSlotItemInstances[i].Tag, QuantityToRemove - RemovedCount, true);
+			if (RemovedCount >= QuantityToRemove)
+			{
+				break;
+			}
+		}
+	}
+	
+	return RemovedCount;
+}
+
 void URancInventoryComponent::MoveItemsToTaggedSlot_Server_Implementation(
 	const FRancItemInstance& ItemInstance, FGameplayTag TargetTaggedSlot)
 {
@@ -175,7 +205,7 @@ int32 URancInventoryComponent::MoveItemsToTaggedSlot_ServerImpl(
 		return 0;
 	}
 
-	if (!IsItemCompatibleWithSlot(ItemInstance.ItemId, TargetTaggedSlot))
+	if (!CanSlotReceiveItem(ItemInstance, TargetTaggedSlot))
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Item is not compatible with the target slot"));
 		return 0;
@@ -206,7 +236,7 @@ int32 URancInventoryComponent::MoveItemsToTaggedSlot_ServerImpl(
 
 	const FRancItemInstance ActualItemToMove = FRancItemInstance(ItemInstance.ItemId, ActualQuantity);
 	RemoveItems_IfServer(ActualItemToMove);
-	AddItemToTaggedSlot_IfServer(TargetTaggedSlot, ActualItemToMove, false);
+	AddItemsToTaggedSlot_IfServer(TargetTaggedSlot, ActualItemToMove, false);
 
 	return ActualQuantity;
 }
@@ -251,7 +281,7 @@ int32 URancInventoryComponent::MoveItemsFromAndToTaggedSlot_ServerImpl(const FRa
 		return 0;
 	}
 	
-	if (!IsItemCompatibleWithSlot(ItemInstance.ItemId, TargetTaggedSlot))
+	if (!CanSlotReceiveItem(ItemInstance, TargetTaggedSlot))
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Item is not compatible with the target slot"));
 		return 0;
@@ -268,18 +298,19 @@ int32 URancInventoryComponent::MoveItemsFromAndToTaggedSlot_ServerImpl(const FRa
 	}
 
 	const FRancItemInstance ActualItemToMove = FRancItemInstance(ItemInstance.ItemId, QuantityRemoved);
-	AddItemToTaggedSlot_IfServer(TargetTaggedSlot, ActualItemToMove, false);
+	AddItemsToTaggedSlot_IfServer(TargetTaggedSlot, ActualItemToMove, false);
 
 	return QuantityRemoved;
 }
 
 int32 URancInventoryComponent::DropFromTaggedSlot(const FGameplayTag& SlotTag, int32 Quantity, float DropAngle)
 {
-	DropFromTaggedSlot_Server_Implementation(SlotTag, Quantity, DropAngle);
-
 	// On client the below is just a guess
 	const FRancTaggedItemInstance Item = GetItemForTaggedSlot(SlotTag);
+	if (!Item.IsValid()) return 0;
 	int32 QuantityToDrop = FMath::Min(Quantity, Item.ItemInstance.Quantity);
+	
+	DropFromTaggedSlot_Server_Implementation(SlotTag, Quantity, DropAngle);
 
 	return QuantityToDrop;
 }
@@ -292,12 +323,9 @@ void URancInventoryComponent::DropFromTaggedSlot_Server_Implementation(const FGa
 	{
 		const int32 QuantityToDrop = FMath::Min(Quantity, Item.ItemInstance.Quantity);
 
-		if (QuantityToDrop == Item.ItemInstance.Quantity)
-		{
-			RemoveItemsFromTaggedSlot_IfServer(SlotTag, QuantityToDrop);
-		}
+		int32 DroppedCount = RemoveItemsFromTaggedSlot_IfServer(SlotTag, QuantityToDrop);
 
-		if (QuantityToDrop > 0)
+		if (DroppedCount > 0)
 		{
 			const FRancItemInstance ItemToDrop(Item.ItemInstance.ItemId, QuantityToDrop);
 			// ReSharper disable once CppExpressionWithoutSideEffects
@@ -317,6 +345,64 @@ const FRancTaggedItemInstance& URancInventoryComponent::GetItemForTaggedSlot(con
 	}
 
 	return FRancTaggedItemInstance::EmptyItemInstance;
+}
+
+int32 URancInventoryComponent::AddItemToAnySlots_IfServer(FRancItemInstance ItemInstance, bool PreferTaggedSlots)
+{
+    if (GetOwnerRole() < ROLE_Authority && GetOwnerRole() != ROLE_None)
+    {
+        return 0; // Ensure this method is called on the server
+    }
+
+    int32 TotalAdded = 0;
+    int32 RemainingQuantity = ItemInstance.Quantity;
+
+    // Adjust the flow based on PreferTaggedSlots flag
+    if (!PreferTaggedSlots)
+    {
+        // Try adding to generic slots first if not preferring tagged slots
+        int32 QuantityAddedToGeneric = AddItems_IfServer(FRancItemInstance(ItemInstance.ItemId, RemainingQuantity), true);
+        TotalAdded += QuantityAddedToGeneric;
+        RemainingQuantity -= QuantityAddedToGeneric;
+    }
+
+    // Proceed to try adding to tagged slots if PreferTaggedSlots is true or if there's remaining quantity
+    if (PreferTaggedSlots || RemainingQuantity > 0)
+    {
+    	for (const FGameplayTag& SlotTag : SpecializedTaggedSlots)
+    	{
+    		if (RemainingQuantity <= 0) break;
+    		if (CanSlotReceiveItem(FRancItemInstance(ItemInstance.ItemId, RemainingQuantity), SlotTag))
+    		{
+    			int32 QuantityAdded = AddItemsToTaggedSlot_IfServer(SlotTag, FRancItemInstance(ItemInstance.ItemId, RemainingQuantity), false);
+    			TotalAdded += QuantityAdded;
+    			RemainingQuantity -= QuantityAdded;
+    		}
+    	}
+    	
+        for (const FGameplayTag& SlotTag : UniversalTaggedSlots)
+        {
+            if (RemainingQuantity <= 0) break;
+            if (CanSlotReceiveItem(FRancItemInstance(ItemInstance.ItemId, RemainingQuantity), SlotTag))
+            {
+                int32 QuantityAdded = AddItemsToTaggedSlot_IfServer(SlotTag, FRancItemInstance(ItemInstance.ItemId, RemainingQuantity), false);
+                TotalAdded += QuantityAdded;
+                RemainingQuantity -= QuantityAdded;
+            }
+        }
+
+        
+    }
+
+    // If there's still remaining quantity and we didn't prefer tagged slots first, try adding back to generic slots
+    if (RemainingQuantity > 0 && !PreferTaggedSlots)
+    {
+        int32 QuantityAddedBackToGeneric = AddItems_IfServer(FRancItemInstance(ItemInstance.ItemId, RemainingQuantity), true);
+        TotalAdded += QuantityAddedBackToGeneric;
+        RemainingQuantity -= QuantityAddedBackToGeneric;
+    }
+
+    return TotalAdded; // Total quantity successfully added across slots
 }
 
 
@@ -402,19 +488,26 @@ void URancInventoryComponent::DetectAndPublishChanges()
 	}
 }
 
-bool URancInventoryComponent::IsItemCompatibleWithSlot(const FGameplayTag& ItemId, const FGameplayTag& SlotTag) const
+bool URancInventoryComponent::CanSlotReceiveItem(const FRancItemInstance& ItemInstance, const FGameplayTag& SlotTag) const
 {
-	if (UniversalTaggedSlots.Contains(SlotTag))
-		return true;
-	
-	const URancItemData* ItemData = URancInventoryFunctions::GetItemDataById(ItemId);
+	const URancItemData* ItemData = URancInventoryFunctions::GetItemDataById(ItemInstance.ItemId);
 	if (!ItemData)
 	{
-		return false; // Item data not found
+		return false; // Item data not found, assume slot cannot receive item
 	}
 
-	// Check if the item's categories contain the slot tag
-	return ItemData->ItemCategories.HasTag(SlotTag);
+	if (!UniversalTaggedSlots.Contains(SlotTag) && !ItemData->ItemCategories.HasTag(SlotTag))
+	{
+		return false; // Item is not compatible with the slot
+	}
+
+	float AdditionalWeight = ItemData->ItemWeight * ItemInstance.Quantity;
+	if (CurrentWeight + AdditionalWeight > MaxWeight)
+	{
+		return false; // Adding this item would exceed max weight capacity
+	}
+
+	return true; // Slot can receive the item
 }
 
 void URancInventoryComponent::OnRep_Slots()
@@ -472,11 +565,32 @@ bool URancInventoryComponent::CraftRecipe_IfServer(const URancRecipe* Recipe)
 	{
 		for (const auto& Component : Recipe->Components)
 		{
-			RemoveItems_IfServer(Component);
+			int QuantityToRemoveFromGenericSlots = FMath::Min(GetItemCount(Component.ItemId), Component.Quantity);
+			int32 RemovedFromGeneric = RemoveItems_IfServer(FRancItemInstance(Component.ItemId, QuantityToRemoveFromGenericSlots));
+			int32 RemovedFromTaggedSlots = RemoveItemsFromAnyTaggedSlots_IfServer(Component.ItemId, Component.Quantity - QuantityToRemoveFromGenericSlots);
+			if (RemovedFromGeneric + RemovedFromTaggedSlots < Component.Quantity)
+			{
+				UE_LOG(LogTemp, Error, TEXT("Failed to remove all items for crafting even though they were confirmed"));
+				return false;
+			}
 		}
 		bSuccess = true;
 
-		OnCraftConfirmed.Broadcast(Recipe->ResultingObject, Recipe->QuantityCreated);
+		if (const URancItemRecipe* ItemRecipe = Cast<URancItemRecipe>(Recipe))
+		{
+			// If it is an item recipe, add the resulting item to the inventory
+			auto CraftedItem = FRancItemInstance(ItemRecipe->ResultingItemId, ItemRecipe->QuantityCreated);
+			const int32 AmountAdded = AddItemToAnySlots_IfServer(CraftedItem, false);
+			if (AmountAdded < ItemRecipe->QuantityCreated)
+			{
+				UE_LOG(LogTemp, Display, TEXT("Failed to add crafted item to inventory, dropping item instead"));
+				/*AWorldItem* DroppedItem =*/ SpawnDroppedItem_IfServer(FRancItemInstance(ItemRecipe->ResultingItemId, ItemRecipe->QuantityCreated - AmountAdded));
+			}
+		}
+		else
+		{
+			OnCraftConfirmed.Broadcast(Recipe->ResultingObject, Recipe->QuantityCreated);
+		}
 	}
 	return bSuccess;
 }

@@ -286,7 +286,7 @@ TArray<FRancItemInstance> URancInventoryFunctions::FilterTradeableItems(URancInv
 		             }
 
 		             bool bCanTradeIterator = FromInventory->ContainsItems(ItemInfo.ItemId) && ToInventory->
-			             CanReceiveItem(ItemInfo);
+			             CanContainerReceiveItems(ItemInfo);
 
 		             if (bCanTradeIterator)
 		             {

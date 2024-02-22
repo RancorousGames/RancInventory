@@ -4,6 +4,7 @@
 #include "CoreMinimal.h"
 #include "Management/RancInventoryFunctions.h"
 #include "Management/RancInventoryData.h"
+#include "Components/RancInventoryComponent.h"
 
 UE_DEFINE_GAMEPLAY_TAG(LeftHandSlot, "Hands.LeftHand");
 UE_DEFINE_GAMEPLAY_TAG(RightHandSlot, "Hands.RightHand");
@@ -18,6 +19,7 @@ UE_DEFINE_GAMEPLAY_TAG(ItemIdRock, "Items.IDs.Rock");
 UE_DEFINE_GAMEPLAY_TAG(ItemIdSticks, "Items.IDs.Sticks");
 UE_DEFINE_GAMEPLAY_TAG(ItemIdSpear, "Items.IDs.StoneSpear");
 UE_DEFINE_GAMEPLAY_TAG(ItemIdHelmet, "Items.IDs.Helmet");
+UE_DEFINE_GAMEPLAY_TAG(ItemIdGiantBoulder, "Items.IDs.GiantBoulder");
 
 void InitializeTestItems()
 {
@@ -28,6 +30,7 @@ void InitializeTestItems()
 	RockItemData->ItemPrimaryType = ItemTypeResource;
 	RockItemData->bIsStackable = true; 
 	RockItemData->MaxStackSize = 5; 
+	RockItemData->ItemWeight = 1; 
 	RockItemData->ItemCategories.AddTag(ItemTypeResource); 
 	URancInventoryFunctions::HardcodeItem(ItemIdRock, RockItemData);
 	
@@ -38,6 +41,7 @@ void InitializeTestItems()
 	SticksItemData->ItemPrimaryType = ItemTypeResource;
 	SticksItemData->bIsStackable = true; 
 	SticksItemData->MaxStackSize = 5; 
+	SticksItemData->ItemWeight = 1; 
 	SticksItemData->ItemCategories.AddTag(ItemTypeResource); 
 	URancInventoryFunctions::HardcodeItem(ItemIdSticks, SticksItemData);
 
@@ -48,6 +52,7 @@ void InitializeTestItems()
 	HelmetItemData->ItemPrimaryType = ItemTypeArmor; 
 	HelmetItemData->bIsStackable = false;
 	HelmetItemData->MaxStackSize = 1;
+	HelmetItemData->ItemWeight = 2; 
 	HelmetItemData->ItemCategories.AddTag(HelmetSlot); 
 	URancInventoryFunctions::HardcodeItem(ItemIdHelmet, HelmetItemData);
 
@@ -58,6 +63,19 @@ void InitializeTestItems()
 	SpearItemData->ItemPrimaryType = ItemTypeWeapon; 
 	SpearItemData->bIsStackable = false;
 	SpearItemData->MaxStackSize = 5; // should not matter
+	SpearItemData->ItemWeight = 3; 
  	SpearItemData->ItemCategories.AddTag(ItemTypeWeapon); 
 	URancInventoryFunctions::HardcodeItem(ItemIdSpear, SpearItemData);
+
+	
+	URancItemData* GiantBoulderItemData = NewObject<URancItemData>();
+	GiantBoulderItemData->ItemId = ItemIdGiantBoulder;
+	GiantBoulderItemData->ItemName = FName("Giant Boulder");
+	GiantBoulderItemData->ItemDescription = FText::FromString("HEAVY!");
+	GiantBoulderItemData->ItemPrimaryType = ItemTypeResource; 
+	GiantBoulderItemData->bIsStackable = false;
+	GiantBoulderItemData->MaxStackSize = 1;
+	GiantBoulderItemData->ItemWeight = 10; 
+	GiantBoulderItemData->ItemCategories.AddTag(ItemTypeResource); 
+	URancInventoryFunctions::HardcodeItem(ItemIdGiantBoulder, GiantBoulderItemData);
 }

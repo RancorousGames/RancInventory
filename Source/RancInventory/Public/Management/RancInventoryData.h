@@ -242,12 +242,15 @@ class RANCINVENTORY_API URancItemRecipe : public URancRecipe
     GENERATED_BODY()
 
 public:
-    explicit URancItemRecipe(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get()){}
+    explicit URancItemRecipe(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get())
+    {
+        
+    }
     
     FORCEINLINE virtual FPrimaryAssetId GetPrimaryAssetId() const override
     {
         // Create a string by appending the resulting item ID to each component
-        FString ResultingItemIdString = ResultingItem.ItemId.ToString();
+        FString ResultingItemIdString = ResultingItemId.ToString();
         for (const auto& Component : Components)
         {
             ResultingItemIdString += Component.ItemId.ToString();
@@ -258,7 +261,7 @@ public:
 public:
     // Replaces use of ResultingItem
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ranc Inventory", meta = (AssetBundles = "Data"))
-    FRancItemInstance ResultingItem;
+    FGameplayTag ResultingItemId;
 };
 
 USTRUCT(BlueprintType, Category = "Ranc Inventory | Structs")

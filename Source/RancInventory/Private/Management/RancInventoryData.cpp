@@ -7,7 +7,7 @@
 #include UE_INLINE_GENERATED_CPP_BY_NAME(RancInventoryData)
 #endif
 
-const FRancItemInstance FRancItemInstance::EmptyItemInstance(FGameplayTag(), -1);
+const FRancItemInstance FRancItemInstance::EmptyItemInstance(FGameplayTag(), 0);
 const FRancTaggedItemInstance FRancTaggedItemInstance::EmptyItemInstance(FGameplayTag(), FRancItemInstance::EmptyItemInstance);
 
 URancItemData::URancItemData(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)

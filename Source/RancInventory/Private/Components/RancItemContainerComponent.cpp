@@ -5,7 +5,7 @@
 #include "Net/Core/PushModel/PushModel.h"
 
 URancItemContainerComponent::URancItemContainerComponent(const FObjectInitializer& ObjectInitializer) :
-	Super(ObjectInitializer), MaxWeight(0.f), MaxNumItems(0), CurrentWeight(0.f)
+	Super(ObjectInitializer), MaxWeight(0.f), MaxNumItemsInContainer(0), CurrentWeight(0.f)
 {
 	PrimaryComponentTick.bCanEverTick = false;
 	PrimaryComponentTick.bStartWithTickEnabled = false;
@@ -18,15 +18,12 @@ void URancItemContainerComponent::InitializeComponent()
 	Super::InitializeComponent();
 
 	// add all initial items to items
-	if (GetOwnerRole() == ROLE_Authority && GetOwnerRole() != ROLE_None)
+	for (const FRancInitialItem& InitialItem : InitialItems)
 	{
-		for (const FRancInitialItem& InitialItem : InitialItems)
-		{
-			const URancItemData* Data = URancInventoryFunctions::GetSingleItemDataById(InitialItem.ItemId, {}, false);
+		const URancItemData* Data = URancInventoryFunctions::GetSingleItemDataById(InitialItem.ItemId, {}, false);
 
-			if (Data && Data->ItemId.IsValid())
-				Items.Add(FRancItemInstance(Data->ItemId, InitialItem.Quantity));
-		}
+		if (Data && Data->ItemId.IsValid())
+			Items.Add(FRancItemInstance(Data->ItemId, InitialItem.Quantity));
 	}
 	CopyItemsToCache();
 
@@ -56,68 +53,68 @@ void URancItemContainerComponent::OnRep_Items()
 	DetectAndPublishChanges();
 }
 
-void URancItemContainerComponent::AddItems_IfServer(const FRancItemInstance& ItemInstance)
+int32 URancItemContainerComponent::AddItems_IfServer(const FRancItemInstance& ItemInstance, bool AllowPartial)
 {
-	if (GetOwnerRole() != ROLE_Authority && GetOwnerRole() != ROLE_None) // none needed for tests
-	{
-		UE_LOG(LogTemp, Warning, TEXT("AddItems called on non-authority!"));
-		return;
-	}
+    if (GetOwnerRole() != ROLE_Authority && GetOwnerRole() != ROLE_None) // none needed for tests
+    {
+        UE_LOG(LogTemp, Warning, TEXT("AddItems called on non-authority!"));
+        return 0;
+    }
 
-	// Check if the inventory can receive the item
-	if (!CanReceiveItem(ItemInstance))
-	{
-		UE_LOG(LogTemp, Warning, TEXT("Cannot receive item: %s"), *ItemInstance.ItemId.ToString());
-		return;
-	}
+    // Check if the inventory can receive the item and calculate the acceptable quantity
+    int32 AcceptableQuantity = GetAmountOfItemContainerCanReceive(ItemInstance.ItemId);
 
-	bool bItemAdded = false;
-	for (auto& ExistingItem : Items)
-	{
-		// If item exists and is stackable, increase the quantity
-		if (ExistingItem.ItemId == ItemInstance.ItemId)
-		{
-			ExistingItem.Quantity += ItemInstance.Quantity;
-			bItemAdded = true;
-			break;
-		}
-	}
+    if (AcceptableQuantity <= 0 || (!AllowPartial && AcceptableQuantity < ItemInstance.Quantity))
+    {
+        return 0; // No items added
+    }
 
-	// If item does not exist in the inventory, add it
-	if (!bItemAdded)
-	{
-		Items.Add(ItemInstance);
-	}
+	int32 AmountToAdd = FMath::Min(AcceptableQuantity, ItemInstance.Quantity);
+    for (auto& ExistingItem : Items)
+    {
+        // If item exists, increase the quantity up to the acceptable amount
+        if (ExistingItem.ItemId == ItemInstance.ItemId)
+        {
+            ExistingItem.Quantity += AmountToAdd;
+        	goto Finish;
+        }
+    }
+	
+    Items.Add(FRancItemInstance(ItemInstance.ItemId, AmountToAdd));
+	
+	Finish:
+    UpdateWeight();
 
-	// Update the current weight of the inventory
-	UpdateWeight();
+    OnItemAdded.Broadcast(FRancItemInstance(ItemInstance.ItemId, AmountToAdd));
 
-	OnItemAdded.Broadcast(ItemInstance);
+    MARK_PROPERTY_DIRTY_FROM_NAME(URancItemContainerComponent, Items, this);
 
-	// Mark the Items array as dirty to ensure replication
-	MARK_PROPERTY_DIRTY_FROM_NAME(URancItemContainerComponent, Items, this);
+    return AmountToAdd; // Return the actual quantity added
 }
 
-bool URancItemContainerComponent::RemoveItems_IfServer(const FRancItemInstance& ItemInstance)
+int32 URancItemContainerComponent::RemoveItems_IfServer(const FRancItemInstance& ItemInstance, bool AllowPartial)
 {
 	if (GetOwnerRole() != ROLE_Authority && GetOwnerRole() != ROLE_None)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("RemoveItems called on non-authority!"));
-		return false;
+		return 0;
 	}
 
-	// Check if the inventory can give the item
-	if (!ContainsItems(ItemInstance.ItemId, ItemInstance.Quantity))
+	int32 ContainedAmount = GetItemCount(ItemInstance.ItemId);
+	if (!AllowPartial && !ContainsItems(ItemInstance.ItemId, ItemInstance.Quantity))
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Cannot remove item: %s"), *ItemInstance.ItemId.ToString());
-		return false;
+		return 0;
 	}
+
+	int32 AmountRemoved = 0;
 
 	for (int i = Items.Num() - 1; i >= 0; --i)
 	{
 		auto& ExistingItem = Items[i];
 		if (ExistingItem.ItemId == ItemInstance.ItemId)
 		{
+			AmountRemoved += FMath::Min(ExistingItem.Quantity, ItemInstance.Quantity);
 			ExistingItem.Quantity -= ItemInstance.Quantity;
 
 			// If the quantity drops to zero or below, remove the item from the inventory
@@ -137,7 +134,7 @@ bool URancItemContainerComponent::RemoveItems_IfServer(const FRancItemInstance& 
 	// Mark the Items array as dirty to ensure replication
 	MARK_PROPERTY_DIRTY_FROM_NAME(URancItemContainerComponent, Items, this);
 
-	return true;
+	return AmountRemoved;
 }
 
 AWorldItem* URancItemContainerComponent::SpawnDroppedItem_IfServer(const FRancItemInstance& ItemInstance,
@@ -150,7 +147,7 @@ AWorldItem* URancItemContainerComponent::SpawnDroppedItem_IfServer(const FRancIt
 			                         ? GetOwner()->GetActorLocation() + GetOwner()->GetActorForwardVector() *
 			                         DropDistance
 			                         : GetOwner()->GetActorLocation() + GetOwner()->GetActorForwardVector().
-			                         RotateAngleAxis(DropAngle, FVector::UpVector) * DropDistance;
+			                                                                        RotateAngleAxis(DropAngle, FVector::UpVector) * DropDistance;
 		AWorldItem* WorldItem = World->SpawnActorDeferred<AWorldItem>(DropItemClass, FTransform(DropSpot));
 		if (WorldItem)
 		{
@@ -175,7 +172,7 @@ int32 URancItemContainerComponent::DropItems(const FRancItemInstance& ItemInstan
 }
 
 void URancItemContainerComponent::DropItems_Server_Implementation(const FRancItemInstance& ItemInstance,
-                                                                   float DropAngle)
+                                                                  float DropAngle)
 {
 	auto ContainedItemInstance = FindItemById(ItemInstance.ItemId);
 	const int32 QuantityToDrop = FMath::Min(ItemInstance.Quantity, ContainedItemInstance.Quantity);
@@ -227,6 +224,7 @@ int32 URancItemContainerComponent::DropAllItems_ServerImpl()
 	return DroppedCount;
 }
 
+
 float URancItemContainerComponent::GetCurrentWeight() const
 {
 	return CurrentWeight;
@@ -252,44 +250,45 @@ const FRancItemInstance& URancItemContainerComponent::FindItemById(const FGamepl
 	return FRancItemInstance::EmptyItemInstance;
 }
 
-bool URancItemContainerComponent::CanReceiveItem(const FRancItemInstance& ItemInstance) const
+bool URancItemContainerComponent::CanContainerReceiveItems(const FRancItemInstance& ItemInstance) const
 {
-	// Check if adding this item would exceed the max number of unique items
-	if (!ContainsItems(ItemInstance.ItemId) && Items.Num() >= MaxNumItems)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("Cannot receive item: Inventory is full."));
-		return false;
-	}
-
-	// Calculate the additional weight this item would add
-	if (const URancItemData* const ItemData = URancInventoryFunctions::GetItemDataById(ItemInstance.ItemId))
-	{
-		float AdditionalWeight = ItemData->ItemWeight * ItemInstance.Quantity;
-		if (CurrentWeight + AdditionalWeight > MaxWeight)
-		{
-			UE_LOG(LogTemp, Warning, TEXT("Cannot receive item: Exceeds max weight."));
-			return false;
-		}
-	}
-	else
-	{
-		UE_LOG(LogTemp, Warning, TEXT("Could not find item data for item: %s"), *ItemInstance.ItemId.ToString());
-		return false;
-	}
-
-	return true;
+	return GetAmountOfItemContainerCanReceive(ItemInstance.ItemId) >= ItemInstance.Quantity;
 }
+
+int32 URancItemContainerComponent::GetAmountOfItemContainerCanReceive(const FGameplayTag& ItemId) const
+{
+	const URancItemData* ItemData = URancInventoryFunctions::GetItemDataById(ItemId);
+	if (!ItemData)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Could not find item data for item: %s"), *ItemId.ToString());
+		return 0; // Item data not found
+	}
+
+	// Calculate how many items can be added without exceeding the max weight
+	int32 AcceptableQuantityByWeight = FMath::FloorToInt((MaxWeight - CurrentWeight) / ItemData->ItemWeight);
+	AcceptableQuantityByWeight = AcceptableQuantityByWeight > 0 ? AcceptableQuantityByWeight : 0;
+	
+	int32 AcceptableQuantityByNumItems = 0;
+	// Sum up quantities in all items
+	for (const auto& Item : Items)
+	{
+		AcceptableQuantityByNumItems += Item.Quantity;
+	}
+	
+	AcceptableQuantityByNumItems = MaxNumItemsInContainer - AcceptableQuantityByNumItems;
+
+	return FMath::Min(AcceptableQuantityByWeight, AcceptableQuantityByNumItems);
+}
+
 
 bool URancItemContainerComponent::ContainsItems(const FGameplayTag& ItemId, int32 Quantity) const
 {
-	for (const auto& Item : Items)
-	{
-		if (Item.ItemId == ItemId)
-		{
-			return Item.Quantity >= Quantity;
-		}
-	}
-	return false;
+	return ContainsItemsImpl(ItemId, Quantity);
+}
+
+bool URancItemContainerComponent::ContainsItemsImpl(const FGameplayTag& ItemId, int32 Quantity) const
+{
+	return GetItemCount(ItemId) >= Quantity;
 }
 
 int32 URancItemContainerComponent::GetItemCount(const FGameplayTag& ItemId) const
@@ -301,22 +300,8 @@ int32 URancItemContainerComponent::GetItemCount(const FGameplayTag& ItemId) cons
 			return Item.Quantity;
 		}
 	}
-	
+
 	return 0;
-}
-
-int32 URancItemContainerComponent::GetCurrentItemCount() const
-{
-	int32 Count = 0;
-	for (const auto& Item : Items)
-	{
-		Count += Item.Quantity;
-	}
-	return Count;
-}
-
-void URancItemContainerComponent::A()
-{
 }
 
 TArray<FRancItemInstance> URancItemContainerComponent::GetAllItems() const
@@ -327,6 +312,18 @@ TArray<FRancItemInstance> URancItemContainerComponent::GetAllItems() const
 bool URancItemContainerComponent::IsEmpty() const
 {
 	return Items.Num() == 0;
+}
+
+void URancItemContainerComponent::ClearContainer_IfServer()
+{
+	if (GetOwnerRole() < ROLE_Authority && GetOwnerRole() != ROLE_None)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("ClearInventory called on non-authority!"));
+		return;
+	}
+	
+	Items.Reset();
+	OnRep_Items();
 }
 
 void URancItemContainerComponent::UpdateWeight()

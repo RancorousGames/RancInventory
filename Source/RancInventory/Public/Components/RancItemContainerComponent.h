@@ -4,7 +4,7 @@
 #include "RancItemContainerComponent.generated.h"
 
 UCLASS(Blueprintable, ClassGroup = (Custom), Category = "Ranc Inventory | Classes", EditInlineNew, meta = (BlueprintSpawnableComponent))
-class URancItemContainerComponent : public UActorComponent
+class RANCINVENTORY_API URancItemContainerComponent : public UActorComponent
 {
     GENERATED_BODY()
 public:
@@ -20,24 +20,20 @@ public:
     float GetMaxWeight() const;
 
     UFUNCTION(BlueprintPure, Category="Ranc Inventory")
-    int32 GetCurrentItemCount() const;
-
-    
-    void A();
-
-    UFUNCTION(BlueprintPure, Category="Ranc Inventory")
     const FRancItemInstance& FindItemById(const FGameplayTag& ItemId) const;
 
     /* Add items to the inventory
      * Should only be called on server as we can't trust client to provide trustworthy ItemInstance
-     * Instead have the client send an input like CraftItem or PickupItem to the server which results in server call to AddItem  */
+     * Instead have the client send an input like CraftItem or PickupItem to the server which results in server call to AddItem
+     * Returns the amount added */
     UFUNCTION(BlueprintCallable, Category="Ranc Inventory")
-    void AddItems_IfServer(const FRancItemInstance& ItemInstance);
+    int32 AddItems_IfServer(const FRancItemInstance& ItemInstance, bool AllowPartial = false);
 
     /* For most games we could probably trust the client to specify ItemInstance but for e.g. a hot potato we can't
-     * Instead have the client send an input like UseItem or DropItem  */
+     * Instead have the client send an input like UseItem or DropItem
+     * Returns the amount removed, if AllowPartial is false and there is insufficient quantity then removes 0*/
     UFUNCTION(BlueprintCallable, Category="Ranc Inventory")
-    bool RemoveItems_IfServer(const FRancItemInstance& ItemInstance);
+    int32 RemoveItems_IfServer(const FRancItemInstance& ItemInstance, bool AllowPartial = false);
     
     /* Attempts to drop the item from the inventory, attempting to spawn an Item object in the world
      * Specify DropItemClass and DropDistance properties to customize the drop
@@ -50,8 +46,11 @@ public:
     UFUNCTION(BlueprintCallable, Category="Ranc Inventory")
     int32 DropAllItems_IfServer();
     
-    UFUNCTION(BlueprintCallable, Category="Ranc Inventory")
-    bool CanReceiveItem(const FRancItemInstance& ItemInstance) const;
+    UFUNCTION(BlueprintPure, Category="Ranc Inventory")
+    bool CanContainerReceiveItems(const FRancItemInstance& ItemInstance) const;
+    
+    UFUNCTION(BlueprintPure, Category="Ranc Inventory")
+    int32 GetAmountOfItemContainerCanReceive(const FGameplayTag& ItemId) const;
     
     UFUNCTION(BlueprintPure, Category="Ranc Inventory")
     bool ContainsItems(const FGameplayTag& ItemId, int32 Quantity = 1) const;
@@ -64,6 +63,10 @@ public:
     
     UFUNCTION(BlueprintPure, Category="Ranc Inventory")
     bool IsEmpty() const;
+
+    // Removes all items and publishes the removals
+    UFUNCTION(BlueprintCallable, Category="Ranc Inventory")
+    void ClearContainer_IfServer();
     
     DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnInventoryItemAdded, const FRancItemInstance&, ItemInstance);
     UPROPERTY(BlueprintAssignable, Category="Ranc Inventory")
@@ -81,13 +84,13 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite)
     TSubclassOf<AWorldItem> DropItemClass = AWorldItem::StaticClass();
 
-    /* Max weight allowed for this inventory */
+    /* Max weight allowed for this item container, this also applies to any child classes */
     UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Ranc Inventory", meta = (AllowPrivateAccess = "true", ClampMin = "0", UIMin = "0"))
     float MaxWeight;
 
-    /* Max num of items allowed for this inventory */
+    /* Max num of items allowed for this item container, this does NOT apply to child classes */
     UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Ranc Inventory", meta = (AllowPrivateAccess = "true", ClampMin = "1", UIMin = "1"))
-    int32 MaxNumItems;
+    int32 MaxNumItemsInContainer;
 
 protected:
 
@@ -100,9 +103,11 @@ protected:
 
     UFUNCTION(Server, Reliable)
     void DropItems_Server(const FRancItemInstance& ItemInstance, float DropAngle = 0);
+
     
     // virtual drop implementation for override in subclasses
     virtual int32 DropAllItems_ServerImpl();
+    virtual bool ContainsItemsImpl(const FGameplayTag& ItemId, int32 Quantity = 1) const; // impl needed to allow subclass override
 
     AWorldItem* SpawnDroppedItem_IfServer(const FRancItemInstance& ItemInstance, float DropAngle = 0) const;
     

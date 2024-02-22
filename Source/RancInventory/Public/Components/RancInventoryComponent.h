@@ -5,6 +5,7 @@
 #include "RancItemContainerComponent.h"
 #include "RancInventoryComponent.generated.h"
 
+
 UCLASS(Blueprintable, ClassGroup = (Custom), Category = "Ranc Inventory | Classes", EditInlineNew, meta = (BlueprintSpawnableComponent))
 class RANCINVENTORY_API URancInventoryComponent : public URancItemContainerComponent
 {
@@ -16,16 +17,20 @@ public:
     virtual void InitializeComponent() override;
     
 ////////////////// TAGGED SLOTS ///////////////////
-
-    // Add an item to a tagged slot, if the slot is already occupied it will return the quantity that was added
+    
+    // Add an item to a tagged slot, if the slot is already occupied it will return the quantity that was added. Allows partial when stacking
     UFUNCTION(BlueprintCallable, Category="Ranc Inventory | Equipment", Meta = (HidePin="OverrideExistingItem"))
-    int32 AddItemToTaggedSlot_IfServer(const FGameplayTag& SlotTag, const FRancItemInstance& ItemInfo,
+    int32 AddItemsToTaggedSlot_IfServer(const FGameplayTag& SlotTag, const FRancItemInstance& ItemsToAdd,
                                        bool OverrideExistingItem = false);
 
     // Remove up to Quantity item from a tagged slot, will return the count that was removed
     UFUNCTION(BlueprintCallable, Category="Ranc Inventory | Equipment")
     int32 RemoveItemsFromTaggedSlot_IfServer(const FGameplayTag& SlotTag, int32 QuantityToRemove, bool AllowPartial = true);
 
+    // Remove up to Quantity item from any tagged slot, will return the count that was removed, always allows partial removal
+    UFUNCTION(BlueprintCallable, Category="Ranc Inventory | Equipment")
+    int32 RemoveItemsFromAnyTaggedSlots_IfServer(FGameplayTag ItemId, int32 QuantityToRemove);
+    
     UFUNCTION(Server, Reliable, BlueprintCallable, Category="Ranc Inventory")
     void MoveItemsToTaggedSlot_Server(const FRancItemInstance& ItemInstance, FGameplayTag TargetTaggedSlot);
     int32 MoveItemsToTaggedSlot_ServerImpl(const FRancItemInstance& ItemInstance, FGameplayTag TargetTaggedSlot);
@@ -45,10 +50,23 @@ public:
      * Returns the quantity actually dropped, on client this is only a "guess" */
     UFUNCTION(BlueprintCallable, Category="Ranc Inventory | Equipment")
     int32 DropFromTaggedSlot(const FGameplayTag& SlotTag, int32 Quantity, float DropAngle = 0);
+
+    UFUNCTION(BlueprintPure, Category="Ranc Inventory")
+    int32 GetItemCountIncludingTaggedSlots(const FGameplayTag& ItemId) const;
     
-    UFUNCTION(BlueprintCallable, Category="Ranc Inventory | Equipment")
+    UFUNCTION(BlueprintPure, Category="Ranc Inventory | Equipment")
+    bool CanSlotReceiveItem(const FRancItemInstance& ItemInstance, const FGameplayTag& SlotTag) const;
+    
+    UFUNCTION(BlueprintPure, Category="Ranc Inventory | Equipment")
     const FRancTaggedItemInstance& GetItemForTaggedSlot(const FGameplayTag& SlotTag) const;
 
+    /* Attempts to add an item to a generic or tagged slot, PreferTaggedSlots determines which is tried first.
+     * It may distribute items over several slots, e.g. 5 rocks in left hand and the remaining 3 in generic inventory
+     * If PreferTaggedSlots is true, an item with category e.g. HelmetSlot will go into HelmetSlot first
+     * Returns amount added, and always allows partial adding */
+    UFUNCTION(BlueprintCallable, Category="Ranc Inventory | Equipment")
+    int32 AddItemToAnySlots_IfServer(FRancItemInstance ItemInstance, bool PreferTaggedSlots = true);
+    
     // New events for slot equipment changes, this also gets called if an already held stackable item has its stack quantity increased
     DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnItemAddedToTaggedSlot, const FGameplayTag&, SlotTag, const FRancItemInstance&, ItemInfo);
     UPROPERTY(BlueprintAssignable, Category="Ranc Inventory | Equipment")
@@ -87,7 +105,7 @@ public:
 
     UFUNCTION(Server, Reliable, BlueprintCallable, Category="Ranc Inventory | Crafting")
     void CraftRecipeId_Server(const FPrimaryAssetId& RecipeId);
-
+    
     UFUNCTION(BlueprintCallable, Category="Ranc Inventory | Crafting")
     bool CraftRecipe_IfServer(const URancRecipe* Recipe);
 
@@ -124,7 +142,7 @@ public:
     TArray<FPrimaryAssetId> AllUnlockedRecipes;
 
 protected:
-
+    
     void CheckAndUpdateRecipeAvailability();
 
     virtual int32 DropAllItems_ServerImpl() override;
@@ -133,6 +151,8 @@ protected:
     void DropFromTaggedSlot_Server(const FGameplayTag& SlotTag, int32 Quantity, float DropAngle = 0);
     
     virtual void UpdateWeight() override;
+    
+    virtual bool ContainsItemsImpl(const FGameplayTag& ItemId, int32 Quantity) const override;
     
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
     
@@ -147,7 +167,6 @@ private:
     // The cache is a copy of Items that is not replicated, used to detect changes after replication, only used on client
     TMap<FGameplayTag, FRancItemInstance> TaggedItemsCache; // Slot to quantity;
     void DetectAndPublishChanges();
-    bool IsItemCompatibleWithSlot(const FGameplayTag& ItemId, const FGameplayTag& SlotTag) const;
 
     UFUNCTION()
     void OnRep_Slots();
