@@ -80,6 +80,14 @@ public:
     /* Trade items between two inventory components */
     UFUNCTION(BlueprintCallable, Category = "Ranc Inventory")
     static void TradeRancItem(TArray<FRancItemInstance> ItemsToTrade, URancItemContainerComponent* FromInventory, URancItemContainerComponent* ToInventory);
+    
+    /* Moves from a source ItemInstance to a target one, either moving, stacking stackable items or swapping
+     * Not exposed to blueprint directly as its a utility function for other inventory classes
+     * IgnoreMaxStacks will allow a target slot to go above the item datas maxstacksize (used for itemcontainer)
+     * AllowPartial if enabled will allow a move to partially succeed, e.g. only move 2 of requested 3 quantity, if false moves full or nothing
+     */
+    static int32 MoveBetweenSlots(FRancItemInstance* Source, FRancItemInstance* Target, bool IgnoreMaxStacks, int32 RequestedQuantity, bool AllowPartial);
+
 
     /* Check if the given item info have a valid id */
     UFUNCTION(BlueprintPure, Category = "Ranc Inventory")
@@ -90,7 +98,7 @@ public:
     static void PermanentlyLoadAllRecipesAsync();
     
     UFUNCTION(BlueprintCallable, Category = "Ranc Inventory")
-    bool AreAllRecipesLoaded();
+    static bool AreAllRecipesLoaded();
     
     UFUNCTION(BlueprintCallable, Category = "Ranc Inventory")
     static TArray<URancRecipe*> GetAllRancItemRecipes();

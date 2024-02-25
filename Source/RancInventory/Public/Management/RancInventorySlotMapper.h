@@ -52,28 +52,12 @@ protected:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
     TMap<FGameplayTag, FRancItemInstance> DisplayedTaggedSlots;
     
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-    int32 NumberOfSlots;
-    
-    // Linked inventory component for direct interaction
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-    URancInventoryComponent* LinkedInventoryComponent;
-    
-    DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnSlotUpdated, int32, SlotIndex);
-    UPROPERTY(BlueprintAssignable, Category="Inventory Mapping")
-    FOnSlotUpdated OnSlotUpdated;
-    
-    DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnTaggedSlotUpdated, const FGameplayTag&, SlotTag);
-    UPROPERTY(BlueprintAssignable, Category="Inventory Mapping")
-    FOnTaggedSlotUpdated OnTaggedSlotUpdated;
-    
 public:
     URancInventorySlotMapper();
 
     // Initializes the slot mapper with a given inventory component, setting up initial mappings
     UFUNCTION(BlueprintCallable, Category="Inventory Mapping")
-    void Initialize(URancInventoryComponent* InventoryComponent, int32 NumSlots = 9, bool AutoEquipToSpecialSlots = true, bool
-                    PreferUniversalOverGenericSlots = false);
+    void Initialize(URancInventoryComponent* InventoryComponent, int32 NumSlots = 9);
 
     // Checks if a given slot is empty
     UFUNCTION(BlueprintCallable, BlueprintPure, Category="Inventory Mapping")
@@ -86,9 +70,27 @@ public:
     UFUNCTION(BlueprintCallable, BlueprintPure, Category="Inventory Mapping")
     FRancItemInstance GetItem(int32 SlotIndex) const;
     
-    // Splits a specified quantity of items from one slot to another, creating a new slot if necessary
+    /**
+     * Attempts to split a specified quantity of an item from one slot to another.
+     * If the source is a tagged slot, SourceTaggedSlot should be valid, and SourceSlotIndex is ignored.
+     * If the source is a generic slot, SourceSlotIndex is used, and SourceTaggedSlot should be FGameplayTag::EmptyTag.
+     * The same logic applies to the target slot with TargetTaggedSlot and TargetSlotIndex.
+     * 
+     * - If the source slot doesn't have enough quantity, the operation fails.
+     * - If the target slot is occupied by a different item, the operation fails.
+     * - If adding the items to the target slot would exceed the item's max stack size, the operation fails.
+     * - The operation updates the quantity of items in both the source and target slots.
+     * - If the operation results in the source slot being emptied, it is reset to an empty state.
+     * - The operation broadcasts updates for both the source and target slots to reflect the changes.
+     * 
+     * @param SourceTaggedSlot The gameplay tag of the source tagged slot, if applicable.
+     * @param SourceSlotIndex The index of the source generic slot, if applicable.
+     * @param TargetTaggedSlot The gameplay tag of the target tagged slot, if applicable.
+     * @param TargetSlotIndex The index of the target generic slot, if applicable.
+     * @param Quantity The number of items to be split from the source slot to the target slot.
+     */
     UFUNCTION(BlueprintCallable, Category="Inventory Mapping")
-    void SplitItem(int32 SourceSlotIndex, int32 TargetSlotIndex, int32 Quantity);
+    void SplitItem(FGameplayTag SourceTaggedSlot, int32 SourceSlotIndex, FGameplayTag TargetTaggedSlot, int32 TargetSlotIndex, int32 Quantity);
     
     UFUNCTION(BlueprintCallable, Category="Inventory Mapping")
     int32 DropItem(FGameplayTag TaggedSlot, int32 SlotIndex, int32 Quantity);
@@ -104,29 +106,39 @@ public:
     const FRancItemInstance& GetItemForTaggedSlot(const FGameplayTag& SlotTag) const;
     
     UFUNCTION(BlueprintCallable, Category="Inventory Mapping")
-    bool CanAddItemToSlot(const FRancItemInstance& ItemInfo, int32 SlotIndex) const;
-
-    // If true, items are automatically equipped to specialized slots if they exist, if false they go into generic slots
-    UPROPERTY(VisibleAnywhere, Category="Inventory Mapping")
-    bool bAutoAddToSpecializedSlots;
-
-    // If true, an item without a special slot as category will go into e.g. left/right hand slots before going into a generic slot
-    UPROPERTY(VisibleAnywhere, Category="Inventory Mapping")
-    bool bPreferUniversalOverGenericSlots;
+    bool CanSlotReceiveItem(const FRancItemInstance& ItemInstance, int32 SlotIndex) const;
+    
+    UFUNCTION(BlueprintCallable, Category="Inventory Mapping")
+    bool CanTaggedSlotReceiveItem(const FRancItemInstance& ItemInstance, const FGameplayTag& SlotTag, bool CheckContainerLimits = true) const;
+    
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+    int32 NumberOfSlots;
+    
+    // Linked inventory component for direct interaction
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+    URancInventoryComponent* LinkedInventoryComponent;
+    
+    DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnSlotUpdated, int32, SlotIndex);
+    UPROPERTY(BlueprintAssignable, Category="Inventory Mapping")
+    FOnSlotUpdated OnSlotUpdated;
+    
+    DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnTaggedSlotUpdated, const FGameplayTag&, SlotTag);
+    UPROPERTY(BlueprintAssignable, Category="Inventory Mapping")
+    FOnTaggedSlotUpdated OnTaggedSlotUpdated;
     
 protected:
-    FGameplayTag FindTaggedSlotForItem(const FRancItemInstance& Item);
+    FGameplayTag FindTaggedSlotForItem(const FRancItemInstance& Item) const;
     
 private:    
     UFUNCTION()
     void HandleItemAdded(const FRancItemInstance& Item);
     int32 FindSlotIndexForItem(const FRancItemInstance& Item);
     UFUNCTION()
-    void HandleItemRemoved(const FRancItemInstance& ItemInfo);
+    void HandleItemRemoved(const FRancItemInstance& ItemInstance);
     UFUNCTION()
-    void HandleTaggedItemAdded(const FGameplayTag& SlotTag, const FRancItemInstance& ItemInfo);
+    void HandleTaggedItemAdded(const FGameplayTag& SlotTag, const FRancItemInstance& ItemInstance);
     UFUNCTION()
-    void HandleTaggedItemRemoved(const FGameplayTag& SlotTag, const FRancItemInstance& ItemInfo);
+    void HandleTaggedItemRemoved(const FGameplayTag& SlotTag, const FRancItemInstance& ItemInstance);
     
     void ForceFullUpdate();
 

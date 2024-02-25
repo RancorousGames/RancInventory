@@ -19,6 +19,7 @@ UE_DEFINE_GAMEPLAY_TAG(ItemIdRock, "Items.IDs.Rock");
 UE_DEFINE_GAMEPLAY_TAG(ItemIdSticks, "Items.IDs.Sticks");
 UE_DEFINE_GAMEPLAY_TAG(ItemIdSpear, "Items.IDs.StoneSpear");
 UE_DEFINE_GAMEPLAY_TAG(ItemIdHelmet, "Items.IDs.Helmet");
+UE_DEFINE_GAMEPLAY_TAG(ItemIdChestArmor, "Items.IDs.ChestArmor");
 UE_DEFINE_GAMEPLAY_TAG(ItemIdGiantBoulder, "Items.IDs.GiantBoulder");
 
 void InitializeTestItems()
@@ -56,6 +57,17 @@ void InitializeTestItems()
 	HelmetItemData->ItemCategories.AddTag(HelmetSlot); 
 	URancInventoryFunctions::HardcodeItem(ItemIdHelmet, HelmetItemData);
 
+	URancItemData* ChestItemData = NewObject<URancItemData>();
+	ChestItemData->ItemId = ItemIdChestArmor;
+	ChestItemData->ItemName = FName("Chest Armor");
+	ChestItemData->ItemDescription = FText::FromString("Armor protecting the torso.");
+	ChestItemData->ItemPrimaryType = ItemTypeArmor; 
+	ChestItemData->bIsStackable = false;
+	ChestItemData->MaxStackSize = 1;
+	ChestItemData->ItemWeight = 5; // Adjusted weight for chest armor
+	ChestItemData->ItemCategories.AddTag(ChestSlot); // Adjust for chest slot
+	URancInventoryFunctions::HardcodeItem(ItemIdChestArmor, ChestItemData);
+	
 	URancItemData* SpearItemData = NewObject<URancItemData>();
 	SpearItemData->ItemId = ItemIdSpear;
 	SpearItemData->ItemName = FName("Spear");

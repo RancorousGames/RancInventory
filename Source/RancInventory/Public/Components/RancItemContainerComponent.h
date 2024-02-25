@@ -47,19 +47,19 @@ public:
     int32 DropAllItems_IfServer();
     
     UFUNCTION(BlueprintPure, Category="Ranc Inventory")
-    bool CanContainerReceiveItems(const FRancItemInstance& ItemInstance) const;
+    bool CanReceiveItems(const FRancItemInstance& ItemInstance) const;
     
     UFUNCTION(BlueprintPure, Category="Ranc Inventory")
-    int32 GetAmountOfItemContainerCanReceive(const FGameplayTag& ItemId) const;
+    int32 GetQuantityOfItemCanBeReceived(const FGameplayTag& ItemId) const;
     
     UFUNCTION(BlueprintPure, Category="Ranc Inventory")
-    bool ContainsItems(const FGameplayTag& ItemId, int32 Quantity = 1) const;
+    bool DoesContainerContainItems(const FGameplayTag& ItemId, int32 Quantity = 1) const;
     
     UFUNCTION(BlueprintPure, Category="Ranc Inventory")
-    int32 GetItemCount(const FGameplayTag& ItemId) const;
+    int32 GetContainerItemCount(const FGameplayTag& ItemId) const;
 
     UFUNCTION(BlueprintPure, Category="Ranc Inventory")
-    TArray<FRancItemInstance> GetAllItems() const;
+    TArray<FRancItemInstance> GetAllContainerItems() const;
     
     UFUNCTION(BlueprintPure, Category="Ranc Inventory")
     bool IsEmpty() const;
@@ -70,11 +70,11 @@ public:
     
     DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnInventoryItemAdded, const FRancItemInstance&, ItemInstance);
     UPROPERTY(BlueprintAssignable, Category="Ranc Inventory")
-    FOnInventoryItemAdded OnItemAdded;
+    FOnInventoryItemAdded OnItemAddedToContainer;
     
     DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnInventoryItemRemoved, const FRancItemInstance&, ItemInstance);
     UPROPERTY(BlueprintAssignable, Category="Ranc Inventory")
-    FOnInventoryItemRemoved OnItemRemoved;
+    FOnInventoryItemRemoved OnItemRemovedFromContainer;
     
     /* Distance away from the owning actor to drop items. Only used on server */ 
     UPROPERTY(EditAnywhere, BlueprintReadWrite)
@@ -110,6 +110,8 @@ protected:
     virtual bool ContainsItemsImpl(const FGameplayTag& ItemId, int32 Quantity = 1) const; // impl needed to allow subclass override
 
     AWorldItem* SpawnDroppedItem_IfServer(const FRancItemInstance& ItemInstance, float DropAngle = 0) const;
+
+    FRancItemInstance* FindContainerItemInstance(const FGameplayTag& ItemId);
     
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 protected:

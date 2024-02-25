@@ -62,7 +62,7 @@ int32 URancItemContainerComponent::AddItems_IfServer(const FRancItemInstance& It
     }
 
     // Check if the inventory can receive the item and calculate the acceptable quantity
-    int32 AcceptableQuantity = GetAmountOfItemContainerCanReceive(ItemInstance.ItemId);
+    int32 AcceptableQuantity = GetQuantityOfItemCanBeReceived(ItemInstance.ItemId);
 
     if (AcceptableQuantity <= 0 || (!AllowPartial && AcceptableQuantity < ItemInstance.Quantity))
     {
@@ -85,7 +85,7 @@ int32 URancItemContainerComponent::AddItems_IfServer(const FRancItemInstance& It
 	Finish:
     UpdateWeight();
 
-    OnItemAdded.Broadcast(FRancItemInstance(ItemInstance.ItemId, AmountToAdd));
+    OnItemAddedToContainer.Broadcast(FRancItemInstance(ItemInstance.ItemId, AmountToAdd));
 
     MARK_PROPERTY_DIRTY_FROM_NAME(URancItemContainerComponent, Items, this);
 
@@ -100,8 +100,8 @@ int32 URancItemContainerComponent::RemoveItems_IfServer(const FRancItemInstance&
 		return 0;
 	}
 
-	int32 ContainedAmount = GetItemCount(ItemInstance.ItemId);
-	if (!AllowPartial && !ContainsItems(ItemInstance.ItemId, ItemInstance.Quantity))
+	int32 ContainedAmount = GetContainerItemCount(ItemInstance.ItemId);
+	if (!AllowPartial && !DoesContainerContainItems(ItemInstance.ItemId, ItemInstance.Quantity))
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Cannot remove item: %s"), *ItemInstance.ItemId.ToString());
 		return 0;
@@ -129,7 +129,7 @@ int32 URancItemContainerComponent::RemoveItems_IfServer(const FRancItemInstance&
 	// Update the current weight of the inventory
 	UpdateWeight();
 
-	OnItemRemoved.Broadcast(ItemInstance);
+	OnItemRemovedFromContainer.Broadcast(ItemInstance);
 
 	// Mark the Items array as dirty to ensure replication
 	MARK_PROPERTY_DIRTY_FROM_NAME(URancItemContainerComponent, Items, this);
@@ -156,6 +156,19 @@ AWorldItem* URancItemContainerComponent::SpawnDroppedItem_IfServer(const FRancIt
 		}
 		return WorldItem;
 	}
+	return nullptr;
+}
+
+FRancItemInstance* URancItemContainerComponent::FindContainerItemInstance(const FGameplayTag& ItemId)
+{
+	for (auto& Item : Items)
+	{
+		if (Item.ItemId == ItemId)
+		{
+			return &Item;
+		}
+	}
+
 	return nullptr;
 }
 
@@ -191,7 +204,7 @@ void URancItemContainerComponent::DropItems_Server_Implementation(const FRancIte
 		{
 			Items.Remove(ContainedItemInstance);
 		}
-		OnItemRemoved.Broadcast(ItemInstance);
+		OnItemRemovedFromContainer.Broadcast(ItemInstance);
 		UpdateWeight();
 	}
 }
@@ -250,12 +263,12 @@ const FRancItemInstance& URancItemContainerComponent::FindItemById(const FGamepl
 	return FRancItemInstance::EmptyItemInstance;
 }
 
-bool URancItemContainerComponent::CanContainerReceiveItems(const FRancItemInstance& ItemInstance) const
+bool URancItemContainerComponent::CanReceiveItems(const FRancItemInstance& ItemInstance) const
 {
-	return GetAmountOfItemContainerCanReceive(ItemInstance.ItemId) >= ItemInstance.Quantity;
+	return GetQuantityOfItemCanBeReceived(ItemInstance.ItemId) >= ItemInstance.Quantity;
 }
 
-int32 URancItemContainerComponent::GetAmountOfItemContainerCanReceive(const FGameplayTag& ItemId) const
+int32 URancItemContainerComponent::GetQuantityOfItemCanBeReceived(const FGameplayTag& ItemId) const
 {
 	const URancItemData* ItemData = URancInventoryFunctions::GetItemDataById(ItemId);
 	if (!ItemData)
@@ -281,17 +294,17 @@ int32 URancItemContainerComponent::GetAmountOfItemContainerCanReceive(const FGam
 }
 
 
-bool URancItemContainerComponent::ContainsItems(const FGameplayTag& ItemId, int32 Quantity) const
+bool URancItemContainerComponent::DoesContainerContainItems(const FGameplayTag& ItemId, int32 Quantity) const
 {
 	return ContainsItemsImpl(ItemId, Quantity);
 }
 
 bool URancItemContainerComponent::ContainsItemsImpl(const FGameplayTag& ItemId, int32 Quantity) const
 {
-	return GetItemCount(ItemId) >= Quantity;
+	return GetContainerItemCount(ItemId) >= Quantity;
 }
 
-int32 URancItemContainerComponent::GetItemCount(const FGameplayTag& ItemId) const
+int32 URancItemContainerComponent::GetContainerItemCount(const FGameplayTag& ItemId) const
 {
 	for (const auto& Item : Items)
 	{
@@ -304,7 +317,7 @@ int32 URancItemContainerComponent::GetItemCount(const FGameplayTag& ItemId) cons
 	return 0;
 }
 
-TArray<FRancItemInstance> URancItemContainerComponent::GetAllItems() const
+TArray<FRancItemInstance> URancItemContainerComponent::GetAllContainerItems() const
 {
 	return Items;
 }
@@ -363,11 +376,11 @@ void URancItemContainerComponent::DetectAndPublishChanges()
 			{
 				if (*OldQuantity < NewItem.Quantity)
 				{
-					OnItemAdded.Broadcast(FRancItemInstance(NewItem.ItemId, NewItem.Quantity - *OldQuantity));
+					OnItemAddedToContainer.Broadcast(FRancItemInstance(NewItem.ItemId, NewItem.Quantity - *OldQuantity));
 				}
 				else if (*OldQuantity > NewItem.Quantity)
 				{
-					OnItemRemoved.Broadcast(FRancItemInstance(NewItem.ItemId, *OldQuantity - NewItem.Quantity));
+					OnItemRemovedFromContainer.Broadcast(FRancItemInstance(NewItem.ItemId, *OldQuantity - NewItem.Quantity));
 				}
 			}
 			// Mark this item as processed by temporarily setting its value to its own negative
@@ -376,7 +389,7 @@ void URancItemContainerComponent::DetectAndPublishChanges()
 		else
 		{
 			// New item
-			OnItemAdded.Broadcast(NewItem);
+			OnItemAddedToContainer.Broadcast(NewItem);
 			ItemsCache.Add(NewItem.ItemId, -abs(NewItem.Quantity)); // Mark as processed
 		}
 	}
@@ -388,7 +401,7 @@ void URancItemContainerComponent::DetectAndPublishChanges()
 		if (Pair.Value >= 0)
 		{
 			// Item was not processed (not found in Items), so it has been removed
-			OnItemRemoved.Broadcast(FRancItemInstance(Pair.Key, Pair.Value));
+			OnItemRemovedFromContainer.Broadcast(FRancItemInstance(Pair.Key, Pair.Value));
 			_KeysToRemove.Add(Pair.Key);
 		}
 		else

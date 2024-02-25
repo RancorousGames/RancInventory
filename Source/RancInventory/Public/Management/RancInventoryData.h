@@ -289,6 +289,12 @@ struct FRancTaggedItemInstance
         Tag = InTag;
     }
 
+    FRancTaggedItemInstance(FGameplayTag InTag, FGameplayTag InItemId, int32 InQuantity)
+    {
+        ItemInstance = FRancItemInstance(InItemId, InQuantity);
+        Tag = InTag;
+    }
+
     
     bool operator==(const FRancTaggedItemInstance& Other) const
     {

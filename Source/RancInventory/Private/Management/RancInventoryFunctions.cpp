@@ -285,8 +285,8 @@ TArray<FRancItemInstance> URancInventoryFunctions::FilterTradeableItems(URancInv
 			             return false;
 		             }
 
-		             bool bCanTradeIterator = FromInventory->ContainsItems(ItemInfo.ItemId) && ToInventory->
-			             CanContainerReceiveItems(ItemInfo);
+		             bool bCanTradeIterator = FromInventory->DoesContainerContainItems(ItemInfo.ItemId) && ToInventory->
+			             CanReceiveItems(ItemInfo);
 
 		             if (bCanTradeIterator)
 		             {
@@ -308,7 +308,6 @@ TArray<FRancItemInstance> URancInventoryFunctions::FilterTradeableItems(URancInv
 
 	return Output;
 }
-
 
 
 TArray<FGameplayTag> URancInventoryFunctions::GetAllRancItemIds()
@@ -402,7 +401,7 @@ void URancInventoryFunctions::TradeRancItem(TArray<FRancItemInstance> ItemsToTra
 	// first check if frominventory has the items:
 	for (const FRancItemInstance& Iterator : ItemsToTrade)
 	{
-		if (!FromInventory->ContainsItems(Iterator.ItemId, Iterator.Quantity))
+		if (!FromInventory->DoesContainerContainItems(Iterator.ItemId, Iterator.Quantity))
 		{
 			UE_LOG(LogRancInventory_Internal, Warning,
 			       TEXT("TradeRancItem: FromInventory does not contain the item %s"), *Iterator.ItemId.ToString());
@@ -421,6 +420,75 @@ void URancInventoryFunctions::TradeRancItem(TArray<FRancItemInstance> ItemsToTra
 		}
 		ToInventory->AddItems_IfServer(Iterator);
 	}
+}
+
+int32 URancInventoryFunctions::MoveBetweenSlots(FRancItemInstance* Source, FRancItemInstance* Target, bool IgnoreMaxStacks, int32 RequestedQuantity, bool AllowPartial)
+{
+	const URancItemData* SourceItemData = URancInventoryFunctions::GetItemDataById(Source->ItemId);
+	if (!SourceItemData)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Failed to retrieve item data for source item"));
+		return 0;
+	}
+	
+	if (!AllowPartial && RequestedQuantity > Source->Quantity)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("AllowPartial set to false, can't move more than is contained."));
+		return 0;
+	}
+		
+	int32 TransferAmount = FMath::Min(RequestedQuantity, Source->Quantity);
+
+	bool DoSimpleSwap = false;
+	
+	if (Target->IsValid())
+	{
+		const bool ShouldStack = SourceItemData->bIsStackable && Source->ItemId == Target->ItemId;
+		if (!ShouldStack && Source->Quantity > RequestedQuantity)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("Not possible to split source slot to a occupied slot with a different item."));
+			return 0;
+		}
+
+		const int32 RemainingSpace = IgnoreMaxStacks || !ShouldStack ? TransferAmount : SourceItemData->MaxStackSize - Target->Quantity;
+		TransferAmount = FMath::Min(TransferAmount, RemainingSpace);
+
+		DoSimpleSwap = !ShouldStack;
+	}
+	else
+	{
+		DoSimpleSwap = TransferAmount >= Source->Quantity;
+	}
+
+	if (TransferAmount <= 0)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Possible transfer amount was 0"));
+		return 0;
+	}
+	
+	if (!AllowPartial && TransferAmount < RequestedQuantity)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("AllowPartial set to false, and could not move the full requested amount"));
+		return 0;
+	}
+
+
+	if (DoSimpleSwap)
+	{
+		const FRancItemInstance Temp = *Source;
+		*Source = *Target; // Target might be invalid but that's fine
+		*Target = Temp;
+	}
+	else
+	{
+		Target->ItemId = Source->ItemId;
+		Target->Quantity += TransferAmount;
+		Source->Quantity -= TransferAmount;
+		if (Source->Quantity <= 0)
+			*Source = FRancItemInstance::EmptyItemInstance;
+	}
+
+	return TransferAmount;
 }
 
 bool URancInventoryFunctions::IsItemValid(const FRancItemInstance InItemInfo)

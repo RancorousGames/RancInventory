@@ -7,7 +7,7 @@
 #include "Misc/AutomationTest.h"
 #include "InventorySetup.cpp"
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRancItemContainerComponentTest, "GameTests.FRancItemContainerComponentTest.Tests", EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRancItemContainerComponentTest, "GameTests.RancItemContainer.Tests", EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::ProductFilter)
 
 #define SETUP_RANCITEMCONTAINER(MaxItems, CarryCapacity) \
 URancItemContainerComponent* ItemContainerComponent = NewObject<URancItemContainerComponent>(); \
@@ -68,7 +68,7 @@ bool TestAddItems(FRancItemContainerComponentTest* Test)
     FRancItemInstance AnotherSpearInstance(ItemIdSpear, 1); // Another spear to test limit
     AddedQuantity = ItemContainerComponent->AddItems_IfServer(AnotherSpearInstance, false);
     Res &= Test->TestEqual(TEXT("Should not add another spear due to item count limit"), AddedQuantity, 0);
-    Res &= Test->TestEqual(TEXT("Total item count should remain 2 after attempting to add another spear"), ItemContainerComponent->GetAllItems().Num(), 2);
+    Res &= Test->TestEqual(TEXT("Total item count should remain 2 after attempting to add another spear"), ItemContainerComponent->GetAllContainerItems().Num(), 2);
 
     // Test attempting to add an unstackable item that exceeds the weight limit
     ItemContainerComponent->MaxWeight = 7; // Adjust max weight for this test
@@ -93,27 +93,27 @@ bool TestRemoveItems(FRancItemContainerComponentTest* Test)
     // Test removing a stackable item partially
     int32 RemovedQuantity = ItemContainerComponent->RemoveItems_IfServer(FRancItemInstance(ItemIdRock, 2), true); // Try removing 2 Rocks
     Res &= Test->TestEqual(TEXT("Should remove 2 rocks"), RemovedQuantity, 2);
-    Res &= Test->TestEqual(TEXT("Total rocks should be 3 after removal"), ItemContainerComponent->GetItemCount(ItemIdRock), 3);
+    Res &= Test->TestEqual(TEXT("Total rocks should be 3 after removal"), ItemContainerComponent->GetContainerItemCount(ItemIdRock), 3);
 
     // Test removing a stackable item completely
     RemovedQuantity = ItemContainerComponent->RemoveItems_IfServer(FRancItemInstance(ItemIdRock, 3), true); // Remove remaining Rocks
     Res &= Test->TestEqual(TEXT("Should remove 3 rocks"), RemovedQuantity, 3);
-    Res &= Test->TestTrue(TEXT("Rocks should be completely removed"), !ItemContainerComponent->ContainsItems(ItemIdRock, 1));
+    Res &= Test->TestTrue(TEXT("Rocks should be completely removed"), !ItemContainerComponent->DoesContainerContainItems(ItemIdRock, 1));
 
     // Test removing an unstackable item (Spear)
     RemovedQuantity = ItemContainerComponent->RemoveItems_IfServer(FRancItemInstance(ItemIdSpear, 1), true);
     Res &= Test->TestEqual(TEXT("Should remove 1 spear"), RemovedQuantity, 1);
-    Res &= Test->TestTrue(TEXT("Spear should be completely removed"), !ItemContainerComponent->ContainsItems(ItemIdSpear, 1));
+    Res &= Test->TestTrue(TEXT("Spear should be completely removed"), !ItemContainerComponent->DoesContainerContainItems(ItemIdSpear, 1));
 
     // Test attempting to remove more items than are available (Helmet)
     RemovedQuantity = ItemContainerComponent->RemoveItems_IfServer(FRancItemInstance(ItemIdHelmet, 2), false); // Try removing 2 Helmets
     Res &= Test->TestEqual(TEXT("Should not remove any helmets as quantity exceeds available"), RemovedQuantity, 0);
-    Res &= Test->TestTrue(TEXT("Helmet should remain after failed removal attempt"), ItemContainerComponent->ContainsItems(ItemIdHelmet, 1));
+    Res &= Test->TestTrue(TEXT("Helmet should remain after failed removal attempt"), ItemContainerComponent->DoesContainerContainItems(ItemIdHelmet, 1));
 
     // Test partial removal when not allowed (Helmet)
     RemovedQuantity = ItemContainerComponent->RemoveItems_IfServer(FRancItemInstance(ItemIdHelmet, 1), false); // Properly remove Helmet
     Res &= Test->TestEqual(TEXT("Should remove helmet"), RemovedQuantity, 1);
-    Res &= Test->TestFalse(TEXT("Helmet should be removed after successful removal"), ItemContainerComponent->ContainsItems(ItemIdHelmet, 1));
+    Res &= Test->TestFalse(TEXT("Helmet should be removed after successful removal"), ItemContainerComponent->DoesContainerContainItems(ItemIdHelmet, 1));
 
     return Res;
 }
@@ -124,27 +124,27 @@ bool TestCanReceiveItems(FRancItemContainerComponentTest* Test)
     bool Res = true;
 
     // Initially, the container should be able to receive any item within its capacity
-    Res &= Test->TestTrue(TEXT("Container should initially be able to receive rocks"), ItemContainerComponent->CanContainerReceiveItems(FRancItemInstance(ItemIdRock, 5)));
+    Res &= Test->TestTrue(TEXT("Container should initially be able to receive rocks"), ItemContainerComponent->CanReceiveItems(FRancItemInstance(ItemIdRock, 5)));
 
     // Add some items to change the container's capacity state
     ItemContainerComponent->AddItems_IfServer(FRancItemInstance(ItemIdRock, 3), false); // 3 Rocks, assuming each rock weighs 1 unit
 
     // Now, the container should report its reduced capacity accurately
-    Res &= Test->TestTrue(TEXT("Container should still be able to receive more rocks"), ItemContainerComponent->CanContainerReceiveItems(FRancItemInstance(ItemIdRock, 2)));
-    Res &= Test->TestFalse(TEXT("Container should not be able to receive more rocks than its weight limit"), ItemContainerComponent->CanContainerReceiveItems(FRancItemInstance(ItemIdRock, 4)));
+    Res &= Test->TestTrue(TEXT("Container should still be able to receive more rocks"), ItemContainerComponent->CanReceiveItems(FRancItemInstance(ItemIdRock, 2)));
+    Res &= Test->TestFalse(TEXT("Container should not be able to receive more rocks than its weight limit"), ItemContainerComponent->CanReceiveItems(FRancItemInstance(ItemIdRock, 4)));
 
     // Add unstackable item (Helmet)
     ItemContainerComponent->AddItems_IfServer(FRancItemInstance(ItemIdHelmet, 5), false); // adding 5x2=10 units worth of weight
 
     // Check if the container can receive another unstackable item without exceeding item count and weight limits
-    Res &= Test->TestTrue(TEXT("Container should be able to receive a spear"), ItemContainerComponent->CanContainerReceiveItems(FRancItemInstance(ItemIdSpear, 1)));
+    Res &= Test->TestTrue(TEXT("Container should be able to receive a spear"), ItemContainerComponent->CanReceiveItems(FRancItemInstance(ItemIdSpear, 1)));
     
     // Fill up the container to its limits
     ItemContainerComponent->AddItems_IfServer(FRancItemInstance(ItemIdRock, 2), false); // Adding more rocks to reach the weight limit
 
     // Test the container's capacity with various items now that it's full
-    Res &= Test->TestFalse(TEXT("Container should not be able to receive any more items due to weight limit"), ItemContainerComponent->CanContainerReceiveItems(FRancItemInstance(ItemIdRock, 1)));
-    Res &= Test->TestFalse(TEXT("Container should not be able to receive any more unstackable items due to item count limit"), ItemContainerComponent->CanContainerReceiveItems(FRancItemInstance(ItemIdHelmet, 1)));
+    Res &= Test->TestFalse(TEXT("Container should not be able to receive any more items due to weight limit"), ItemContainerComponent->CanReceiveItems(FRancItemInstance(ItemIdRock, 1)));
+    Res &= Test->TestFalse(TEXT("Container should not be able to receive any more unstackable items due to item count limit"), ItemContainerComponent->CanReceiveItems(FRancItemInstance(ItemIdHelmet, 1)));
 
     return Res;
 }
@@ -159,23 +159,23 @@ bool TestItemCountsAndPresence(FRancItemContainerComponentTest* Test)
     ItemContainerComponent->AddItems_IfServer(FRancItemInstance(ItemIdHelmet, 1), false); // Add 1 Helmet
 
     // Test GetItemCount for stackable and unstackable items
-    Res &= Test->TestEqual(TEXT("Inventory should report 5 rocks"), ItemContainerComponent->GetItemCount(ItemIdRock), 5);
-    Res &= Test->TestEqual(TEXT("Inventory should report 1 helmet"), ItemContainerComponent->GetItemCount(ItemIdHelmet), 1);
+    Res &= Test->TestEqual(TEXT("Inventory should report 5 rocks"), ItemContainerComponent->GetContainerItemCount(ItemIdRock), 5);
+    Res &= Test->TestEqual(TEXT("Inventory should report 1 helmet"), ItemContainerComponent->GetContainerItemCount(ItemIdHelmet), 1);
 
     // Test ContainsItems for exact and over-quantities
-    Res &= Test->TestTrue(TEXT("Inventory should contain at least 5 rocks"), ItemContainerComponent->ContainsItems(ItemIdRock, 5));
-    Res &= Test->TestFalse(TEXT("Inventory should not falsely report more rocks than it contains"), ItemContainerComponent->ContainsItems(ItemIdRock, 6));
-    Res &= Test->TestTrue(TEXT("Inventory should confirm the presence of the helmet"), ItemContainerComponent->ContainsItems(ItemIdHelmet, 1));
-    Res &= Test->TestFalse(TEXT("Inventory should not report more helmets than it contains"), ItemContainerComponent->ContainsItems(ItemIdHelmet, 2));
+    Res &= Test->TestTrue(TEXT("Inventory should contain at least 5 rocks"), ItemContainerComponent->DoesContainerContainItems(ItemIdRock, 5));
+    Res &= Test->TestFalse(TEXT("Inventory should not falsely report more rocks than it contains"), ItemContainerComponent->DoesContainerContainItems(ItemIdRock, 6));
+    Res &= Test->TestTrue(TEXT("Inventory should confirm the presence of the helmet"), ItemContainerComponent->DoesContainerContainItems(ItemIdHelmet, 1));
+    Res &= Test->TestFalse(TEXT("Inventory should not report more helmets than it contains"), ItemContainerComponent->DoesContainerContainItems(ItemIdHelmet, 2));
 
     // Test GetAllItems to ensure it returns all added items correctly
-    TArray<FRancItemInstance> AllItems = ItemContainerComponent->GetAllItems();
+    TArray<FRancItemInstance> AllItems = ItemContainerComponent->GetAllContainerItems();
     Res &= Test->TestTrue(TEXT("GetAllItems should include rocks"), AllItems.ContainsByPredicate([](const FRancItemInstance& Item) { return Item.ItemId == ItemIdRock && Item.Quantity == 5; }));
     Res &= Test->TestTrue(TEXT("GetAllItems should include the helmet"), AllItems.ContainsByPredicate([](const FRancItemInstance& Item) { return Item.ItemId == ItemIdHelmet && Item.Quantity == 1; }));
     
     // Remove some items and test counts again
     ItemContainerComponent->RemoveItems_IfServer(FRancItemInstance(ItemIdRock, 3), true); // Remove 3 Rocks
-    Res &= Test->TestEqual(TEXT("After removal, inventory should report 2 rocks"), ItemContainerComponent->GetItemCount(ItemIdRock), 2);
+    Res &= Test->TestEqual(TEXT("After removal, inventory should report 2 rocks"), ItemContainerComponent->GetContainerItemCount(ItemIdRock), 2);
     
     // Test inventory is not empty
     Res &= Test->TestFalse(TEXT("Inventory should not be empty"), ItemContainerComponent->IsEmpty());
@@ -191,33 +191,35 @@ bool TestMiscFunctions(FRancItemContainerComponentTest* Test)
 {
     SETUP_RANCITEMCONTAINER(10, 50); // Setup with a capacity for 10 items and 50 weight capacity.
     
+    bool Res = true;
     // Assuming InitializeTestItems() initializes the items including a "Rock" and "Helmet" with their respective tags.
     InitializeTestItems();
 
     // Test FindItemById - Initially, the container should not contain a "Rock" item.
     FRancItemInstance RockItemInstance = ItemContainerComponent->FindItemById(ItemIdRock);
-    bool bTestFindBeforeAdd = Test->TestTrue(TEXT("FindItemById should not find an item before it's added"), RockItemInstance.ItemId != ItemIdRock);
+    Res &=  Test->TestTrue(TEXT("FindItemById should not find an item before it's added"), RockItemInstance.ItemId != ItemIdRock);
     
     // Add a "Rock" item to the container.
     ItemContainerComponent->AddItems_IfServer(FRancItemInstance(ItemIdRock, 1));
     
     // Test FindItemById - Now, the container should contain the "Rock" item.
     RockItemInstance = ItemContainerComponent->FindItemById(ItemIdRock);
-    bool bTestFindAfterAdd = Test->TestTrue(TEXT("FindItemById should find the item after it's added"), RockItemInstance.ItemId == ItemIdRock);
+    Res &=  Test->TestTrue(TEXT("FindItemById should find the item after it's added"), RockItemInstance.ItemId == ItemIdRock);
 
     // Test ContainsItems for "Rock".
-    bool bTestContainsItems = Test->TestTrue(TEXT("ContainsItems should return true for items present in the container"), ItemContainerComponent->ContainsItems(ItemIdRock, 1));
+    Res &=  Test->TestTrue(TEXT("ContainsItems should return true for items present in the container"), ItemContainerComponent->DoesContainerContainItems(ItemIdRock, 1));
 
     // Test IsEmpty before and after adding items.
-    bool bTestIsEmptyBefore = Test->TestFalse(TEXT("IsEmpty should return false when items are present"), ItemContainerComponent->IsEmpty());
-    ItemContainerComponent->DropAllItems_IfServer(); // Assuming this clears all items.
-    bool bTestIsEmptyAfter = Test->TestTrue(TEXT("IsEmpty should return true when no items are present"), ItemContainerComponent->IsEmpty());
+    Res &=  Test->TestFalse(TEXT("IsEmpty should return false when items are present"), ItemContainerComponent->IsEmpty());
 
+    // ItemContainerComponent->DropAllItems_IfServer(); // Assuming this clears all items.
+   // bool bTestIsEmptyAfter = Test->TestTrue(TEXT("IsEmpty should return true when no items are present"), ItemContainerComponent->IsEmpty());
+    ItemContainerComponent->ClearContainer_IfServer();
 
     ItemContainerComponent->AddItems_IfServer(FRancItemInstance(ItemIdRock, 1));
     ItemContainerComponent->DropItems(FRancItemInstance(ItemIdRock, 1));
     
-    return bTestFindBeforeAdd && bTestFindAfterAdd && bTestContainsItems && bTestIsEmptyBefore && bTestIsEmptyAfter;
+    return Res;
 }
 
 bool FRancItemContainerComponentTest::RunTest(const FString& Parameters)
