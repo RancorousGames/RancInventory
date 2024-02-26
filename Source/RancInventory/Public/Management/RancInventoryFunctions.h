@@ -80,6 +80,10 @@ public:
     /* Trade items between two inventory components */
     UFUNCTION(BlueprintCallable, Category = "Ranc Inventory")
     static void TradeRancItem(TArray<FRancItemInstance> ItemsToTrade, URancItemContainerComponent* FromInventory, URancItemContainerComponent* ToInventory);
+
+    // Utiltiy function to check if moving an item from one slot to another would cause a swap
+    static bool ShouldItemsBeSwapped(FRancItemInstance* Source, FRancItemInstance* Target);
+
     
     /* Moves from a source ItemInstance to a target one, either moving, stacking stackable items or swapping
      * Not exposed to blueprint directly as its a utility function for other inventory classes

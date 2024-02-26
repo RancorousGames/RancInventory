@@ -286,7 +286,7 @@ TArray<FRancItemInstance> URancInventoryFunctions::FilterTradeableItems(URancInv
 		             }
 
 		             bool bCanTradeIterator = FromInventory->DoesContainerContainItems(ItemInfo.ItemId) && ToInventory->
-			             CanReceiveItems(ItemInfo);
+			             CanContainerReceiveItems(ItemInfo);
 
 		             if (bCanTradeIterator)
 		             {
@@ -420,6 +420,24 @@ void URancInventoryFunctions::TradeRancItem(TArray<FRancItemInstance> ItemsToTra
 		}
 		ToInventory->AddItems_IfServer(Iterator);
 	}
+}
+
+bool URancInventoryFunctions::ShouldItemsBeSwapped(FRancItemInstance* Source, FRancItemInstance* Target)
+{
+	// This code is copied and slightly modified from MoveBetweenSlots
+	if (Target->IsValid())
+	{
+		const URancItemData* SourceItemData = URancInventoryFunctions::GetItemDataById(Source->ItemId);
+		if (!SourceItemData)
+		{
+			return false;
+		}
+		
+		const bool ShouldStack = SourceItemData->bIsStackable && Source->ItemId == Target->ItemId;
+		return !ShouldStack;
+	}
+
+	return false;
 }
 
 int32 URancInventoryFunctions::MoveBetweenSlots(FRancItemInstance* Source, FRancItemInstance* Target, bool IgnoreMaxStacks, int32 RequestedQuantity, bool AllowPartial)

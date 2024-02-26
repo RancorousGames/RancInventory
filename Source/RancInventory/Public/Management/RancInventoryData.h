@@ -90,7 +90,7 @@ struct FRancItemInstance
     FGameplayTag ItemId;
     
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ranc Inventory")
-    int32 Quantity = 1;
+    int32 Quantity = 0;
 };
 
 USTRUCT(BlueprintType, Category = "Ranc Inventory | Structs")

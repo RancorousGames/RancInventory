@@ -55,9 +55,14 @@ protected:
 public:
     URancInventorySlotMapper();
 
-    // Initializes the slot mapper with a given inventory component, setting up initial mappings
+    /* Initializes the slot mapper with a given inventory component, setting up initial mappings
+     * Parameters:
+     * InventoryComponent: The inventory component to be linked to the slot mapper
+     * NumSlots: The number of slots to be initialized
+     * bPreferEmptyUniversalSlots: Whether MoveItemToAnyTaggedSlot will prefer to use empty universal slots over occupied specialized slots
+     */
     UFUNCTION(BlueprintCallable, Category="Inventory Mapping")
-    void Initialize(URancInventoryComponent* InventoryComponent, int32 NumSlots = 9);
+    void Initialize(URancInventoryComponent* InventoryComponent, int32 NumSlots = 9,  bool bPreferEmptyUniversalSlots = false);
 
     // Checks if a given slot is empty
     UFUNCTION(BlueprintCallable, BlueprintPure, Category="Inventory Mapping")
@@ -90,13 +95,13 @@ public:
      * @param Quantity The number of items to be split from the source slot to the target slot.
      */
     UFUNCTION(BlueprintCallable, Category="Inventory Mapping")
-    void SplitItem(FGameplayTag SourceTaggedSlot, int32 SourceSlotIndex, FGameplayTag TargetTaggedSlot, int32 TargetSlotIndex, int32 Quantity);
+    bool SplitItems(FGameplayTag SourceTaggedSlot, int32 SourceSlotIndex, FGameplayTag TargetTaggedSlot, int32 TargetSlotIndex, int32 Quantity);
     
     UFUNCTION(BlueprintCallable, Category="Inventory Mapping")
     int32 DropItem(FGameplayTag TaggedSlot, int32 SlotIndex, int32 Quantity);
     
     UFUNCTION(BlueprintCallable, Category="Inventory Mapping")
-    bool MoveItem(FGameplayTag SourceTaggedSlot, int32 SourceSlotIndex = -1,
+    bool MoveItems(FGameplayTag SourceTaggedSlot, int32 SourceSlotIndex = -1,
                   FGameplayTag TargetTaggedSlot = FGameplayTag(), int32 TargetSlotIndex = -1);
 
     UFUNCTION(BlueprintCallable, Category="Inventory Mapping")
@@ -111,11 +116,14 @@ public:
     UFUNCTION(BlueprintCallable, Category="Inventory Mapping")
     bool CanTaggedSlotReceiveItem(const FRancItemInstance& ItemInstance, const FGameplayTag& SlotTag, bool CheckContainerLimits = true) const;
     
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Inventory Mapping")
     int32 NumberOfSlots;
     
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Inventory Mapping")
+    bool PreferEmptyUniversalSlots = true;
+    
     // Linked inventory component for direct interaction
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Inventory Mapping")
     URancInventoryComponent* LinkedInventoryComponent;
     
     DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnSlotUpdated, int32, SlotIndex);

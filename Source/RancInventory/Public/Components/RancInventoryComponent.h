@@ -45,6 +45,7 @@ public:
 	void MoveItems_Server(const FRancItemInstance& ItemInstance,
 							   const FGameplayTag& SourceTaggedSlot = FGameplayTag(),
 							   const FGameplayTag& TargetTaggedSlot = FGameplayTag());
+	
 	int32 MoveItems_ServerImpl(const FRancItemInstance& ItemInstance,
 	                           const FGameplayTag& SourceTaggedSlot = FGameplayTag(),
 	                           const FGameplayTag& TargetTaggedSlot = FGameplayTag());
@@ -73,8 +74,7 @@ public:
 	// Removes all items from generic and tagged slots, and publishes the removals
 	UFUNCTION(BlueprintCallable, Category="Ranc Inventory")
 	void ClearInventory_IfServer();
-
-
+	
 	// New events for slot equipment changes, this also gets called if an already held stackable item has its stack quantity increased
 	DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnItemAddedToTaggedSlot, const FGameplayTag&, SlotTag, const FRancItemInstance&, ItemInfo);
 
@@ -161,7 +161,7 @@ protected:
 	UFUNCTION(Server, Reliable)
 	void DropFromTaggedSlot_Server(const FGameplayTag& SlotTag, int32 Quantity, float DropAngle = 0);
 
-	virtual void UpdateWeight() override;
+	virtual void UpdateWeightAndSlots() override;
 
 	virtual bool ContainsItemsImpl(const FGameplayTag& ItemId, int32 Quantity) const override;
 
@@ -185,4 +185,6 @@ private:
 
 	UFUNCTION()
 	void OnRep_Recipes();
+
+	friend class URancInventorySlotMapper;
 };

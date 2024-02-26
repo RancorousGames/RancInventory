@@ -12,8 +12,8 @@ public:
     explicit URancItemContainerComponent(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
 
     virtual void InitializeComponent() override;
-    
-	UFUNCTION(BlueprintPure, Category="Ranc Inventory")
+	
+    UFUNCTION(BlueprintPure, Category="Ranc Inventory")
     float GetCurrentWeight() const;
 
     UFUNCTION(BlueprintPure, Category="Ranc Inventory")
@@ -46,12 +46,17 @@ public:
     UFUNCTION(BlueprintCallable, Category="Ranc Inventory")
     int32 DropAllItems_IfServer();
     
+	/* Checks weight and container slot count */
     UFUNCTION(BlueprintPure, Category="Ranc Inventory")
-    bool CanReceiveItems(const FRancItemInstance& ItemInstance) const;
-    
+    bool CanContainerReceiveItems(const FRancItemInstance& ItemInstance) const;
+
+	/* Checks weight and container slot count */
     UFUNCTION(BlueprintPure, Category="Ranc Inventory")
-    int32 GetQuantityOfItemCanBeReceived(const FGameplayTag& ItemId) const;
-    
+    int32 GetQuantityOfItemContainerCanReceive(const FGameplayTag& ItemId) const;
+	
+	UFUNCTION(BlueprintPure, Category="Ranc Inventory")
+    bool HasWeightCapacityForItems(const FRancItemInstance& ItemInstance) const;
+
     UFUNCTION(BlueprintPure, Category="Ranc Inventory")
     bool DoesContainerContainItems(const FGameplayTag& ItemId, int32 Quantity = 1) const;
     
@@ -88,10 +93,14 @@ public:
     UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Ranc Inventory", meta = (AllowPrivateAccess = "true", ClampMin = "0", UIMin = "0"))
     float MaxWeight;
 
-    /* Max num of items allowed for this item container, this does NOT apply to child classes */
+    /* Max number of slots contained items are allowed to take up.
+     * Note: The inventory doesn't actually store items in slots, the slots are calculated */
     UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Ranc Inventory", meta = (AllowPrivateAccess = "true", ClampMin = "1", UIMin = "1"))
-    int32 MaxNumItemsInContainer;
+    int32 MaxContainerSlotCount;
 
+	UPROPERTY(BlueprintReadOnly, Category="Ranc Inventory")
+	int32 UsedContainerSlotCount;
+	
 protected:
 
     UPROPERTY(EditAnywhere, Category="Ranc Inventory")
@@ -99,7 +108,7 @@ protected:
     
     UPROPERTY(ReplicatedUsing=OnRep_Items, BlueprintReadOnly, Category="Ranc Inventory")
     TArray<FRancItemInstance> Items;
-
+	
 
     UFUNCTION(Server, Reliable)
     void DropItems_Server(const FRancItemInstance& ItemInstance, float DropAngle = 0);
@@ -116,7 +125,7 @@ protected:
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 protected:
     
-    virtual void UpdateWeight();
+    virtual void UpdateWeightAndSlots();
     float CurrentWeight;
     
     void CopyItemsToCache();

@@ -5,8 +5,6 @@
 #include "Management/RancInventoryData.h"
 #include "Components/RancItemContainerComponent.h"
 #include "Components/RancInventoryComponent.h"
-#include "Engine/AssetManager.h"
-#include "Management/RancInventoryFunctions.h"
 #include "Misc/AutomationTest.h"
 
 #include "InventorySetup.cpp"
@@ -19,7 +17,7 @@ InventoryComponent->UniversalTaggedSlots.Add(LeftHandSlot); \
 InventoryComponent->UniversalTaggedSlots.Add(RightHandSlot); \
 InventoryComponent->SpecializedTaggedSlots.Add(HelmetSlot); \
 InventoryComponent->SpecializedTaggedSlots.Add(ChestSlot); \
-InventoryComponent->MaxNumItemsInContainer = 999; \
+InventoryComponent->MaxContainerSlotCount = 9; \
 InventoryComponent->MaxWeight = CarryCapacity; \
 InitializeTestItems();
 
@@ -35,49 +33,49 @@ bool TestAddingTaggedSlotItems()
 	Res &= RITest->TestTrue(TEXT("No item should be in the left hand slot before addition"), !InventoryComponent->GetItemForTaggedSlot(LeftHandSlot).IsValid());
 
 	// Add an unstackable item to the left hand slot
-	InventoryComponent->AddItemsToTaggedSlot_IfServer(LeftHandSlot, FRancItemInstance(ItemIdHelmet, 1), false);
+	InventoryComponent->AddItemsToTaggedSlot_IfServer(LeftHandSlot, OneHelmet, false);
 	Res &= RITest->TestTrue(
 		TEXT("Unstackable Item should be in the left hand slot after addition"),
 		InventoryComponent->GetItemForTaggedSlot(LeftHandSlot).ItemInstance.ItemId.MatchesTag(ItemIdHelmet));
 
 	// Attempt to add another unstackable item to the same slot without override - should fail
-	InventoryComponent->AddItemsToTaggedSlot_IfServer(LeftHandSlot, FRancItemInstance(ItemIdHelmet, 1), false);
+	InventoryComponent->AddItemsToTaggedSlot_IfServer(LeftHandSlot, OneHelmet, false);
 	Res &= RITest->TestTrue(
 		TEXT("Second unstackable item should not replace the first one without override"), InventoryComponent->GetItemForTaggedSlot(LeftHandSlot).ItemInstance.Quantity == 1);
 
 	// Attempt to add another unstackable item to the same slot with override - should succeed
-	InventoryComponent->AddItemsToTaggedSlot_IfServer(LeftHandSlot, FRancItemInstance(ItemIdHelmet, 1), true);
+	InventoryComponent->AddItemsToTaggedSlot_IfServer(LeftHandSlot, OneHelmet, true);
 	Res &= RITest->TestEqual(
 		TEXT("Second unstackable item should replace the first one with override"), InventoryComponent->GetItemForTaggedSlot(LeftHandSlot).ItemInstance.Quantity, 1);
 
 	// Test adding to a specialized slot that should only accept specific items
 	// Assuming HelmetSlot only accepts items with HelmetTag
-	InventoryComponent->AddItemsToTaggedSlot_IfServer(HelmetSlot, FRancItemInstance(ItemIdSpear, 1), true);
+	InventoryComponent->AddItemsToTaggedSlot_IfServer(HelmetSlot, OneSpear, true);
 	Res &= RITest->TestTrue(TEXT("Non-helmet item should not be added to the helmet slot"), !InventoryComponent->GetItemForTaggedSlot(HelmetSlot).IsValid());
 
 	// Test adding a correct item to a specialized slot
-	InventoryComponent->AddItemsToTaggedSlot_IfServer(HelmetSlot, FRancItemInstance(ItemIdHelmet, 1), true);
+	InventoryComponent->AddItemsToTaggedSlot_IfServer(HelmetSlot, OneHelmet, true);
 	Res &= RITest->TestTrue(
 		TEXT("Helmet item should be added to the helmet slot"), InventoryComponent->GetItemForTaggedSlot(HelmetSlot).ItemInstance.ItemId.MatchesTag(ItemIdHelmet));
 
 	// Test adding a stackable item to an empty slot and then adding a different stackable item to the same slot without override
-	InventoryComponent->AddItemsToTaggedSlot_IfServer(RightHandSlot, FRancItemInstance(ItemIdRock, 3), false); // Assuming this is reset from previous tests
+	InventoryComponent->AddItemsToTaggedSlot_IfServer(RightHandSlot, ThreeRocks, false); // Assuming this is reset from previous tests
 	InventoryComponent->AddItemsToTaggedSlot_IfServer(RightHandSlot, FRancItemInstance(ItemIdSticks, 2), false);
 	Res &= RITest->TestFalse(
 		TEXT("Different stackable item (Sticks) should not be added to a slot already containing a stackable item (Rock) without override"),
 		InventoryComponent->GetItemForTaggedSlot(RightHandSlot).ItemInstance.ItemId.MatchesTag(ItemIdSticks));
 
 	// Test adding an item to a slot that is not designated as either universal or specialized (invalid slot)
-	InventoryComponent->AddItemsToTaggedSlot_IfServer(FGameplayTag::EmptyTag, FRancItemInstance(ItemIdRock, 1), false);
+	InventoryComponent->AddItemsToTaggedSlot_IfServer(FGameplayTag::EmptyTag, OneRock, false);
 	Res &= RITest->TestFalse(TEXT("Item should not be added to an invalid slot"), InventoryComponent->GetItemForTaggedSlot(FGameplayTag::EmptyTag).IsValid());
 
 	// Test adding a stackable item to the max stack size and then attempting to add more with override, which should return 0
-	InventoryComponent->AddItemsToTaggedSlot_IfServer(RightHandSlot, FRancItemInstance(ItemIdRock, 5), true); // Reset to max stack size
-	int32 AmountAdded = InventoryComponent->AddItemsToTaggedSlot_IfServer(RightHandSlot, FRancItemInstance(ItemIdRock, 3), false);
+	InventoryComponent->AddItemsToTaggedSlot_IfServer(RightHandSlot, FiveRocks, true); // Reset to max stack size
+	int32 AmountAdded = InventoryComponent->AddItemsToTaggedSlot_IfServer(RightHandSlot, ThreeRocks, false);
 	Res &= RITest->TestEqual(TEXT("Stackable Item (Rock) amount added should be none as already full stack"), AmountAdded, 0);
 
 	// Do it again but with override true
-	AmountAdded = InventoryComponent->AddItemsToTaggedSlot_IfServer(RightHandSlot, FRancItemInstance(ItemIdRock, 3), true);
+	AmountAdded = InventoryComponent->AddItemsToTaggedSlot_IfServer(RightHandSlot, ThreeRocks, true);
 	Res &= RITest->TestEqual(TEXT("Stackable Item (Rock) amount added should be 3 with override"), AmountAdded, 3);
 
 	// Test adding a stackable item to a slot that has a different stackable item with override enabled
@@ -97,7 +95,7 @@ bool TestRemovingTaggedSlotItems()
 	bool Res = true;
 
 	// Add stackable item to a slot
-	InventoryComponent->AddItemsToTaggedSlot_IfServer(RightHandSlot, FRancItemInstance(ItemIdRock, 3), false);
+	InventoryComponent->AddItemsToTaggedSlot_IfServer(RightHandSlot, ThreeRocks, false);
 
 	// Remove a portion of the stackable item
 	int32 RemovedQuantity = InventoryComponent->RemoveQuantityFromTaggedSlot_IfServer(RightHandSlot, 2, true);
@@ -110,7 +108,7 @@ bool TestRemovingTaggedSlotItems()
 	Res &= RITest->TestTrue(TEXT("Should not remove any items if attempting to remove more than present without allowing partial removal"), RemovedQuantity == 0);
 
 	// Add an unstackable item to a slot and then remove it
-	InventoryComponent->AddItemsToTaggedSlot_IfServer(HelmetSlot, FRancItemInstance(ItemIdHelmet, 1), true);
+	InventoryComponent->AddItemsToTaggedSlot_IfServer(HelmetSlot, OneHelmet, true);
 	RemovedQuantity = InventoryComponent->RemoveQuantityFromTaggedSlot_IfServer(HelmetSlot, 1, true);
 	Res &= RITest->TestTrue(TEXT("Should successfully remove unstackable item (Helmet)"), RemovedQuantity == 1);
 	Res &= RITest->TestFalse(TEXT("Helmet slot should be empty after removing the item"), InventoryComponent->GetItemForTaggedSlot(HelmetSlot).IsValid());
@@ -133,70 +131,94 @@ bool TestMoveTaggedSlotItems()
 	bool Res = true;
 
 	// Add item to a tagged slot directly
-	InventoryComponent->AddItemsToTaggedSlot_IfServer(HelmetSlot, FRancItemInstance(ItemIdHelmet, 1), true);
+	InventoryComponent->AddItemsToTaggedSlot_IfServer(HelmetSlot, OneHelmet, true);
 	Res &= RITest->TestTrue(
 		TEXT("Helmet item should be added to the helmet slot"), InventoryComponent->GetItemForTaggedSlot(HelmetSlot).ItemInstance.ItemId.MatchesTag(ItemIdHelmet));
 	Res &= RITest->TestTrue(TEXT("Container should be empty"), InventoryComponent->GetAllContainerItems().Num() == 0);
 
 	// Move item from tagged slot to generic inventory (cannot directly verify generic inventory, so just ensure removal)
-	int32 MovedQuantity = InventoryComponent->MoveItems_ServerImpl(FRancItemInstance(ItemIdHelmet, 1), HelmetSlot);
+	int32 MovedQuantity = InventoryComponent->MoveItems_ServerImpl(OneHelmet, HelmetSlot);
 	Res &= RITest->TestEqual(TEXT("Should move the helmet item from the tagged slot to generic inventory"), MovedQuantity, 1);
 	Res &= RITest->TestTrue(TEXT("Helmet slot should be empty"), !InventoryComponent->GetItemForTaggedSlot(HelmetSlot).IsValid());
 	Res &= RITest->TestTrue(TEXT("Generic inventory should contain the helmet item"), InventoryComponent->GetContainerItemCount(ItemIdHelmet) == 1);
 	// generic inventory now has the helmet item
 
 	// Try to move item to invalid (chest) slot
-	MovedQuantity = InventoryComponent->MoveItems_ServerImpl(FRancItemInstance(ItemIdHelmet, 1), FGameplayTag::EmptyTag, ChestSlot);
+	MovedQuantity = InventoryComponent->MoveItems_ServerImpl(OneHelmet, FGameplayTag::EmptyTag, ChestSlot);
 	Res &= RITest->TestEqual(TEXT("Should not move the helmet item to the chest slot"), MovedQuantity, 0);
 	Res &= RITest->TestFalse(TEXT("Chest slot should not contain the helmet item"), InventoryComponent->GetItemForTaggedSlot(ChestSlot).IsValid());
 
 	// Move item back to a different tagged slot from generic inventory
-	MovedQuantity = InventoryComponent->MoveItems_ServerImpl(FRancItemInstance(ItemIdHelmet, 1), FGameplayTag::EmptyTag, RightHandSlot);
+	MovedQuantity = InventoryComponent->MoveItems_ServerImpl(OneHelmet, FGameplayTag::EmptyTag, RightHandSlot);
 	Res &= RITest->TestEqual(TEXT("Should move the helmet item from generic inventory to right hand slot"), MovedQuantity, 1);
 	Res &= RITest->TestTrue(
 		TEXT("Right hand slot should now contain the helmet item"), InventoryComponent->GetItemForTaggedSlot(RightHandSlot).ItemInstance.ItemId.MatchesTag(ItemIdHelmet));
 
 	// Move item from one hand to the other
-	MovedQuantity = InventoryComponent->MoveItems_ServerImpl(FRancItemInstance(ItemIdHelmet, 1), RightHandSlot, LeftHandSlot);
+	MovedQuantity = InventoryComponent->MoveItems_ServerImpl(OneHelmet, RightHandSlot, LeftHandSlot);
 	Res &= RITest->TestEqual(TEXT("Should move the helmet item from right hand slot to left hand slot"), MovedQuantity, 1);
 	Res &= RITest->TestTrue(
 		TEXT("Left hand slot should now contain the helmet item"), InventoryComponent->GetItemForTaggedSlot(LeftHandSlot).ItemInstance.ItemId.MatchesTag(ItemIdHelmet));
 
 	// Attempt to move an item that doesn't exist in the source tagged slot
-	MovedQuantity = InventoryComponent->MoveItems_ServerImpl(FRancItemInstance(ItemIdRock, 1), HelmetSlot);
+	MovedQuantity = InventoryComponent->MoveItems_ServerImpl(OneRock, HelmetSlot);
 	Res &= RITest->TestEqual(TEXT("Should not move an item that doesn't exist in the source tagged slot"), MovedQuantity, 0);
 
 	// Status: Inventory contains 1 item, helmet in left hand slot
 
 	// Add an item compatible with RightHandSlot but not with HelmetSlot
-	InventoryComponent->AddItemsToTaggedSlot_IfServer(RightHandSlot, FRancItemInstance(ItemIdSpear, 1), true);
+	InventoryComponent->AddItemsToTaggedSlot_IfServer(RightHandSlot, OneSpear, true);
 	Res &= RITest->TestTrue(
 		TEXT("Spear item should be added to the right hand slot"), InventoryComponent->GetItemForTaggedSlot(RightHandSlot).ItemInstance.ItemId.MatchesTag(ItemIdSpear));
 
 	// Attempt to move the Spear (Weapon) to HelmetSlot (Armor) directly, should fail
-	MovedQuantity = InventoryComponent->MoveItems_ServerImpl(FRancItemInstance(ItemIdSpear, 1), RightHandSlot, HelmetSlot);
+	MovedQuantity = InventoryComponent->MoveItems_ServerImpl(OneSpear, RightHandSlot, HelmetSlot);
 	Res &= RITest->TestEqual(TEXT("Should not move the spear item to helmet slot"), MovedQuantity, 0);
 	Res &= RITest->TestFalse(TEXT("Helmet slot should still be empty"), InventoryComponent->GetItemForTaggedSlot(HelmetSlot).IsValid());
 
 	// Try to Move a (non existent) Spear back to an empty RightHandSlot from HelmetSlot
-	MovedQuantity = InventoryComponent->MoveItems_ServerImpl(FRancItemInstance(ItemIdSpear, 1), RightHandSlot, HelmetSlot);
+	MovedQuantity = InventoryComponent->MoveItems_ServerImpl(OneSpear, RightHandSlot, HelmetSlot);
 	Res &= RITest->TestEqual(TEXT("Should not move the spear item from right hand slot to helmet slot directly"), MovedQuantity, 0);
 	Res &= RITest->TestTrue(
 		TEXT("Right hand slot should still contain the spear item"), InventoryComponent->GetItemForTaggedSlot(RightHandSlot).ItemInstance.ItemId.MatchesTag(ItemIdSpear));
 
+	// Try again but other way which should also fail because helmet slot is empty AND spear is incompatible
+	MovedQuantity = InventoryComponent->MoveItems_ServerImpl(OneHelmet, HelmetSlot, RightHandSlot);
+	Res &= RITest->TestEqual(TEXT("Should not move the helmet item from left hand slot to right hand slot directly"), MovedQuantity, 0);
+	Res &= RITest->TestTrue(
+		TEXT("Right hand slot should still contain the spear item"), InventoryComponent->GetItemForTaggedSlot(RightHandSlot).ItemInstance.ItemId.MatchesTag(ItemIdSpear));
+	
 	// Status: Helmet in left hand, Spear in right hand
 
 	// attempt to swap the items in the hands
-	MovedQuantity = InventoryComponent->MoveItems_ServerImpl(FRancItemInstance(ItemIdHelmet, 1), LeftHandSlot, RightHandSlot);
+	MovedQuantity = InventoryComponent->MoveItems_ServerImpl(OneHelmet, LeftHandSlot, RightHandSlot);
 	Res &= RITest->TestEqual(TEXT("Should Swap the two items"), MovedQuantity, 1);
 	Res &= RITest->TestTrue(
 		TEXT("Right hand slot should now contain the helmet item"), InventoryComponent->GetItemForTaggedSlot(RightHandSlot).ItemInstance.ItemId.MatchesTag(ItemIdHelmet));
 	Res &= RITest->TestTrue(
 		TEXT("Left hand slot should now contain the spear item"), InventoryComponent->GetItemForTaggedSlot(LeftHandSlot).ItemInstance.ItemId.MatchesTag(ItemIdSpear));
 
+	// move helmet from right hand to helmet slot
+	MovedQuantity = InventoryComponent->MoveItems_ServerImpl(OneHelmet, RightHandSlot, HelmetSlot);
+	Res &= RITest->TestEqual(TEXT("Should move the helmet item from right hand slot to helmet slot"), MovedQuantity, 1);
+	Res &= RITest->TestTrue(
+		TEXT("Helmet slot should now contain the helmet item"), InventoryComponent->GetItemForTaggedSlot(HelmetSlot).ItemInstance.ItemId.MatchesTag(ItemIdHelmet));
+
+	// Now try moving spear from left hand to helmet slot which should fail
+	MovedQuantity = InventoryComponent->MoveItems_ServerImpl(OneSpear, LeftHandSlot, HelmetSlot);
+	Res &= RITest->TestEqual(TEXT("Should not move the spear item from left hand slot to helmet slot"), MovedQuantity, 0);
+	Res &= RITest->TestTrue(
+		TEXT("Left hand slot should still contain the spear item"), InventoryComponent->GetItemForTaggedSlot(LeftHandSlot).ItemInstance.ItemId.MatchesTag(ItemIdSpear));
+
+	// Try again the other direction, which should also fail because the spear would get swapped to helmet slot 
+	MovedQuantity = InventoryComponent->MoveItems_ServerImpl(OneHelmet, HelmetSlot, LeftHandSlot);
+	Res &= RITest->TestEqual(TEXT("Should not move the helmet item from helmet slot to left hand slot"), MovedQuantity, 0);
+	Res &= RITest->TestTrue(
+		TEXT("Left hand slot should still contain the spear item"), InventoryComponent->GetItemForTaggedSlot(LeftHandSlot).ItemInstance.ItemId.MatchesTag(ItemIdSpear));
+	
 	// Remove spear, Attempt to move items from an empty or insufficient source slot
 	InventoryComponent->RemoveQuantityFromTaggedSlot_IfServer(LeftHandSlot, 1, true);
-	MovedQuantity = InventoryComponent->MoveItems_ServerImpl(FRancItemInstance(ItemIdSpear, 1), LeftHandSlot); // Assuming RightHandSlot is empty
+	MovedQuantity = InventoryComponent->MoveItems_ServerImpl(OneSpear, LeftHandSlot); // Assuming RightHandSlot is empty
 	Res &= RITest->TestEqual(TEXT("Should not move items from an empty or insufficient source slot"), MovedQuantity, 0);
 	Res &= RITest->TestTrue(TEXT("No items in generic inventory"), InventoryComponent->GetAllContainerItems().Num() == 0);
 
@@ -207,7 +229,7 @@ bool TestMoveTaggedSlotItems()
 
 	// Test moving stackable rocks
 	InventoryComponent->AddItems_IfServer(FRancItemInstance(ItemIdRock, 8));
-	MovedQuantity = InventoryComponent->MoveItems_ServerImpl(FRancItemInstance(ItemIdRock, 3), FGameplayTag::EmptyTag, RightHandSlot);
+	MovedQuantity = InventoryComponent->MoveItems_ServerImpl(ThreeRocks, FGameplayTag::EmptyTag, RightHandSlot);
 	Res &= RITest->TestEqual(TEXT("Should move 3 rocks to right hand slot"), MovedQuantity, 3);
 	Res &= RITest->TestTrue(TEXT("Right hand slot should contain 3 rocks"), InventoryComponent->GetItemForTaggedSlot(RightHandSlot).ItemInstance.Quantity == 3);
 	Res &= RITest->TestTrue(TEXT("Generic inventory should contain 5 rocks"), InventoryComponent->GetContainerItemCount(ItemIdRock) == 5);
@@ -218,13 +240,13 @@ bool TestMoveTaggedSlotItems()
 	Res &= RITest->TestTrue(TEXT("Generic inventory should contain 3 rocks"), InventoryComponent->GetContainerItemCount(ItemIdRock) == 3);
 
 	// Try again and verify none are moved
-	MovedQuantity = InventoryComponent->MoveItems_ServerImpl(FRancItemInstance(ItemIdRock, 3), FGameplayTag::EmptyTag, RightHandSlot);
+	MovedQuantity = InventoryComponent->MoveItems_ServerImpl(ThreeRocks, FGameplayTag::EmptyTag, RightHandSlot);
 	Res &= RITest->TestEqual(TEXT("Should not move any rocks to right hand slot"), MovedQuantity, 0);
 	Res &= RITest->TestTrue(TEXT("Right hand slot should still contain 5 rocks"), InventoryComponent->GetItemForTaggedSlot(RightHandSlot).ItemInstance.Quantity == 5);
 	Res &= RITest->TestTrue(TEXT("Generic inventory should contain 3 rocks"), InventoryComponent->GetContainerItemCount(ItemIdRock) == 3);
 
 	// Move to other hand in several steps
-	MovedQuantity = InventoryComponent->MoveItems_ServerImpl(FRancItemInstance(ItemIdRock, 2), RightHandSlot, LeftHandSlot);
+	MovedQuantity = InventoryComponent->MoveItems_ServerImpl(TwoRocks, RightHandSlot, LeftHandSlot);
 	Res &= RITest->TestEqual(TEXT("Should move 2 rocks from right hand slot to left hand slot"), MovedQuantity, 2);
 	Res &= RITest->TestTrue(TEXT("Left hand slot should contain 2 rocks"), InventoryComponent->GetItemForTaggedSlot(LeftHandSlot).ItemInstance.Quantity == 2);
 	Res &= RITest->TestTrue(TEXT("Right hand slot should contain 3 rocks"), InventoryComponent->GetItemForTaggedSlot(RightHandSlot).ItemInstance.Quantity == 3);
@@ -232,16 +254,16 @@ bool TestMoveTaggedSlotItems()
 	// Decided to allow this for now // Attempt to move more than exists to verify that it fails
 	// MovedQuantity = InventoryComponent->MoveItems_ServerImpl(FRancItemInstance(ItemIdRock, 5), RightHandSlot, LeftHandSlot);
 	// Res &= RITest->TestEqual(TEXT("Should not move any rocks from right hand slot to left hand slot"), MovedQuantity, 0);
-	// Res &= RITest->TestTrue(TEXT("Left hand slot should still contain 2 rocks"), InventoryComponent->GetItemForTaggedSlot(LeftHandSlot).ItemInstance.Quantity == 2);
+	// Res &= RITest->TestTrue(TEXT("Left hand slot shou<ld still contain 2 rocks"), InventoryComponent->GetItemForTaggedSlot(LeftHandSlot).ItemInstance.Quantity == 2);
 
 	// Now move the remaining 3 rocks to the left hand slot
-	MovedQuantity = InventoryComponent->MoveItems_ServerImpl(FRancItemInstance(ItemIdRock, 3), RightHandSlot, LeftHandSlot);
+	MovedQuantity = InventoryComponent->MoveItems_ServerImpl(ThreeRocks, RightHandSlot, LeftHandSlot);
 	Res &= RITest->TestEqual(TEXT("Should move 3 rocks from right hand slot to left hand slot"), MovedQuantity, 3);
 	Res &= RITest->TestTrue(TEXT("Left hand slot should contain 5 rocks"), InventoryComponent->GetItemForTaggedSlot(LeftHandSlot).ItemInstance.Quantity == 5);
 	Res &= RITest->TestTrue(TEXT("Right hand slot should be empty"), !InventoryComponent->GetItemForTaggedSlot(RightHandSlot).IsValid());
 
 	// Now we test the same kind of rock moving but to and then from generic inventory
-	MovedQuantity = InventoryComponent->MoveItems_ServerImpl(FRancItemInstance(ItemIdRock, 3), LeftHandSlot);
+	MovedQuantity = InventoryComponent->MoveItems_ServerImpl(ThreeRocks, LeftHandSlot);
 	Res &= RITest->TestEqual(TEXT("Should move 3 rocks from left hand slot to generic inventory"), MovedQuantity, 3);
 	Res &= RITest->TestTrue(TEXT("Left hand slot should now hold 2 rocks"), InventoryComponent->GetItemForTaggedSlot(LeftHandSlot).ItemInstance.Quantity == 2);
 	Res &= RITest->TestTrue(TEXT("Generic inventory should contain 6 rocks"), InventoryComponent->GetContainerItemCount(ItemIdRock) == 6);
@@ -252,7 +274,7 @@ bool TestMoveTaggedSlotItems()
 	// Res &= RITest->TestTrue(TEXT("Left hand slot should still hold 2 rocks"), InventoryComponent->GetItemForTaggedSlot(LeftHandSlot).ItemInstance.Quantity == 2);
 	// Res &= RITest->TestTrue(TEXT("Generic inventory should contain 6 rocks"), InventoryComponent->GetContainerItemCount(ItemIdRock) == 6);
 
-	MovedQuantity = InventoryComponent->MoveItems_ServerImpl(FRancItemInstance(ItemIdRock, 2), LeftHandSlot);
+	MovedQuantity = InventoryComponent->MoveItems_ServerImpl(TwoRocks, LeftHandSlot);
 	Res &= RITest->TestEqual(TEXT("Should move 2 rocks from left hand slot to generic inventory"), MovedQuantity, 2);
 	Res &= RITest->TestTrue(TEXT("Left hand slot should now be empty"), !InventoryComponent->GetItemForTaggedSlot(LeftHandSlot).IsValid());
 	Res &= RITest->TestTrue(TEXT("Generic inventory should contain 8 rocks"), InventoryComponent->GetContainerItemCount(ItemIdRock) == 8);
@@ -264,19 +286,19 @@ bool TestMoveTaggedSlotItems()
 	// Res &= RITest->TestTrue(TEXT("Generic inventory should contain 8 rocks"), InventoryComponent->GetContainerItemCount(ItemIdRock) == 8);
 
 	// Move back to right hand
-	MovedQuantity = InventoryComponent->MoveItems_ServerImpl(FRancItemInstance(ItemIdRock, 2), FGameplayTag::EmptyTag, RightHandSlot);
+	MovedQuantity = InventoryComponent->MoveItems_ServerImpl(TwoRocks, FGameplayTag::EmptyTag, RightHandSlot);
 	Res &= RITest->TestEqual(TEXT("Should move 2 rocks to right hand slot"), MovedQuantity, 2);
 	Res &= RITest->TestTrue(TEXT("Right hand slot should contain 2 rocks"), InventoryComponent->GetItemForTaggedSlot(RightHandSlot).ItemInstance.Quantity == 2);
 	Res &= RITest->TestTrue(TEXT("Generic inventory should contain 6 rocks"), InventoryComponent->GetContainerItemCount(ItemIdRock) == 6);
 
 	// Try moving just 1 more rock to Right hand
-	MovedQuantity = InventoryComponent->MoveItems_ServerImpl(FRancItemInstance(ItemIdRock, 1), FGameplayTag::EmptyTag, RightHandSlot);
+	MovedQuantity = InventoryComponent->MoveItems_ServerImpl(OneRock, FGameplayTag::EmptyTag, RightHandSlot);
 	Res &= RITest->TestEqual(TEXT("Should move 1 rock to right hand slot"), MovedQuantity, 1);
 	Res &= RITest->TestTrue(TEXT("Right hand slot should contain 3 rocks"), InventoryComponent->GetItemForTaggedSlot(RightHandSlot).ItemInstance.Quantity == 3);
 	Res &= RITest->TestTrue(TEXT("Generic inventory should contain 5 rocks"), InventoryComponent->GetContainerItemCount(ItemIdRock) == 5);
 
 	// move 2 more to get full stack
-	MovedQuantity = InventoryComponent->MoveItems_ServerImpl(FRancItemInstance(ItemIdRock, 2), FGameplayTag::EmptyTag, RightHandSlot);
+	MovedQuantity = InventoryComponent->MoveItems_ServerImpl(TwoRocks, FGameplayTag::EmptyTag, RightHandSlot);
 	Res &= RITest->TestEqual(TEXT("Should move 2 rocks to right hand slot"), MovedQuantity, 2);
 	Res &= RITest->TestTrue(TEXT("Right hand slot should contain 5 rocks"), InventoryComponent->GetItemForTaggedSlot(RightHandSlot).ItemInstance.Quantity == 5);
 	Res &= RITest->TestTrue(TEXT("Generic inventory should contain 3 rocks"), InventoryComponent->GetContainerItemCount(ItemIdRock) == 3);
@@ -284,14 +306,14 @@ bool TestMoveTaggedSlotItems()
 	// remove two rocks from right hand, leaving three, then add a spear to left hand
 	// Then we try to swap the hand contents but with only 1 rock, which is invalid as it would leave 2 rocks behind making the swap impossible
 	InventoryComponent->RemoveQuantityFromTaggedSlot_IfServer(RightHandSlot, 2, true);
-	InventoryComponent->AddItemsToTaggedSlot_IfServer(LeftHandSlot, FRancItemInstance(ItemIdSpear, 1), true);
-	MovedQuantity = InventoryComponent->MoveItems_ServerImpl(FRancItemInstance(ItemIdRock, 1), RightHandSlot, LeftHandSlot);
+	InventoryComponent->AddItemsToTaggedSlot_IfServer(LeftHandSlot, OneSpear, true);
+	MovedQuantity = InventoryComponent->MoveItems_ServerImpl(OneRock, RightHandSlot, LeftHandSlot);
 	Res &= RITest->TestEqual(TEXT("Should not move any rocks from right hand slot to left hand slot"), MovedQuantity, 0);
 	Res &= RITest->TestTrue(TEXT("Right hand slot should still contain 3 rocks"), InventoryComponent->GetItemForTaggedSlot(RightHandSlot).ItemInstance.Quantity == 3);
 	Res &= RITest->TestTrue(TEXT("Left hand slot should contain the spear"), InventoryComponent->GetItemForTaggedSlot(LeftHandSlot).ItemInstance.ItemId.MatchesTag(ItemIdSpear));
 
 	// Now move all 3 rocks expecting a swap
-	MovedQuantity = InventoryComponent->MoveItems_ServerImpl(FRancItemInstance(ItemIdRock, 3), RightHandSlot, LeftHandSlot);
+	MovedQuantity = InventoryComponent->MoveItems_ServerImpl(ThreeRocks, RightHandSlot, LeftHandSlot);
 	Res &= RITest->TestEqual(TEXT("Should move 3 rocks from right hand slot to left hand slot"), MovedQuantity, 3);
 	Res &= RITest->TestTrue(TEXT("Left hand slot should contain 3 rocks"), InventoryComponent->GetItemForTaggedSlot(LeftHandSlot).ItemInstance.Quantity == 3);
 
@@ -306,7 +328,7 @@ bool TestDroppingFromTaggedSlot()
 	bool Res = true;
 
 	// Step 1: Add an item to a tagged slot
-	InventoryComponent->AddItemsToTaggedSlot_IfServer(RightHandSlot, FRancItemInstance(ItemIdRock, 3), true);
+	InventoryComponent->AddItemsToTaggedSlot_IfServer(RightHandSlot, ThreeRocks, true);
 	Res &= RITest->TestTrue(
 		TEXT("Rocks should be added to the right hand slot"),
 		InventoryComponent->GetItemForTaggedSlot(RightHandSlot).ItemInstance.ItemId.MatchesTag(ItemIdRock) && InventoryComponent->GetItemForTaggedSlot(RightHandSlot).ItemInstance.
@@ -325,7 +347,7 @@ bool TestDroppingFromTaggedSlot()
 	Res &= RITest->TestEqual(TEXT("Should not drop any items from an empty tagged slot"), DroppedQuantity, 0);
 
 	// Step 5: Attempt to drop items from a tagged slot with a non-stackable item
-	InventoryComponent->AddItemsToTaggedSlot_IfServer(HelmetSlot, FRancItemInstance(ItemIdHelmet, 1), true); // Add a non-stackable item
+	InventoryComponent->AddItemsToTaggedSlot_IfServer(HelmetSlot, OneHelmet, true); // Add a non-stackable item
 	DroppedQuantity = InventoryComponent->DropFromTaggedSlot(HelmetSlot, 1, 0.0f);
 	Res &= RITest->TestEqual(TEXT("Should set to drop the non-stackable item (Helmet)"), DroppedQuantity, 1);
 
@@ -340,12 +362,12 @@ bool TestCanCraftRecipe()
 
 	// Create a recipe for crafting
 	URancRecipe* TestRecipe = NewObject<URancRecipe>();
-	TestRecipe->Components.Add(FRancItemInstance(ItemIdRock, 2)); // Requires 2 Rocks
-	TestRecipe->Components.Add(FRancItemInstance(ItemIdSticks, 3)); // Requires 3 Sticks
+	TestRecipe->Components.Add(TwoRocks); // Requires 2 Rocks
+	TestRecipe->Components.Add(ThreeSticks); // Requires 3 Sticks
 
 	// Step 1: Inventory has all required components in the correct quantities
-	InventoryComponent->AddItemsToTaggedSlot_IfServer(RightHandSlot, FRancItemInstance(ItemIdRock, 2), true);
-	InventoryComponent->AddItemsToTaggedSlot_IfServer(LeftHandSlot, FRancItemInstance(ItemIdSticks, 3), true);
+	InventoryComponent->AddItemsToTaggedSlot_IfServer(RightHandSlot, TwoRocks, true);
+	InventoryComponent->AddItemsToTaggedSlot_IfServer(LeftHandSlot, ThreeSticks, true);
 	Res &= RITest->TestTrue(TEXT("CanCraftRecipe should return true when all components are present in correct quantities"), InventoryComponent->CanCraftRecipe(TestRecipe));
 
 	// Step 2: Inventory is missing one component
@@ -365,14 +387,14 @@ bool TestCanCraftRecipe()
 
 	// Step 6: Inventory has all required components in the generic inventory
 
-	InventoryComponent->AddItems_IfServer(FRancItemInstance(ItemIdRock, 2));
-	InventoryComponent->AddItems_IfServer(FRancItemInstance(ItemIdSticks, 3));
+	InventoryComponent->AddItems_IfServer(TwoRocks);
+	InventoryComponent->AddItems_IfServer(ThreeSticks);
 	Res &= RITest->TestTrue(
 		TEXT("CanCraftRecipe should return true when all components are present in generic inventory in correct quantities"), InventoryComponent->CanCraftRecipe(TestRecipe));
 
 	// Step 7: Generic inventory has insufficient quantity of one component
 	// First, simulate removing items from generic inventory by moving them to a tagged slot and then removing
-	InventoryComponent->MoveItems_ServerImpl(FRancItemInstance(ItemIdRock, 1), FGameplayTag::EmptyTag, RightHandSlot); // Simulate removing 1 Rock from generic inventory
+	InventoryComponent->MoveItems_ServerImpl(OneRock, FGameplayTag::EmptyTag, RightHandSlot); // Simulate removing 1 Rock from generic inventory
 	InventoryComponent->RemoveQuantityFromTaggedSlot_IfServer(RightHandSlot, 1, true); // Actually remove the moved item
 	Res &= RITest->TestFalse(
 		TEXT("CanCraftRecipe should return false when components in generic inventory are present but in insufficient quantities"), InventoryComponent->CanCraftRecipe(TestRecipe));
@@ -390,12 +412,12 @@ bool TestCraftRecipe()
 	URancRecipe* TestRecipe = NewObject<URancRecipe>();
 	TestRecipe->ResultingObject = UObject::StaticClass(); // Assuming UMyCraftedObject is a valid class
 	TestRecipe->QuantityCreated = 1;
-	TestRecipe->Components.Add(FRancItemInstance(ItemIdRock, 2)); // Requires 2 Rocks
-	TestRecipe->Components.Add(FRancItemInstance(ItemIdSticks, 3)); // Requires 3 Sticks
+	TestRecipe->Components.Add(TwoRocks); // Requires 2 Rocks
+	TestRecipe->Components.Add(ThreeSticks); // Requires 3 Sticks
 
 	// Step 1: Crafting success
-	InventoryComponent->AddItems_IfServer(FRancItemInstance(ItemIdRock, 5));
-	InventoryComponent->AddItems_IfServer(FRancItemInstance(ItemIdSticks, 3));
+	InventoryComponent->AddItems_IfServer(FiveRocks);
+	InventoryComponent->AddItems_IfServer(ThreeSticks);
 	Res &= RITest->TestTrue(TEXT("CraftRecipe_IfServer should return true when all components are present"), InventoryComponent->CraftRecipe_IfServer(TestRecipe));
 	// Would be nice to test if we could confirm OnCraftConfirmed gets called but haven't found a nice way
 
@@ -415,9 +437,9 @@ bool TestCraftRecipe()
 
 
 	// Step 5: Crafting success with components spread between generic inventory and tagged slots
-	InventoryComponent->AddItems_IfServer(FRancItemInstance(ItemIdRock, 1)); // Add 1 Rock to generic inventory
-	InventoryComponent->AddItemsToTaggedSlot_IfServer(LeftHandSlot, FRancItemInstance(ItemIdRock, 1), true); // Add another Rock to a tagged slot
-	InventoryComponent->AddItemsToTaggedSlot_IfServer(RightHandSlot, FRancItemInstance(ItemIdSticks, 3), true); // Add 3 Sticks to a tagged slot
+	InventoryComponent->AddItems_IfServer(OneRock); // Add 1 Rock to generic inventory
+	InventoryComponent->AddItemsToTaggedSlot_IfServer(LeftHandSlot, OneRock, true); // Add another Rock to a tagged slot
+	InventoryComponent->AddItemsToTaggedSlot_IfServer(RightHandSlot, ThreeSticks, true); // Add 3 Sticks to a tagged slot
 	Res &= RITest->TestTrue(
 		TEXT("CraftRecipe_IfServer should return true when components are spread between generic and tagged slots"), InventoryComponent->CraftRecipe_IfServer(TestRecipe));
 	// Assuming a way to verify the resulting object was created successfully
@@ -427,7 +449,7 @@ bool TestCraftRecipe()
 	InventoryComponent->RemoveQuantityFromTaggedSlot_IfServer(RightHandSlot, 99, true); // Clear Sticks from HelmetSlot
 
 	// Step 7: Crafting failure when tagged slots contain all necessary components but in insufficient quantities
-	InventoryComponent->AddItemsToTaggedSlot_IfServer(LeftHandSlot, FRancItemInstance(ItemIdRock, 1), true); // Add only 1 Rock to a tagged slot, insufficient for the recipe
+	InventoryComponent->AddItemsToTaggedSlot_IfServer(LeftHandSlot, OneRock, true); // Add only 1 Rock to a tagged slot, insufficient for the recipe
 	InventoryComponent->AddItemsToTaggedSlot_IfServer(RightHandSlot, FRancItemInstance(ItemIdSticks, 2), true); // Add only 2 Sticks to a tagged slot, insufficient for the recipe
 	Res &= RITest->TestFalse(
 		TEXT("CraftRecipe_IfServer should return false when not all components are present in sufficient quantities"), InventoryComponent->CraftRecipe_IfServer(TestRecipe));
@@ -442,15 +464,15 @@ bool TestInventoryMaxCapacity()
 	bool Res = true;
 
 	// Step 1: Adding Stackable Items to Generic Slots
-	InventoryComponent->AddItems_IfServer(FRancItemInstance(ItemIdRock, 3));
+	InventoryComponent->AddItems_IfServer(ThreeRocks);
 	Res &= RITest->TestEqual(TEXT("Should successfully add rocks within capacity"), InventoryComponent->GetItemCountIncludingTaggedSlots(ItemIdRock), 3);
-	InventoryComponent->AddItems_IfServer(FRancItemInstance(ItemIdSticks, 3)); // Trying to add more rocks, total weight would be 6 but capacity is 5
+	InventoryComponent->AddItems_IfServer(ThreeSticks); // Trying to add more rocks, total weight would be 6 but capacity is 5
 	Res &= RITest->TestEqual(TEXT("Should fail to add sticks beyond capacity"), InventoryComponent->GetItemCountIncludingTaggedSlots(ItemIdSticks), 0);
 
 	// Step 2: Adding Unstackable Items to Tagged Slots
-	int32 QuantityAdded = InventoryComponent->AddItemsToTaggedSlot_IfServer(LeftHandSlot, FRancItemInstance(ItemIdHelmet, 1), true); // Weight = 2
+	int32 QuantityAdded = InventoryComponent->AddItemsToTaggedSlot_IfServer(LeftHandSlot, OneHelmet, true); // Weight = 2
 	Res &= RITest->TestEqual(TEXT("Should successfully add a helmet within capacity"), QuantityAdded, 1);
-	QuantityAdded = InventoryComponent->AddItemsToTaggedSlot_IfServer(RightHandSlot, FRancItemInstance(ItemIdHelmet, 1), true);
+	QuantityAdded = InventoryComponent->AddItemsToTaggedSlot_IfServer(RightHandSlot, OneHelmet, true);
 	// Trying to add another helmet, total weight would be 4
 	Res &= RITest->TestEqual(TEXT("Should fail to add a second helmet beyond capacity"), QuantityAdded, 0);
 
@@ -458,7 +480,7 @@ bool TestInventoryMaxCapacity()
 	InventoryComponent->RemoveItemsFromAnyTaggedSlots_IfServer(ItemIdHelmet, 1); // Reset tagged slot
 	QuantityAdded = InventoryComponent->AddItemsToTaggedSlot_IfServer(RightHandSlot, FRancItemInstance(ItemIdSticks, 5)); // Try Adding 5 sticks, which should fail
 	Res &= RITest->TestEqual(TEXT("AddItemsToTaggedSlot_IfServer does not do partial adding and weight exceeds capacity"), QuantityAdded, 0);
-	QuantityAdded = InventoryComponent->AddItemsToTaggedSlot_IfServer(RightHandSlot, FRancItemInstance(ItemIdRock, 2));
+	QuantityAdded = InventoryComponent->AddItemsToTaggedSlot_IfServer(RightHandSlot, TwoRocks);
 	Res &= RITest->TestEqual(TEXT("Should successfully add 2 rocks within capacity"), QuantityAdded, 2);
 
 	URancItemRecipe* BoulderRecipe = NewObject<URancItemRecipe>();
@@ -477,8 +499,8 @@ bool TestInventoryMaxCapacity()
 
 bool TestAddItemToAnySlots()
 {
-	SETUP_RANCINVENTORY(15);
-	InventoryComponent->MaxNumItemsInContainer = 5;
+	SETUP_RANCINVENTORY(20);
+	InventoryComponent->MaxContainerSlotCount = 2;
 
 	bool Res = true;
 	// Create item instances with specified quantities and weights
@@ -491,27 +513,31 @@ bool TestAddItemToAnySlots()
 
 	// remove from right hand slot
 	InventoryComponent->RemoveItemsFromAnyTaggedSlots_IfServer(ItemIdRock, 5); // weight 0
-
+	Res &= RITest->TestFalse(TEXT("Right hand slot should be empty"), InventoryComponent->GetItemForTaggedSlot(RightHandSlot).IsValid());
+	
 	// PreferTaggedSlots = false, adding items to generic slots first
 	Added = InventoryComponent->AddItemsToAnySlots_IfServer(RockInstance, false);
 	Res &= RITest->TestEqual(TEXT("Should add all rocks"), Added, 5); // weight 5
 	Res &= RITest->TestFalse(TEXT("Right hand slot should be empty"), InventoryComponent->GetItemForTaggedSlot(RightHandSlot).IsValid());
 	Res &= RITest->TestFalse(TEXT("Left hand slot should be empty"), InventoryComponent->GetItemForTaggedSlot(LeftHandSlot).IsValid());
+	
+	// Exceeding generic slot count, items should spill over to tagged slots if available
+	InventoryComponent->AddItemsToAnySlots_IfServer(RockInstance, false); // take up last slot
+	Added = InventoryComponent->AddItemsToAnySlots_IfServer(StickInstance, false); // weight 12
+	Res &= RITest->TestEqual(TEXT("Should add sticks to the first universal tagged slot after generic slots are full"), Added, 2);
+	Res &= RITest->TestEqual(TEXT("First universal tagged slot (left hand) should contain sticks"), InventoryComponent->GetItemForTaggedSlot(InventoryComponent->UniversalTaggedSlots[0]).ItemInstance.Quantity, 2);
 
-	// Exceeding generic slot capacity, items should spill over to tagged slots if available
-	//	Added = InventoryComponent->AddItemsToAnySlots_IfServer(StickInstance, false); // weight 7
-	//	Res &= RITest->TestEqual(TEXT("Should add sticks to left hand slot after generic slots are full"), Added, 2);
-	//	Res &= RITest->TestEqual(TEXT("Left hand slot should contain sticks"), InventoryComponent->GetItemForTaggedSlot(LeftHandSlot).ItemInstance.Quantity, 2);
-
-	// Capacity limit reached, no more items should be added
-	FRancItemInstance HeavyItem(ItemIdGiantBoulder, 1); // Weight 10 exceeding capacity
+	// Weight limit almost reached, no heavy items should be added despite right hand being available
+	FRancItemInstance HeavyItem(ItemIdGiantBoulder, 1); // Weight 22 exceeding capacity
 	Added = InventoryComponent->AddItemsToAnySlots_IfServer(HeavyItem, true);
 	Res &= RITest->TestEqual(TEXT("Should not add heavy items beyond weight capacity"), Added, 0);
-
+	
+	InventoryComponent->MoveItems_ServerImpl(RockInstance, FGameplayTag::EmptyTag, RightHandSlot);
+	
 	// Adding items back to generic slots if there's still capacity after attempting tagged slots
-	//InventoryComponent->MaxWeight = 30; // Increase weight capacity for this test
-	//Added = InventoryComponent->AddItemsToAnySlots_IfServer(HeavyItem, true);
-	//Res &= RITest->TestEqual(TEXT("Should add heavy items to generic slots after trying tagged slots"), Added, 1);
+	InventoryComponent->MaxWeight = 25; // Increase weight capacity for this test
+	Added = InventoryComponent->AddItemsToAnySlots_IfServer(HeavyItem, true);
+	Res &= RITest->TestEqual(TEXT("Should add heavy items to generic slots after trying tagged slots"), Added, 1);
 
 	return Res;
 }
