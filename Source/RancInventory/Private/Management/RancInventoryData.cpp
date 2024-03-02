@@ -1,5 +1,4 @@
-// Author: Lucas Vilas-Boas
-// Year: 2023
+// Copyright Rancorous Games, 2024
 
 #include "Management/RancInventoryData.h"
 
@@ -7,13 +6,13 @@
 #include UE_INLINE_GENERATED_CPP_BY_NAME(RancInventoryData)
 #endif
 
-const FRancItemInstance FRancItemInstance::EmptyItemInstance(FGameplayTag(), 0);
-const FRancTaggedItemInstance FRancTaggedItemInstance::EmptyItemInstance(FGameplayTag(), FRancItemInstance::EmptyItemInstance);
+const FRISItemInstance FRISItemInstance::EmptyItemInstance(FGameplayTag(), 0);
+const FRancTaggedItemInstance FRancTaggedItemInstance::EmptyItemInstance(FGameplayTag(), FRISItemInstance::EmptyItemInstance);
 
-URancItemData::URancItemData(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
+URisItemData::URisItemData(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
 }
 
-URancRecipe::URancRecipe(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
+URISRecipe::URISRecipe(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
 }

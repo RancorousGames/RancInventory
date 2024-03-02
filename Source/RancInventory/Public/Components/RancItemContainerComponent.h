@@ -1,15 +1,17 @@
-﻿#pragma once
+﻿// Copyright Rancorous Games, 2024
+
+#pragma once
 #include "Actors/AWorldItem.h"
 #include "Management/RancInventoryData.h"
 #include "RancItemContainerComponent.generated.h"
 
 UCLASS(Blueprintable, ClassGroup = (Custom), Category = "Ranc Inventory | Classes", EditInlineNew, meta = (BlueprintSpawnableComponent))
-class RANCINVENTORY_API URancItemContainerComponent : public UActorComponent
+class RANCINVENTORY_API URISItemContainerComponent : public UActorComponent
 {
     GENERATED_BODY()
 public:
     
-    explicit URancItemContainerComponent(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
+    explicit URISItemContainerComponent(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
 
     virtual void InitializeComponent() override;
 	
@@ -20,27 +22,27 @@ public:
     float GetMaxWeight() const;
 
     UFUNCTION(BlueprintPure, Category="Ranc Inventory")
-    const FRancItemInstance& FindItemById(const FGameplayTag& ItemId) const;
+    const FRISItemInstance& FindItemById(const FGameplayTag& ItemId) const;
 
     /* Add items to the inventory
      * Should only be called on server as we can't trust client to provide trustworthy ItemInstance
      * Instead have the client send an input like CraftItem or PickupItem to the server which results in server call to AddItem
      * Returns the amount added */
     UFUNCTION(BlueprintCallable, Category="Ranc Inventory")
-    int32 AddItems_IfServer(const FRancItemInstance& ItemInstance, bool AllowPartial = false);
+    int32 AddItems_IfServer(const FRISItemInstance& ItemInstance, bool AllowPartial = false);
 
     /* For most games we could probably trust the client to specify ItemInstance but for e.g. a hot potato we can't
      * Instead have the client send an input like UseItem or DropItem
      * Returns the amount removed, if AllowPartial is false and there is insufficient quantity then removes 0*/
     UFUNCTION(BlueprintCallable, Category="Ranc Inventory")
-    int32 RemoveItems_IfServer(const FRancItemInstance& ItemInstance, bool AllowPartial = false);
+    int32 RemoveItems_IfServer(const FRISItemInstance& ItemInstance, bool AllowPartial = false);
     
     /* Attempts to drop the item from the inventory, attempting to spawn an Item object in the world
      * Specify DropItemClass and DropDistance properties to customize the drop
      * Called on client it will request the drop on the server
      * Returns the quantity actually dropped, on client this is only a "guess" */
     UFUNCTION(BlueprintCallable, Category="Ranc Inventory")
-    int32 DropItems(const FRancItemInstance& ItemInstance, float DropAngle = 0);
+    int32 DropItems(const FRISItemInstance& ItemInstance, float DropAngle = 0);
 
     /* Useful for e.g. Death, drops items evenly spaced in a circle with radius DropDistance */
     UFUNCTION(BlueprintCallable, Category="Ranc Inventory")
@@ -48,14 +50,14 @@ public:
     
 	/* Checks weight and container slot count */
     UFUNCTION(BlueprintPure, Category="Ranc Inventory")
-    bool CanContainerReceiveItems(const FRancItemInstance& ItemInstance) const;
+    bool CanContainerReceiveItems(const FRISItemInstance& ItemInstance) const;
 
 	/* Checks weight and container slot count */
     UFUNCTION(BlueprintPure, Category="Ranc Inventory")
     int32 GetQuantityOfItemContainerCanReceive(const FGameplayTag& ItemId) const;
 	
 	UFUNCTION(BlueprintPure, Category="Ranc Inventory")
-    bool HasWeightCapacityForItems(const FRancItemInstance& ItemInstance) const;
+    bool HasWeightCapacityForItems(const FRISItemInstance& ItemInstance) const;
 
     UFUNCTION(BlueprintPure, Category="Ranc Inventory")
     bool DoesContainerContainItems(const FGameplayTag& ItemId, int32 Quantity = 1) const;
@@ -64,7 +66,7 @@ public:
     int32 GetContainerItemCount(const FGameplayTag& ItemId) const;
 
     UFUNCTION(BlueprintPure, Category="Ranc Inventory")
-    TArray<FRancItemInstance> GetAllContainerItems() const;
+    TArray<FRISItemInstance> GetAllContainerItems() const;
     
     UFUNCTION(BlueprintPure, Category="Ranc Inventory")
     bool IsEmpty() const;
@@ -73,11 +75,11 @@ public:
     UFUNCTION(BlueprintCallable, Category="Ranc Inventory")
     void ClearContainer_IfServer();
     
-    DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnInventoryItemAdded, const FRancItemInstance&, ItemInstance);
+    DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnInventoryItemAdded, const FRISItemInstance&, ItemInstance);
     UPROPERTY(BlueprintAssignable, Category="Ranc Inventory")
     FOnInventoryItemAdded OnItemAddedToContainer;
     
-    DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnInventoryItemRemoved, const FRancItemInstance&, ItemInstance);
+    DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnInventoryItemRemoved, const FRISItemInstance&, ItemInstance);
     UPROPERTY(BlueprintAssignable, Category="Ranc Inventory")
     FOnInventoryItemRemoved OnItemRemovedFromContainer;
     
@@ -87,7 +89,7 @@ public:
 
     /* Class to spawn when dropping items. Only used on server */
     UPROPERTY(EditAnywhere, BlueprintReadWrite)
-    TSubclassOf<AWorldItem> DropItemClass = AWorldItem::StaticClass();
+    TSubclassOf<ARISWorldItem> DropItemClass = ARISWorldItem::StaticClass();
 
     /* Max weight allowed for this item container, this also applies to any child classes */
     UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Ranc Inventory", meta = (AllowPrivateAccess = "true", ClampMin = "0", UIMin = "0"))
@@ -107,20 +109,20 @@ protected:
     TArray<FRancInitialItem> InitialItems;
     
     UPROPERTY(ReplicatedUsing=OnRep_Items, BlueprintReadOnly, Category="Ranc Inventory")
-    TArray<FRancItemInstance> Items;
+    TArray<FRISItemInstance> Items;
 	
 
     UFUNCTION(Server, Reliable)
-    void DropItems_Server(const FRancItemInstance& ItemInstance, float DropAngle = 0);
+    void DropItems_Server(const FRISItemInstance& ItemInstance, float DropAngle = 0);
 
     
     // virtual drop implementation for override in subclasses
     virtual int32 DropAllItems_ServerImpl();
     virtual bool ContainsItemsImpl(const FGameplayTag& ItemId, int32 Quantity = 1) const; // impl needed to allow subclass override
 
-    AWorldItem* SpawnDroppedItem_IfServer(const FRancItemInstance& ItemInstance, float DropAngle = 0) const;
+    ARISWorldItem* SpawnDroppedItem_IfServer(const FRISItemInstance& ItemInstance, float DropAngle = 0) const;
 
-    FRancItemInstance* FindContainerItemInstance(const FGameplayTag& ItemId);
+    FRISItemInstance* FindContainerItemInstance(const FGameplayTag& ItemId);
     
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 protected:

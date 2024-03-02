@@ -1,5 +1,4 @@
-// Author: Lucas Vilas-Boas
-// Year: 2023
+// Copyright Rancorous Games, 2024
 
 #include "SFRancInventoryDetailsPanel.h"
 #include <Management/RancInventoryData.h>
@@ -17,7 +16,7 @@ void SFRancInventoryDetailsPanel::CustomizeHeader(const TSharedRef<IPropertyHand
         .ValueContent()
         [
             SNew(SObjectPropertyEntryBox)
-                .AllowedClass(URancItemData::StaticClass())
+                .AllowedClass(URisItemData::StaticClass())
                 .PropertyHandle(PropertyHandle)
                 .DisplayThumbnail(true)
                 .ThumbnailPool(CustomizationUtils.GetThumbnailPool())

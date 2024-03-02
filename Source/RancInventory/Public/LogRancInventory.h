@@ -1,13 +1,7 @@
-// Author: Lucas Vilas-Boas
-// Year: 2023
+// Copyright Rancorous Games, 2024
 
 #pragma once
 
 #include <Logging/LogMacros.h>
 
-/**
- *
- */
-
-DECLARE_LOG_CATEGORY_EXTERN(LogRancInventory, Display, All);
-DECLARE_LOG_CATEGORY_EXTERN(LogRancInventory_Internal, NoLogging, All);
+DECLARE_LOG_CATEGORY_EXTERN(LogRISInventory, Display, All);

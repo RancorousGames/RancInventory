@@ -10,7 +10,7 @@
 class UTexture2D;
 
 constexpr auto RancItemDataType = TEXT("RancInventory_ItemData");
-constexpr auto RancItemRecipeType = TEXT("RancInventory_ItemRecipe");
+constexpr auto RISItemRecipeType = TEXT("RancInventory_ItemRecipe");
 
 USTRUCT(BlueprintType, Category = "Ranc Inventory | Structs")
 struct FPrimaryRancItemId : public FPrimaryAssetId
@@ -50,33 +50,33 @@ struct FPrimaryRancItemIdContainer
 };
 
 USTRUCT(BlueprintType, Category = "Ranc Inventory | Structs")
-struct FRancItemInstance
+struct FRISItemInstance
 {
     GENERATED_BODY()
 
-    static const FRancItemInstance EmptyItemInstance;
+    static const FRISItemInstance EmptyItemInstance;
 
-    FRancItemInstance() = default;
+    FRISItemInstance() = default;
 
-    explicit FRancItemInstance(const FGameplayTag& InItemId) : ItemId(InItemId)
+    explicit FRISItemInstance(const FGameplayTag& InItemId) : ItemId(InItemId)
     {
     }
 
-    explicit FRancItemInstance(const FGameplayTag& InItemId, const int32& InQuant) : ItemId(InItemId), Quantity(InQuant)
+    explicit FRISItemInstance(const FGameplayTag& InItemId, const int32& InQuant) : ItemId(InItemId), Quantity(InQuant)
     {
     }
 
-    bool operator==(const FRancItemInstance& Other) const
+    bool operator==(const FRISItemInstance& Other) const
     {
         return ItemId == Other.ItemId;
     }
 
-    bool operator!=(const FRancItemInstance& Other) const
+    bool operator!=(const FRISItemInstance& Other) const
     {
         return !(*this == Other);
     }
 
-    bool operator<(const FRancItemInstance& Other) const
+    bool operator<(const FRISItemInstance& Other) const
     {
         return ItemId.ToString() < Other.ItemId.ToString();
     }
@@ -118,12 +118,12 @@ struct FRancInitialItem
 };
 
 UCLASS(NotBlueprintable, NotPlaceable, Category = "Ranc Inventory | Classes | Data")
-class RANCINVENTORY_API URancItemData : public UPrimaryDataAsset
+class RANCINVENTORY_API URisItemData : public UPrimaryDataAsset
 {
     GENERATED_BODY()
 
 public:
-    explicit URancItemData(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
+    explicit URisItemData(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
 
     FORCEINLINE virtual FPrimaryAssetId GetPrimaryAssetId() const override
     {
@@ -177,7 +177,7 @@ public:
 
 
 UCLASS(Blueprintable, Category = "Ranc Inventory | Classes | Data")
-class RANCINVENTORY_API USpawnableRancItemData : public URancItemData
+class RANCINVENTORY_API USpawnableRancItemData : public URisItemData
 {
     GENERATED_BODY()
 
@@ -197,12 +197,12 @@ public:
 };
 
 UCLASS(NotBlueprintable, NotPlaceable, Category = "Ranc Inventory | Classes | Data")
-class RANCINVENTORY_API URancRecipe : public UPrimaryDataAsset
+class RANCINVENTORY_API URISRecipe : public UPrimaryDataAsset
 {
     GENERATED_BODY()
 
 public:
-    explicit URancRecipe(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
+    explicit URISRecipe(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
     
     FORCEINLINE virtual FPrimaryAssetId GetPrimaryAssetId() const override
     {
@@ -223,7 +223,7 @@ public:
     int32 QuantityCreated = 1;
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ranc Inventory", meta = (AssetBundles = "Data"))
-    TArray<FRancItemInstance> Components;
+    TArray<FRISItemInstance> Components;
 
     /* Tags can be used to group recipes, e.g. you might have Recipes.Items and Recipes.Buildings */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ranc Inventory", meta = (AssetBundles = "Data"))
@@ -237,7 +237,7 @@ public:
 
 
 UCLASS(NotBlueprintable, NotPlaceable, Category = "Ranc Inventory | Classes | Data")
-class RANCINVENTORY_API URancItemRecipe : public URancRecipe
+class RANCINVENTORY_API URancItemRecipe : public URISRecipe
 {
     GENERATED_BODY()
 
@@ -275,7 +275,7 @@ struct FRancTaggedItemInstance
     FGameplayTag Tag;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ranc Inventory")
-    FRancItemInstance ItemInstance;
+    FRISItemInstance ItemInstance;
     
     bool IsValid() const
     {
@@ -283,7 +283,7 @@ struct FRancTaggedItemInstance
     }
     
     FRancTaggedItemInstance(){}
-    FRancTaggedItemInstance(FGameplayTag InTag, FRancItemInstance InItemInfo)
+    FRancTaggedItemInstance(FGameplayTag InTag, FRISItemInstance InItemInfo)
     {
         ItemInstance = InItemInfo;
         Tag = InTag;
@@ -291,7 +291,7 @@ struct FRancTaggedItemInstance
 
     FRancTaggedItemInstance(FGameplayTag InTag, FGameplayTag InItemId, int32 InQuantity)
     {
-        ItemInstance = FRancItemInstance(InItemId, InQuantity);
+        ItemInstance = FRISItemInstance(InItemId, InQuantity);
         Tag = InTag;
     }
 

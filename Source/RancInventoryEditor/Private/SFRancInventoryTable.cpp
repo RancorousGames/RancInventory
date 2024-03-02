@@ -1,4 +1,4 @@
-// Copyright Rancorous Games, 2023
+// Copyright Rancorous Games, 2024
 
 #include "SFRancInventoryTable.h"
 #include <Management/RancInventoryFunctions.h>
@@ -203,14 +203,14 @@ void SFRancInventoryTable::UpdateItemList()
 {
     ItemArr.Empty();
 
-    for (const FPrimaryAssetId& Iterator : URancInventoryFunctions::GetAllRancItemPrimaryIds())
+    for (const FPrimaryAssetId& Iterator : URISInventoryFunctions::GetAllRancItemPrimaryIds())
     {
         ItemArr.Add(MakeShared<FRancItemRowData>(Iterator));
     }
 
     EdListView->RequestListRefresh();
 
-    if (const UAssetManager* const AssetManager = UAssetManager::GetIfInitialized(); IsValid(AssetManager) && AssetManager->HasInitialScanCompleted() && URancInventoryFunctions::HasEmptyParam(ItemArr))
+    if (const UAssetManager* const AssetManager = UAssetManager::GetIfInitialized(); IsValid(AssetManager) && AssetManager->HasInitialScanCompleted() && URISInventoryFunctions::HasEmptyParam(ItemArr))
     {
         FMessageDialog::Open(EAppMsgType::Ok, FText::FromString(TEXT("Asset Manager could not find any Ranc Items. Please check your Asset Manager settings.")));
     }

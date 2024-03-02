@@ -1,5 +1,4 @@
-// Author: Lucas Vilas-Boas
-// Year: 2023
+// Copyright Rancorous Games, 2024
 
 #pragma once
 
@@ -7,10 +6,10 @@
 
 #include "GameplayTagContainer.h"
 
-class SRancItemCreator final : public SCompoundWidget
+class SRISItemCreator final : public SCompoundWidget
 {
 public:
-    SLATE_USER_ARGS(SRancItemCreator)
+    SLATE_USER_ARGS(SRISItemCreator)
         {
         }
 

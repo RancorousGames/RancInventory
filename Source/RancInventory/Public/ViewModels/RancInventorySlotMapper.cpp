@@ -1,23 +1,16 @@
-﻿#include "RancInventorySlotMapper.h"
+﻿// Copyright Rancorous Games, 2024
 
-#include "RancInventoryFunctions.h"
-#include "Actors/AWorldItem.h"
+#include "RancInventorySlotMapper.h"
+#include "Management/RancInventoryFunctions.h"
 #include "RancInventory/public/Components/RancInventoryComponent.h"
-#include "WarTribes/InventorySystem/AWTWorldItem.h"
 
-URancInventorySlotMapper::URancInventorySlotMapper(): LinkedInventoryComponent(nullptr)
-{
-	// Initialize any necessary members if needed
-}
-
-
-void URancInventorySlotMapper::Initialize(URancInventoryComponent* InventoryComponent, int32 NumSlots,  bool bPreferEmptyUniversalSlots)
+void URISGridViewModel::Initialize_Implementation(URISInventoryComponent* InventoryComponent, int32 NumSlots,  bool bPreferEmptyUniversalSlots)
 {
 	NumberOfSlots = NumSlots;
 	PreferEmptyUniversalSlots = bPreferEmptyUniversalSlots;
 	LinkedInventoryComponent = InventoryComponent;
-	DisplayedSlots.Empty();
-	DisplayedTaggedSlots.Empty();
+	ViewableGridSlots.Empty();
+	ViewableTaggedSlots.Empty();
 	OperationsToConfirm.Empty();
 
 	if (!LinkedInventoryComponent)
@@ -29,22 +22,22 @@ void URancInventorySlotMapper::Initialize(URancInventoryComponent* InventoryComp
 	// Initialize DisplayedSlots with empty item info for the specified number of slots
 	for (int32 i = 0; i < NumSlots; i++)
 	{
-		DisplayedSlots.Add(FRancItemInstance());
+		ViewableGridSlots.Add(FRISItemInstance());
 	}
 
-	LinkedInventoryComponent->OnItemAddedToContainer.AddDynamic(this, &URancInventorySlotMapper::HandleItemAdded);
-	LinkedInventoryComponent->OnItemRemovedFromContainer.AddDynamic(this, &URancInventorySlotMapper::HandleItemRemoved);
+	LinkedInventoryComponent->OnItemAddedToContainer.AddDynamic(this, &URISGridViewModel::HandleItemAdded);
+	LinkedInventoryComponent->OnItemRemovedFromContainer.AddDynamic(this, &URISGridViewModel::HandleItemRemoved);
 	LinkedInventoryComponent->OnItemAddedToTaggedSlot.
-	                          AddDynamic(this, &URancInventorySlotMapper::HandleTaggedItemAdded);
+	                          AddDynamic(this, &URISGridViewModel::HandleTaggedItemAdded);
 	LinkedInventoryComponent->OnItemRemovedFromTaggedSlot.AddDynamic(
-		this, &URancInventorySlotMapper::HandleTaggedItemRemoved);
+		this, &URISGridViewModel::HandleTaggedItemRemoved);
 
 
-	TArray<FRancItemInstance> Items = LinkedInventoryComponent->GetAllContainerItems();
+	TArray<FRISItemInstance> Items = LinkedInventoryComponent->GetAllContainerItems();
 
-	for (FRancItemInstance BackingItem : Items)
+	for (FRISItemInstance BackingItem : Items)
 	{
-		if (const URancItemData* const ItemData = URancInventoryFunctions::GetItemDataById(BackingItem.ItemId))
+		if (const URisItemData* const ItemData = URISInventoryFunctions::GetItemDataById(BackingItem.ItemId))
 		{
 			int32 RemainingQuantity = BackingItem.Quantity;
 			while (RemainingQuantity > 0)
@@ -53,11 +46,11 @@ void URancInventorySlotMapper::Initialize(URancInventoryComponent* InventoryComp
 				if (SlotToAddTo == -1)
 				{
 					UE_LOG(LogTemp, Warning, TEXT("Could not find a slot to add the item to"));
-					LinkedInventoryComponent->DropItems(FRancItemInstance(BackingItem.ItemId, RemainingQuantity));
+					LinkedInventoryComponent->DropItems(FRISItemInstance(BackingItem.ItemId, RemainingQuantity));
 					continue;
 				}
 
-				FRancItemInstance& ExistingItem = DisplayedSlots[SlotToAddTo];
+				FRISItemInstance& ExistingItem = ViewableGridSlots[SlotToAddTo];
 
 				int32 AddLimit = ItemData->bIsStackable ? ItemData->MaxStackSize : 1;
 				if (ExistingItem.ItemId.IsValid())
@@ -79,54 +72,54 @@ void URancInventorySlotMapper::Initialize(URancInventoryComponent* InventoryComp
 
 	for (FGameplayTag& Tag : LinkedInventoryComponent->UniversalTaggedSlots)
 	{
-		DisplayedTaggedSlots.Add(Tag, FRancItemInstance());
+		ViewableTaggedSlots.Add(Tag, FRISItemInstance());
 	}
 	for (FGameplayTag& Tag : LinkedInventoryComponent->SpecializedTaggedSlots)
 	{
-		DisplayedTaggedSlots.Add(Tag, FRancItemInstance());
+		ViewableTaggedSlots.Add(Tag, FRISItemInstance());
 	}
 
 	const TArray<FRancTaggedItemInstance>& TaggedItems = LinkedInventoryComponent->GetAllTaggedItems();
 	for (const FRancTaggedItemInstance& TaggedItem : TaggedItems)
 	{
-		DisplayedTaggedSlots[TaggedItem.Tag] = TaggedItem.ItemInstance;
+		ViewableTaggedSlots[TaggedItem.Tag] = TaggedItem.ItemInstance;
 	}
 }
 
 
-bool URancInventorySlotMapper::IsSlotEmpty(int32 SlotIndex) const
+bool URISGridViewModel::IsSlotEmpty(int32 SlotIndex) const
 {
-	return !DisplayedSlots.IsValidIndex(SlotIndex) || !DisplayedSlots[SlotIndex].ItemId.IsValid();
+	return !ViewableGridSlots.IsValidIndex(SlotIndex) || !ViewableGridSlots[SlotIndex].ItemId.IsValid();
 }
 
 
-bool URancInventorySlotMapper::IsTaggedSlotEmpty(const FGameplayTag& SlotTag) const
+bool URISGridViewModel::IsTaggedSlotEmpty(const FGameplayTag& SlotTag) const
 {
-	return !DisplayedTaggedSlots.Contains(SlotTag) || !DisplayedTaggedSlots[SlotTag].ItemId.IsValid();
+	return !ViewableTaggedSlots.Contains(SlotTag) || !ViewableTaggedSlots[SlotTag].ItemId.IsValid();
 }
 
 
-FRancItemInstance URancInventorySlotMapper::GetItem(int32 SlotIndex) const
+FRISItemInstance URISGridViewModel::GetItem(int32 SlotIndex) const
 {
-	if (DisplayedSlots.IsValidIndex(SlotIndex))
+	if (ViewableGridSlots.IsValidIndex(SlotIndex))
 	{
-		return DisplayedSlots[SlotIndex];
+		return ViewableGridSlots[SlotIndex];
 	}
 
 	// Return an empty item info if the slot index is invalid
-	return FRancItemInstance();
+	return FRISItemInstance();
 }
 
-bool URancInventorySlotMapper::SplitItems(FGameplayTag SourceTaggedSlot, int32 SourceSlotIndex, FGameplayTag TargetTaggedSlot, int32 TargetSlotIndex, int32 Quantity)
+bool URISGridViewModel::SplitItems_Implementation(FGameplayTag SourceTaggedSlot, int32 SourceSlotIndex, FGameplayTag TargetTaggedSlot, int32 TargetSlotIndex, int32 Quantity)
 {
 	if (!LinkedInventoryComponent) return false;
 
-	FRancItemInstance SourceItem;
+	FRISItemInstance SourceItem;
 	if (SourceTaggedSlot.IsValid())
 	{
 		SourceItem = GetItemForTaggedSlot(SourceTaggedSlot);
 	}
-	else if (DisplayedSlots.IsValidIndex(SourceSlotIndex))
+	else if (ViewableGridSlots.IsValidIndex(SourceSlotIndex))
 	{
 		SourceItem = GetItem(SourceSlotIndex);
 	}
@@ -137,15 +130,15 @@ bool URancInventorySlotMapper::SplitItems(FGameplayTag SourceTaggedSlot, int32 S
 
 	if (SourceItem.Quantity < Quantity) return false; // Not enough items in source
 
-	FRancItemInstance TargetItem;
+	FRISItemInstance TargetItem;
 	if (TargetTaggedSlot.IsValid())
 	{
-		if (DisplayedTaggedSlots.Contains(TargetTaggedSlot))
+		if (ViewableTaggedSlots.Contains(TargetTaggedSlot))
 			TargetItem = GetItemForTaggedSlot(TargetTaggedSlot);
 		else
 			return false; // Invalid target
 	}
-	else if (DisplayedSlots.IsValidIndex(TargetSlotIndex))
+	else if (ViewableGridSlots.IsValidIndex(TargetSlotIndex))
 	{
 		TargetItem = GetItem(TargetSlotIndex);
 	}
@@ -160,7 +153,7 @@ bool URancInventorySlotMapper::SplitItems(FGameplayTag SourceTaggedSlot, int32 S
 		return false;
 	}
 
-	const URancItemData* ItemData = URancInventoryFunctions::GetItemDataById(SourceItem.ItemId);
+	const URisItemData* ItemData = URISInventoryFunctions::GetItemDataById(SourceItem.ItemId);
 	if (!ItemData) return false; // Item data not found
 
 	// Calculate total quantity after split and check against max stack size
@@ -170,37 +163,37 @@ bool URancInventorySlotMapper::SplitItems(FGameplayTag SourceTaggedSlot, int32 S
 	// Perform the split
 	if (SourceTaggedSlot.IsValid())
 	{
-		DisplayedTaggedSlots[SourceTaggedSlot].Quantity -= Quantity;
-		if (DisplayedTaggedSlots[SourceTaggedSlot].Quantity <= 0)
-			DisplayedTaggedSlots[SourceTaggedSlot] = FRancItemInstance(); // Reset if empty
+		ViewableTaggedSlots[SourceTaggedSlot].Quantity -= Quantity;
+		if (ViewableTaggedSlots[SourceTaggedSlot].Quantity <= 0)
+			ViewableTaggedSlots[SourceTaggedSlot] = FRISItemInstance(); // Reset if empty
 	}
 	else
 	{
-		DisplayedSlots[SourceSlotIndex].Quantity -= Quantity;
-		if (DisplayedSlots[SourceSlotIndex].Quantity <= 0)
-			DisplayedSlots[SourceSlotIndex] = FRancItemInstance(); // Reset if empty
+		ViewableGridSlots[SourceSlotIndex].Quantity -= Quantity;
+		if (ViewableGridSlots[SourceSlotIndex].Quantity <= 0)
+			ViewableGridSlots[SourceSlotIndex] = FRISItemInstance(); // Reset if empty
 	}
 
 	if (TargetTaggedSlot.IsValid())
 	{
-		if (DisplayedTaggedSlots[TargetTaggedSlot].IsValid())
+		if (ViewableTaggedSlots[TargetTaggedSlot].IsValid())
 		{
-			DisplayedTaggedSlots[TargetTaggedSlot].Quantity += Quantity;
+			ViewableTaggedSlots[TargetTaggedSlot].Quantity += Quantity;
 		}
 		else
 		{
-			DisplayedTaggedSlots[TargetTaggedSlot] = FRancItemInstance(SourceItem.ItemId, Quantity);
+			ViewableTaggedSlots[TargetTaggedSlot] = FRISItemInstance(SourceItem.ItemId, Quantity);
 		}
 	}
 	else
 	{
-		if (DisplayedSlots[TargetSlotIndex].IsValid())
+		if (ViewableGridSlots[TargetSlotIndex].IsValid())
 		{
-			DisplayedSlots[TargetSlotIndex].Quantity += Quantity;
+			ViewableGridSlots[TargetSlotIndex].Quantity += Quantity;
 		}
 		else
 		{
-			DisplayedSlots[TargetSlotIndex] = FRancItemInstance(SourceItem.ItemId, Quantity);
+			ViewableGridSlots[TargetSlotIndex] = FRISItemInstance(SourceItem.ItemId, Quantity);
 		}
 	}
 
@@ -209,30 +202,30 @@ bool URancInventorySlotMapper::SplitItems(FGameplayTag SourceTaggedSlot, int32 S
 	// Broadcast updates
 	if (SourceTaggedSlot.IsValid())
 	{
-		OperationsToConfirm.Emplace(FExpectedOperation(RemoveTagged, SourceTaggedSlot, SourceItem.ItemId, Quantity));
+		OperationsToConfirm.Emplace(FRISExpectedOperation(RemoveTagged, SourceTaggedSlot, SourceItem.ItemId, Quantity));
 		OnTaggedSlotUpdated.Broadcast(SourceTaggedSlot);
 	}
 	else
 	{
-		if (!IsPureSplit) OperationsToConfirm.Emplace(FExpectedOperation(Remove, SourceItem.ItemId, Quantity));
+		if (!IsPureSplit) OperationsToConfirm.Emplace(FRISExpectedOperation(Remove, SourceItem.ItemId, Quantity));
 		OnSlotUpdated.Broadcast(SourceSlotIndex);
 	}
 
 	if (TargetTaggedSlot.IsValid())
 	{
-		OperationsToConfirm.Emplace(FExpectedOperation(AddTagged, TargetTaggedSlot, SourceItem.ItemId, Quantity));
+		OperationsToConfirm.Emplace(FRISExpectedOperation(AddTagged, TargetTaggedSlot, SourceItem.ItemId, Quantity));
 		if (SourceTaggedSlot.IsValid())
-			LinkedInventoryComponent->MoveItems_Server(FRancItemInstance(SourceItem.ItemId, Quantity), SourceTaggedSlot, TargetTaggedSlot);
+			LinkedInventoryComponent->MoveItems_Server(FRISItemInstance(SourceItem.ItemId, Quantity), SourceTaggedSlot, TargetTaggedSlot);
 		else
-			LinkedInventoryComponent->MoveItems_Server(FRancItemInstance(SourceItem.ItemId, Quantity), FGameplayTag::EmptyTag, TargetTaggedSlot);
+			LinkedInventoryComponent->MoveItems_Server(FRISItemInstance(SourceItem.ItemId, Quantity), FGameplayTag::EmptyTag, TargetTaggedSlot);
 		OnTaggedSlotUpdated.Broadcast(TargetTaggedSlot);
 	}
 	else
 	{
 		if (!IsPureSplit)
 		{
-			OperationsToConfirm.Emplace(FExpectedOperation(Add, SourceItem.ItemId, Quantity));
-			LinkedInventoryComponent->MoveItems_Server(FRancItemInstance(SourceItem.ItemId, Quantity), SourceTaggedSlot, FGameplayTag::EmptyTag);
+			OperationsToConfirm.Emplace(FRISExpectedOperation(Add, SourceItem.ItemId, Quantity));
+			LinkedInventoryComponent->MoveItems_Server(FRISItemInstance(SourceItem.ItemId, Quantity), SourceTaggedSlot, FGameplayTag::EmptyTag);
 		}
 		OnSlotUpdated.Broadcast(TargetSlotIndex);
 	}
@@ -240,11 +233,11 @@ bool URancInventorySlotMapper::SplitItems(FGameplayTag SourceTaggedSlot, int32 S
 	return true;
 }
 
-int32 URancInventorySlotMapper::DropItem(FGameplayTag TaggedSlot, int32 SlotIndex, int32 Quantity)
+int32 URISGridViewModel::DropItem(FGameplayTag TaggedSlot, int32 SlotIndex, int32 Quantity)
 {
 	if (!LinkedInventoryComponent ||
-		(TaggedSlot.IsValid() && !DisplayedTaggedSlots.Contains(TaggedSlot)) ||
-		(!TaggedSlot.IsValid() && !DisplayedSlots.IsValidIndex(SlotIndex)))
+		(TaggedSlot.IsValid() && !ViewableTaggedSlots.Contains(TaggedSlot)) ||
+		(!TaggedSlot.IsValid() && !ViewableGridSlots.IsValidIndex(SlotIndex)))
 		return false;
 
 	int32 DroppedCount;;
@@ -253,26 +246,26 @@ int32 URancInventorySlotMapper::DropItem(FGameplayTag TaggedSlot, int32 SlotInde
 		Quantity = FMath::Min(
 			Quantity, LinkedInventoryComponent->GetItemForTaggedSlot(TaggedSlot).ItemInstance.Quantity);
 		DroppedCount = LinkedInventoryComponent->DropFromTaggedSlot(TaggedSlot, Quantity);
-		DisplayedTaggedSlots[TaggedSlot].Quantity -= DroppedCount;
-		if (DisplayedTaggedSlots[TaggedSlot].Quantity <= 0)
+		ViewableTaggedSlots[TaggedSlot].Quantity -= DroppedCount;
+		if (ViewableTaggedSlots[TaggedSlot].Quantity <= 0)
 		{
-			DisplayedTaggedSlots[TaggedSlot] = FRancItemInstance::EmptyItemInstance; // Reset the slot to empty
+			ViewableTaggedSlots[TaggedSlot] = FRISItemInstance::EmptyItemInstance; // Reset the slot to empty
 		}
-		OperationsToConfirm.Emplace(FExpectedOperation(RemoveTagged, TaggedSlot, DroppedCount));
+		OperationsToConfirm.Emplace(FRISExpectedOperation(RemoveTagged, TaggedSlot, DroppedCount));
 		OnTaggedSlotUpdated.Broadcast(TaggedSlot);
 	}
 	else
 	{
-		Quantity = FMath::Min(Quantity, DisplayedSlots[SlotIndex].Quantity);
+		Quantity = FMath::Min(Quantity, ViewableGridSlots[SlotIndex].Quantity);
 		DroppedCount = LinkedInventoryComponent->DropItems(
-			FRancItemInstance(DisplayedSlots[SlotIndex].ItemId, Quantity));
-		OperationsToConfirm.Emplace(FExpectedOperation(Remove, DisplayedSlots[SlotIndex].ItemId, DroppedCount));
+			FRISItemInstance(ViewableGridSlots[SlotIndex].ItemId, Quantity));
+		OperationsToConfirm.Emplace(FRISExpectedOperation(Remove, ViewableGridSlots[SlotIndex].ItemId, DroppedCount));
 		if (DroppedCount > 0)
 		{
-			DisplayedSlots[SlotIndex].Quantity -= DroppedCount;
-			if (DisplayedSlots[SlotIndex].Quantity <= 0)
+			ViewableGridSlots[SlotIndex].Quantity -= DroppedCount;
+			if (ViewableGridSlots[SlotIndex].Quantity <= 0)
 			{
-				DisplayedSlots[SlotIndex] = FRancItemInstance(); // Reset the slot to empty
+				ViewableGridSlots[SlotIndex] = FRISItemInstance(); // Reset the slot to empty
 			}
 			OnSlotUpdated.Broadcast(SlotIndex);
 		}
@@ -281,11 +274,11 @@ int32 URancInventorySlotMapper::DropItem(FGameplayTag TaggedSlot, int32 SlotInde
 	return DroppedCount;
 }
 
-bool URancInventorySlotMapper::MoveItems(FGameplayTag SourceTaggedSlot, int32 SourceSlotIndex,
+bool URISGridViewModel::MoveItems_Implementation(FGameplayTag SourceTaggedSlot, int32 SourceSlotIndex,
                                          FGameplayTag TargetTaggedSlot, int32 TargetSlotIndex)
 {
-	if (!LinkedInventoryComponent || (!SourceTaggedSlot.IsValid() && !DisplayedSlots.IsValidIndex(SourceSlotIndex)) ||
-		(!TargetTaggedSlot.IsValid() && !DisplayedSlots.IsValidIndex(TargetSlotIndex)) ||
+	if (!LinkedInventoryComponent || (!SourceTaggedSlot.IsValid() && !ViewableGridSlots.IsValidIndex(SourceSlotIndex)) ||
+		(!TargetTaggedSlot.IsValid() && !ViewableGridSlots.IsValidIndex(TargetSlotIndex)) ||
 		(SourceSlotIndex != -1 && SourceSlotIndex == TargetSlotIndex) ||
 		(SourceTaggedSlot == TargetTaggedSlot && SourceTaggedSlot.IsValid()))
 	{
@@ -296,10 +289,10 @@ bool URancInventorySlotMapper::MoveItems(FGameplayTag SourceTaggedSlot, int32 So
 	bool SourceIsTaggedSlot = SourceTaggedSlot.IsValid();
 	bool TargetIsTaggedSlot = TargetTaggedSlot.IsValid();
 
-	FRancItemInstance* SourceItem = nullptr;
+	FRISItemInstance* SourceItem = nullptr;
 	if (SourceIsTaggedSlot)
 	{
-		SourceItem = DisplayedTaggedSlots.Find(SourceTaggedSlot);
+		SourceItem = ViewableTaggedSlots.Find(SourceTaggedSlot);
 
 		if (!SourceItem)
 		{
@@ -309,10 +302,10 @@ bool URancInventorySlotMapper::MoveItems(FGameplayTag SourceTaggedSlot, int32 So
 	}
 	else
 	{
-		SourceItem = &DisplayedSlots[SourceSlotIndex];
+		SourceItem = &ViewableGridSlots[SourceSlotIndex];
 	}
 
-	FRancItemInstance* TargetItem;
+	FRISItemInstance* TargetItem;
 	if (TargetIsTaggedSlot)
 	{
 		if (!LinkedInventoryComponent->IsTaggedSlotCompatible(SourceItem->ItemId, TargetTaggedSlot))
@@ -321,7 +314,7 @@ bool URancInventorySlotMapper::MoveItems(FGameplayTag SourceTaggedSlot, int32 So
 			return false;
 		}
 
-		TargetItem = DisplayedTaggedSlots.Find(TargetTaggedSlot);
+		TargetItem = ViewableTaggedSlots.Find(TargetTaggedSlot);
 		if (!TargetItem)
 		{
 			if (!LinkedInventoryComponent->UniversalTaggedSlots.Contains(TargetTaggedSlot) && !LinkedInventoryComponent->SpecializedTaggedSlots.Contains(TargetTaggedSlot))
@@ -330,25 +323,25 @@ bool URancInventorySlotMapper::MoveItems(FGameplayTag SourceTaggedSlot, int32 So
 				return false;
 			}
 
-			DisplayedTaggedSlots.Add(TargetTaggedSlot, FRancItemInstance::EmptyItemInstance);
-			TargetItem = DisplayedTaggedSlots.Find(TargetTaggedSlot);
+			ViewableTaggedSlots.Add(TargetTaggedSlot, FRISItemInstance::EmptyItemInstance);
+			TargetItem = ViewableTaggedSlots.Find(TargetTaggedSlot);
 		}
 	}
 	else
 	{
-		TargetItem = &DisplayedSlots[TargetSlotIndex];
+		TargetItem = &ViewableGridSlots[TargetSlotIndex];
 	}
 
-	if (TargetItem && SourceIsTaggedSlot && URancInventoryFunctions::ShouldItemsBeSwapped(SourceItem, TargetItem) && !LinkedInventoryComponent->IsTaggedSlotCompatible(
+	if (TargetItem && SourceIsTaggedSlot && URISInventoryFunctions::ShouldItemsBeSwapped(SourceItem, TargetItem) && !LinkedInventoryComponent->IsTaggedSlotCompatible(
 		TargetItem->ItemId, SourceTaggedSlot))
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Item is not compatible with the source slot"));
 		return 0;
 	}
 
-	FRancItemInstance MoveItem = FRancItemInstance(SourceItem->ItemId, SourceItem->Quantity);
+	FRISItemInstance MoveItem = FRISItemInstance(SourceItem->ItemId, SourceItem->Quantity);
 
-	const int32 MovedQuantity = URancInventoryFunctions::MoveBetweenSlots(SourceItem, TargetItem, !TargetIsTaggedSlot, SourceItem->Quantity, true);
+	const int32 MovedQuantity = URISInventoryFunctions::MoveBetweenSlots(SourceItem, TargetItem, !TargetIsTaggedSlot, SourceItem->Quantity, true);
 
 	MoveItem.Quantity = MovedQuantity;
 	
@@ -356,16 +349,16 @@ bool URancInventorySlotMapper::MoveItems(FGameplayTag SourceTaggedSlot, int32 So
 	{
 		if (SourceIsTaggedSlot)
 		{
-			OperationsToConfirm.Emplace(FExpectedOperation(RemoveTagged, SourceTaggedSlot, MoveItem.ItemId, MovedQuantity));
+			OperationsToConfirm.Emplace(FRISExpectedOperation(RemoveTagged, SourceTaggedSlot, MoveItem.ItemId, MovedQuantity));
 			OnTaggedSlotUpdated.Broadcast(SourceTaggedSlot);
 			if (TargetIsTaggedSlot)
 			{
-				OperationsToConfirm.Emplace(FExpectedOperation(AddTagged, TargetTaggedSlot,  MoveItem.ItemId, MovedQuantity));
+				OperationsToConfirm.Emplace(FRISExpectedOperation(AddTagged, TargetTaggedSlot,  MoveItem.ItemId, MovedQuantity));
 				OnTaggedSlotUpdated.Broadcast(TargetTaggedSlot);
 			}
 			else
 			{
-				OperationsToConfirm.Emplace(FExpectedOperation(Add,  MoveItem.ItemId, MovedQuantity));
+				OperationsToConfirm.Emplace(FRISExpectedOperation(Add,  MoveItem.ItemId, MovedQuantity));
 				OnSlotUpdated.Broadcast(TargetSlotIndex);
 			}
 		}
@@ -373,8 +366,8 @@ bool URancInventorySlotMapper::MoveItems(FGameplayTag SourceTaggedSlot, int32 So
 		{
 			if (TargetIsTaggedSlot)
 			{
-				OperationsToConfirm.Emplace(FExpectedOperation(Remove,  MoveItem.ItemId, MovedQuantity));
-				OperationsToConfirm.Emplace(FExpectedOperation(AddTagged, TargetTaggedSlot,  MoveItem.ItemId, MovedQuantity));
+				OperationsToConfirm.Emplace(FRISExpectedOperation(Remove,  MoveItem.ItemId, MovedQuantity));
+				OperationsToConfirm.Emplace(FRISExpectedOperation(AddTagged, TargetTaggedSlot,  MoveItem.ItemId, MovedQuantity));
 				OnTaggedSlotUpdated.Broadcast(TargetTaggedSlot);
 			}
 			else // purely visual
@@ -395,9 +388,9 @@ bool URancInventorySlotMapper::MoveItems(FGameplayTag SourceTaggedSlot, int32 So
 }
 
 
-bool URancInventorySlotMapper::CanSlotReceiveItem(const FRancItemInstance& ItemInstance, int32 SlotIndex) const
+bool URISGridViewModel::CanSlotReceiveItem_Implementation(const FRISItemInstance& ItemInstance, int32 SlotIndex) const
 {
-	if (!DisplayedSlots.IsValidIndex(SlotIndex))
+	if (!ViewableGridSlots.IsValidIndex(SlotIndex))
 	{
 		return false; // Slot index out of bounds
 	}
@@ -406,10 +399,10 @@ bool URancInventorySlotMapper::CanSlotReceiveItem(const FRancItemInstance& ItemI
 
 	const bool TargetSlotEmpty = IsSlotEmpty(SlotIndex);
 
-	const FRancItemInstance& TargetSlotItem = DisplayedSlots[SlotIndex];
+	const FRISItemInstance& TargetSlotItem = ViewableGridSlots[SlotIndex];
 	if (TargetSlotEmpty || TargetSlotItem.ItemId == ItemInstance.ItemId)
 	{
-		const URancItemData* ItemData = URancInventoryFunctions::GetItemDataById(ItemInstance.ItemId);
+		const URisItemData* ItemData = URISInventoryFunctions::GetItemDataById(ItemInstance.ItemId);
 		if (!ItemData)
 		{
 			return false; // Item data not found
@@ -422,7 +415,7 @@ bool URancInventorySlotMapper::CanSlotReceiveItem(const FRancItemInstance& ItemI
 	return false; // Different item types or slot not stackable
 }
 
-bool URancInventorySlotMapper::CanTaggedSlotReceiveItem(const FRancItemInstance& ItemInstance, const FGameplayTag& SlotTag, bool CheckContainerLimits) const
+bool URISGridViewModel::CanTaggedSlotReceiveItem_Implementation(const FRISItemInstance& ItemInstance, const FGameplayTag& SlotTag, bool CheckContainerLimits) const
 {
 	bool BasicCheck = LinkedInventoryComponent->IsTaggedSlotCompatible(ItemInstance.ItemId, SlotTag) && (!CheckContainerLimits || LinkedInventoryComponent->
 		CanContainerReceiveItems(ItemInstance));
@@ -430,10 +423,10 @@ bool URancInventorySlotMapper::CanTaggedSlotReceiveItem(const FRancItemInstance&
 	if (!BasicCheck) return false;
 
 	const bool TargetSlotEmpty = IsTaggedSlotEmpty(SlotTag);
-	const FRancItemInstance& TargetSlotItem = DisplayedTaggedSlots.FindChecked(SlotTag);
+	const FRISItemInstance& TargetSlotItem = ViewableTaggedSlots.FindChecked(SlotTag);
 	if (TargetSlotEmpty || TargetSlotItem.ItemId == ItemInstance.ItemId)
 	{
-		const URancItemData* ItemData = URancInventoryFunctions::GetItemDataById(ItemInstance.ItemId);
+		const URisItemData* ItemData = URISInventoryFunctions::GetItemDataById(ItemInstance.ItemId);
 		if (!ItemData)
 		{
 			return false; // Item data not found
@@ -446,12 +439,12 @@ bool URancInventorySlotMapper::CanTaggedSlotReceiveItem(const FRancItemInstance&
 	return false;
 }
 
-void URancInventorySlotMapper::HandleItemAdded(const FRancItemInstance& Item)
+void URISGridViewModel::HandleItemAdded_Implementation(const FRISItemInstance& Item)
 {
 	// Iterate in reverse to safely remove items
 	for (int32 i = OperationsToConfirm.Num() - 1; i >= 0; --i)
 	{
-		if (OperationsToConfirm[i].Operation == SlotOperation::Add &&
+		if (OperationsToConfirm[i].Operation == RISSlotOperation::Add &&
 			OperationsToConfirm[i].Quantity == Item.Quantity &&
 			!OperationsToConfirm[i].TaggedSlot.IsValid() && // Assuming non-tagged operations have a "none" tag
 			OperationsToConfirm[i].ItemId == Item.ItemId) // Assuming you have ItemID or similar property
@@ -473,7 +466,7 @@ void URancInventorySlotMapper::HandleItemAdded(const FRancItemInstance& Item)
 		}
 
 		// get item data
-		const URancItemData* ItemData = URancInventoryFunctions::GetItemDataById(Item.ItemId);
+		const URisItemData* ItemData = URISInventoryFunctions::GetItemDataById(Item.ItemId);
 
 		if (ItemData == nullptr)
 		{
@@ -483,7 +476,7 @@ void URancInventorySlotMapper::HandleItemAdded(const FRancItemInstance& Item)
 
 		// Calculate how many items can be added to this slot
 		int32 ItemsToAdd = FMath::Min(RemainingItems, ItemData->bIsStackable ? ItemData->MaxStackSize : 1);
-		FRancItemInstance& ExistingItem = DisplayedSlots[SlotIndex];
+		FRISItemInstance& ExistingItem = ViewableGridSlots[SlotIndex];
 		if (ExistingItem.IsValid())
 		{
 			ItemsToAdd = FMath::Min(RemainingItems, ItemData->bIsStackable ? ItemData->MaxStackSize - ExistingItem.Quantity : 1);
@@ -491,7 +484,7 @@ void URancInventorySlotMapper::HandleItemAdded(const FRancItemInstance& Item)
 		}
 		else
 		{
-			ExistingItem = FRancItemInstance(Item.ItemId, ItemsToAdd);
+			ExistingItem = FRISItemInstance(Item.ItemId, ItemsToAdd);
 		}
 
 		RemainingItems -= ItemsToAdd;
@@ -502,11 +495,11 @@ void URancInventorySlotMapper::HandleItemAdded(const FRancItemInstance& Item)
 	}
 }
 
-void URancInventorySlotMapper::HandleTaggedItemAdded(const FGameplayTag& SlotTag, const FRancItemInstance& ItemInstance)
+void URISGridViewModel::HandleTaggedItemAdded_Implementation(const FGameplayTag& SlotTag, const FRISItemInstance& ItemInstance)
 {
 	for (int32 i = OperationsToConfirm.Num() - 1; i >= 0; --i)
 	{
-		if (OperationsToConfirm[i].Operation == SlotOperation::AddTagged &&
+		if (OperationsToConfirm[i].Operation == RISSlotOperation::AddTagged &&
 			OperationsToConfirm[i].Quantity == ItemInstance.Quantity &&
 			OperationsToConfirm[i].TaggedSlot == SlotTag &&
 			OperationsToConfirm[i].ItemId == ItemInstance.ItemId)
@@ -517,18 +510,18 @@ void URancInventorySlotMapper::HandleTaggedItemAdded(const FGameplayTag& SlotTag
 	}
 
 	// Directly add the item to the tagged slot without overflow check
-	if (DisplayedTaggedSlots[SlotTag].ItemId == ItemInstance.ItemId)
-		DisplayedTaggedSlots[SlotTag].Quantity += ItemInstance.Quantity;
+	if (ViewableTaggedSlots[SlotTag].ItemId == ItemInstance.ItemId)
+		ViewableTaggedSlots[SlotTag].Quantity += ItemInstance.Quantity;
 	else
-		DisplayedTaggedSlots[SlotTag] = ItemInstance;
+		ViewableTaggedSlots[SlotTag] = ItemInstance;
 	OnTaggedSlotUpdated.Broadcast(SlotTag);
 }
 
-void URancInventorySlotMapper::HandleItemRemoved(const FRancItemInstance& ItemInstance)
+void URISGridViewModel::HandleItemRemoved_Implementation(const FRISItemInstance& ItemInstance)
 {
 	for (int32 i = OperationsToConfirm.Num() - 1; i >= 0; --i)
 	{
-		if (OperationsToConfirm[i].Operation == SlotOperation::Remove &&
+		if (OperationsToConfirm[i].Operation == RISSlotOperation::Remove &&
 			OperationsToConfirm[i].Quantity == ItemInstance.Quantity &&
 			OperationsToConfirm[i].ItemId == ItemInstance.ItemId) // Corrected field names based on your updated struct
 		{
@@ -541,22 +534,22 @@ void URancInventorySlotMapper::HandleItemRemoved(const FRancItemInstance& ItemIn
 	int32 RemainingItems = ItemInstance.Quantity;
 
 	// Iterate through all displayed slots to remove items
-	for (int32 SlotIndex = 0; SlotIndex < DisplayedSlots.Num() && RemainingItems > 0; ++SlotIndex)
+	for (int32 SlotIndex = 0; SlotIndex < ViewableGridSlots.Num() && RemainingItems > 0; ++SlotIndex)
 	{
 		// Check if the current slot contains the item we're looking to remove
-		if (DisplayedSlots[SlotIndex].ItemId == ItemInstance.ItemId)
+		if (ViewableGridSlots[SlotIndex].ItemId == ItemInstance.ItemId)
 		{
 			// Determine how many items we can remove from this slot
-			int32 ItemsToRemove = FMath::Min(RemainingItems, DisplayedSlots[SlotIndex].Quantity);
+			int32 ItemsToRemove = FMath::Min(RemainingItems, ViewableGridSlots[SlotIndex].Quantity);
 
 			// Adjust the slot quantity and the remaining item count
-			DisplayedSlots[SlotIndex].Quantity -= ItemsToRemove;
+			ViewableGridSlots[SlotIndex].Quantity -= ItemsToRemove;
 			RemainingItems -= ItemsToRemove;
 
 			// If the slot is now empty, reset it to the default empty item instance
-			if (DisplayedSlots[SlotIndex].Quantity <= 0)
+			if (ViewableGridSlots[SlotIndex].Quantity <= 0)
 			{
-				DisplayedSlots[SlotIndex] = FRancItemInstance::EmptyItemInstance;
+				ViewableGridSlots[SlotIndex] = FRISItemInstance::EmptyItemInstance;
 			}
 
 			// Broadcast the slot update
@@ -573,11 +566,11 @@ void URancInventorySlotMapper::HandleItemRemoved(const FRancItemInstance& ItemIn
 	}
 }
 
-void URancInventorySlotMapper::HandleTaggedItemRemoved(const FGameplayTag& SlotTag, const FRancItemInstance& ItemInstance)
+void URISGridViewModel::HandleTaggedItemRemoved_Implementation(const FGameplayTag& SlotTag, const FRISItemInstance& ItemInstance)
 {
 	for (int32 i = OperationsToConfirm.Num() - 1; i >= 0; --i)
 	{
-		if (OperationsToConfirm[i].Operation == SlotOperation::RemoveTagged &&
+		if (OperationsToConfirm[i].Operation == RISSlotOperation::RemoveTagged &&
 			OperationsToConfirm[i].Quantity == ItemInstance.Quantity &&
 			OperationsToConfirm[i].TaggedSlot == SlotTag &&
 			OperationsToConfirm[i].ItemId == ItemInstance.ItemId) // Assuming ItemID is available
@@ -587,9 +580,9 @@ void URancInventorySlotMapper::HandleTaggedItemRemoved(const FGameplayTag& SlotT
 		}
 	}
 
-	if (DisplayedTaggedSlots.Contains(SlotTag))
+	if (ViewableTaggedSlots.Contains(SlotTag))
 	{
-		if (!DisplayedTaggedSlots[SlotTag].IsValid() || DisplayedTaggedSlots[SlotTag].ItemId != ItemInstance.ItemId)
+		if (!ViewableTaggedSlots[SlotTag].IsValid() || ViewableTaggedSlots[SlotTag].ItemId != ItemInstance.ItemId)
 		{
 			UE_LOG(LogTemp, Warning, TEXT("Client misprediction detected in tagged slot %s"), *SlotTag.ToString());
 			ForceFullUpdate();
@@ -597,33 +590,33 @@ void URancInventorySlotMapper::HandleTaggedItemRemoved(const FGameplayTag& SlotT
 		}
 
 		// Update the quantity or remove the item if necessary
-		DisplayedTaggedSlots[SlotTag].Quantity -= ItemInstance.Quantity;
-		if (DisplayedTaggedSlots[SlotTag].Quantity <= 0)
+		ViewableTaggedSlots[SlotTag].Quantity -= ItemInstance.Quantity;
+		if (ViewableTaggedSlots[SlotTag].Quantity <= 0)
 		{
-			DisplayedTaggedSlots[SlotTag] = FRancItemInstance::EmptyItemInstance; // Remove the item if quantity drops to 0 or below
+			ViewableTaggedSlots[SlotTag] = FRISItemInstance::EmptyItemInstance; // Remove the item if quantity drops to 0 or below
 		}
 
 		OnTaggedSlotUpdated.Broadcast(SlotTag);
 	}
 }
 
-void URancInventorySlotMapper::ForceFullUpdate()
+void URISGridViewModel::ForceFullUpdate_Implementation()
 {
 	// TODO: Implement this, we prefer not to just call initialize as that will loose all slot mappings
 }
 
-const FRancItemInstance& URancInventorySlotMapper::GetItemForTaggedSlot(const FGameplayTag& SlotTag) const
+const FRISItemInstance& URISGridViewModel::GetItemForTaggedSlot(const FGameplayTag& SlotTag) const
 {
-	return DisplayedTaggedSlots.FindChecked(SlotTag);
+	return ViewableTaggedSlots.FindChecked(SlotTag);
 }
 
 
-int32 URancInventorySlotMapper::FindSlotIndexForItem(const FRancItemInstance& Item)
+int32 URISGridViewModel::FindSlotIndexForItem_Implementation(const FRISItemInstance& Item)
 {
-	const URancItemData* ItemData = URancInventoryFunctions::GetItemDataById(Item.ItemId);
-	for (int32 Index = 0; Index < DisplayedSlots.Num(); ++Index)
+	const URisItemData* ItemData = URISInventoryFunctions::GetItemDataById(Item.ItemId);
+	for (int32 Index = 0; Index < ViewableGridSlots.Num(); ++Index)
 	{
-		const FRancItemInstance& ExistingItem = DisplayedSlots[Index];
+		const FRISItemInstance& ExistingItem = ViewableGridSlots[Index];
 
 		if (!ExistingItem.ItemId.IsValid())
 		{
@@ -641,12 +634,12 @@ int32 URancInventorySlotMapper::FindSlotIndexForItem(const FRancItemInstance& It
 	return -1;
 }
 
-FGameplayTag URancInventorySlotMapper::FindTaggedSlotForItem(const FRancItemInstance& Item) const
+FGameplayTag URISGridViewModel::FindTaggedSlotForItem(const FRISItemInstance& Item) const
 {
 	// Validate
 	if (!Item.IsValid()) return FGameplayTag::EmptyTag;
 
-	const URancItemData* ItemData = URancInventoryFunctions::GetItemDataById(Item.ItemId);
+	const URisItemData* ItemData = URISInventoryFunctions::GetItemDataById(Item.ItemId);
 	if (!ItemData) return FGameplayTag::EmptyTag; // Ensure the item data is valid
 
 	FGameplayTag FallbackSwapSlot = FGameplayTag::EmptyTag;
@@ -696,23 +689,23 @@ FGameplayTag URancInventorySlotMapper::FindTaggedSlotForItem(const FRancItemInst
 	return FallbackSwapSlot;
 }
 
-bool URancInventorySlotMapper::MoveItemToAnyTaggedSlot(const FGameplayTag& SourceTaggedSlot, int32 SourceSlotIndex)
+bool URISGridViewModel::MoveItemToAnyTaggedSlot_Implementation(const FGameplayTag& SourceTaggedSlot, int32 SourceSlotIndex)
 {
-	if (!LinkedInventoryComponent || (!SourceTaggedSlot.IsValid() && !DisplayedSlots.IsValidIndex(SourceSlotIndex)))
+	if (!LinkedInventoryComponent || (!SourceTaggedSlot.IsValid() && !ViewableGridSlots.IsValidIndex(SourceSlotIndex)))
 	{
 		return false;
 	}
 
 	const bool SourceIsTagSlot = SourceTaggedSlot.IsValid();
 
-	const FRancItemInstance* SourceItem = nullptr;
+	const FRISItemInstance* SourceItem = nullptr;
 	if (SourceIsTagSlot)
 	{
-		SourceItem = &DisplayedTaggedSlots[SourceTaggedSlot];
+		SourceItem = &ViewableTaggedSlots[SourceTaggedSlot];
 	}
 	else
 	{
-		SourceItem = &DisplayedSlots[SourceSlotIndex];
+		SourceItem = &ViewableGridSlots[SourceSlotIndex];
 	}
 
 	if (!SourceItem || !SourceItem->IsValid()) return false;

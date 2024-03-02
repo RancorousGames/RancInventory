@@ -1,7 +1,2 @@
-﻿#pragma once
-
-class RancInventoryComponentTest
-{
-public:
-	
-};
+﻿// Copyright Rancorous Games, 2024
+#pragma once

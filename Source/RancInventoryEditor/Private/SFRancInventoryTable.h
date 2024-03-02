@@ -1,5 +1,4 @@
-// Author: Lucas Vilas-Boas
-// Year: 2023
+// Copyright Rancorous Games, 2024
 
 #pragma once
 
@@ -11,7 +10,7 @@ struct FRancItemRowData
 {
     explicit FRancItemRowData(const FPrimaryRancItemId& InPrimaryAssetId)
     {
-        const auto ItemData = URancInventoryFunctions::GetSingleItemDataById(InPrimaryAssetId, { TEXT("Data"), TEXT("SoftData"), }, false);
+        const auto ItemData = URISInventoryFunctions::GetSingleItemDataById(InPrimaryAssetId, { TEXT("Data"), TEXT("SoftData"), }, false);
 
         PrimaryAssetId = InPrimaryAssetId;
         Id = ItemData->ItemId;
@@ -22,7 +21,7 @@ struct FRancItemRowData
         Value = ItemData->ItemValue;
         Weight = ItemData->ItemWeight;
 
-        URancInventoryFunctions::UnloadRancItem(InPrimaryAssetId);
+        URISInventoryFunctions::UnloadRancItem(InPrimaryAssetId);
     }
 
     explicit FRancItemRowData(const FPrimaryAssetId& InPrimaryAssetId) : FRancItemRowData(FPrimaryRancItemId(InPrimaryAssetId))

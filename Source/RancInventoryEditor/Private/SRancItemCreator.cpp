@@ -1,5 +1,4 @@
-// Author: Lucas Vilas-Boas
-// Year: 2023
+// Copyright Rancorous Games, 2024
 
 #include "SRancItemCreator.h"
 #include <Management/RancInventoryData.h>
@@ -23,7 +22,7 @@
 #include <UObject/SavePackage.h>
 #endif
 
-void SRancItemCreator::Construct([[maybe_unused]] const FArguments&)
+void SRISItemCreator::Construct([[maybe_unused]] const FArguments&)
 {
     UpdateFolders();
 
@@ -33,7 +32,7 @@ void SRancItemCreator::Construct([[maybe_unused]] const FArguments&)
         ];
 }
 
-TSharedRef<SWidget> SRancItemCreator::ConstructContent()
+TSharedRef<SWidget> SRISItemCreator::ConstructContent()
 {
     constexpr float SlotPadding = 4.f;
 
@@ -53,8 +52,8 @@ TSharedRef<SWidget> SRancItemCreator::ConstructContent()
                 .DisplayBrowse(true)
                 .DisplayThumbnail(true)
                 .ThumbnailPool(ImageIcon_ThumbnailPool.ToSharedRef())
-                .ObjectPath(this, &SRancItemCreator::GetObjPath, ObjId)
-                .OnObjectChanged(this, &SRancItemCreator::OnObjChanged, ObjId);
+                .ObjectPath(this, &SRISItemCreator::GetObjPath, ObjId)
+                .OnObjectChanged(this, &SRISItemCreator::OnObjChanged, ObjId);
         };
 
     return SNew(SScrollBox)
@@ -75,9 +74,9 @@ TSharedRef<SWidget> SRancItemCreator::ConstructContent()
                 .Padding(SlotPadding)
                 [
                     SNew(SGameplayTagContainerCombo)
-                    .Filter(FString("Item, Items, RancInventory, Inventory"))
-		            .TagContainer(this, &SRancItemCreator::GetIdTagContainer)
-		            .OnTagContainerChanged(this, &SRancItemCreator::OnIdTagContainerChanged)
+                    .Filter(FString("Item, Items, RISInventory, Inventory"))
+		            .TagContainer(this, &SRISItemCreator::GetIdTagContainer)
+		            .OnTagContainerChanged(this, &SRISItemCreator::OnIdTagContainerChanged)
                 ]
                 + SGridPanel::Slot(0, 1)
                 .Padding(SlotPadding)
@@ -109,9 +108,9 @@ TSharedRef<SWidget> SRancItemCreator::ConstructContent()
                     .Z(ItemWorldScale.Z)
                     .AllowSpin(false)
                     .bColorAxisLabels(false)
-                    .OnXCommitted(this, &SRancItemCreator::OnSetArriveTangent, EAxis::X)
-                    .OnYCommitted(this, &SRancItemCreator::OnSetArriveTangent, EAxis::Y)
-                    .OnZCommitted(this, &SRancItemCreator::OnSetArriveTangent, EAxis::Z)
+                    .OnXCommitted(this, &SRISItemCreator::OnSetArriveTangent, EAxis::X)
+                    .OnYCommitted(this, &SRISItemCreator::OnSetArriveTangent, EAxis::Y)
+                    .OnZCommitted(this, &SRISItemCreator::OnSetArriveTangent, EAxis::Z)
                     .Font(FAppStyle::Get().GetFontStyle("PropertyWindow.NormalFont"))
                 ]
                 /*  
@@ -173,9 +172,9 @@ TSharedRef<SWidget> SRancItemCreator::ConstructContent()
                 .Padding(SlotPadding)
                 [
                     SNew(SGameplayTagContainerCombo)
-                    .Filter(FString("Item, Items, RancInventory, Inventory, Types, ItemTypes"))
-                    .TagContainer(this, &SRancItemCreator::GetTypeTagContainer)
-                    .OnTagContainerChanged(this, &SRancItemCreator::OnTypeTagContainerChanged)
+                    .Filter(FString("Item, Items, RISInventory, Inventory, Types, ItemTypes"))
+                    .TagContainer(this, &SRISItemCreator::GetTypeTagContainer)
+                    .OnTagContainerChanged(this, &SRISItemCreator::OnTypeTagContainerChanged)
                 ]
                 + SGridPanel::Slot(0, 6)
                 .Padding(SlotPadding)
@@ -189,9 +188,9 @@ TSharedRef<SWidget> SRancItemCreator::ConstructContent()
                 .Padding(SlotPadding)
                 [
                     SNew(SGameplayTagContainerCombo)
-                    .Filter(FString("Item, Items, RancInventory, Inventory, Categories, ItemCategories"))
-                    .TagContainer(this, &SRancItemCreator::GetCategoryTagContainer)
-                    .OnTagContainerChanged(this, &SRancItemCreator::OnCategoryTagContainerChanged)
+                    .Filter(FString("Item, Items, RISInventory, Inventory, Categories, ItemCategories"))
+                    .TagContainer(this, &SRISItemCreator::GetCategoryTagContainer)
+                    .OnTagContainerChanged(this, &SRISItemCreator::OnCategoryTagContainerChanged)
                 ]
                 + SGridPanel::Slot(0, 7)
                 .Padding(SlotPadding)
@@ -336,8 +335,8 @@ TSharedRef<SWidget> SRancItemCreator::ConstructContent()
                 [
                     SNew(SButton)
                         .Text(FText::FromString(TEXT("Create Item")))
-                        .OnClicked(this, &SRancItemCreator::HandleCreateItemButtonClicked)
-                        .IsEnabled(this, &SRancItemCreator::IsCreateEnabled)
+                        .OnClicked(this, &SRISItemCreator::HandleCreateItemButtonClicked)
+                        .IsEnabled(this, &SRISItemCreator::IsCreateEnabled)
                         .ToolTip(
                             SNew(SToolTip)
                             .Text(FText::FromString(TEXT("Already exists a item with this Id.")))
@@ -352,7 +351,7 @@ TSharedRef<SWidget> SRancItemCreator::ConstructContent()
         ];
 }
 
-void SRancItemCreator::OnIdTagContainerChanged(const FGameplayTagContainer& NewTagContainer)
+void SRISItemCreator::OnIdTagContainerChanged(const FGameplayTagContainer& NewTagContainer)
 {
     const auto FirstTag = NewTagContainer.First();
     if (FirstTag.IsValid())
@@ -365,12 +364,12 @@ void SRancItemCreator::OnIdTagContainerChanged(const FGameplayTagContainer& NewT
     }
 }
 
-FGameplayTagContainer SRancItemCreator::GetIdTagContainer() const
+FGameplayTagContainer SRISItemCreator::GetIdTagContainer() const
 {
     return ItemId.GetSingleTagContainer();
 }
 
-void SRancItemCreator::OnTypeTagContainerChanged(const FGameplayTagContainer& NewTagContainer)
+void SRISItemCreator::OnTypeTagContainerChanged(const FGameplayTagContainer& NewTagContainer)
 {
     const auto FirstTag = NewTagContainer.First();
     if (FirstTag.IsValid())
@@ -383,42 +382,42 @@ void SRancItemCreator::OnTypeTagContainerChanged(const FGameplayTagContainer& Ne
     }
 }
 
-FGameplayTagContainer SRancItemCreator::GetTypeTagContainer() const
+FGameplayTagContainer SRISItemCreator::GetTypeTagContainer() const
 {
     return ItemType.GetSingleTagContainer();
 }
 
-void SRancItemCreator::OnCategoryTagContainerChanged(const FGameplayTagContainer& NewItemCategories)
+void SRISItemCreator::OnCategoryTagContainerChanged(const FGameplayTagContainer& NewItemCategories)
 {
     ItemCategories = NewItemCategories;
 }
 
-FGameplayTagContainer SRancItemCreator::GetCategoryTagContainer() const
+FGameplayTagContainer SRISItemCreator::GetCategoryTagContainer() const
 {
     return ItemCategories;
 }
 
-void SRancItemCreator::OnObjChanged(const FAssetData& AssetData, const int32 ObjId)
+void SRISItemCreator::OnObjChanged(const FAssetData& AssetData, const int32 ObjId)
 {
     ObjectMap.FindOrAdd(ObjId) = AssetData.GetAsset();
 }
 
-FString SRancItemCreator::GetObjPath(const int32 ObjId) const
+FString SRISItemCreator::GetObjPath(const int32 ObjId) const
 {
     return ObjectMap.Contains(ObjId) && ObjectMap.FindRef(ObjId).IsValid() ? ObjectMap.FindRef(ObjId)->GetPathName() : FString();
 }
 
-void SRancItemCreator::HandleNewEntryClassSelected(const UClass* Class)
+void SRISItemCreator::HandleNewEntryClassSelected(const UClass* Class)
 {
     ItemClass = Class;
 }
 
-const UClass* SRancItemCreator::GetSelectedEntryClass() const
+const UClass* SRISItemCreator::GetSelectedEntryClass() const
 {
     return ItemClass.Get();
 }
 
-void SRancItemCreator::UpdateFolders()
+void SRISItemCreator::UpdateFolders()
 {
     AssetFoldersArr.Empty();
 
@@ -433,13 +432,13 @@ void SRancItemCreator::UpdateFolders()
         }
     }
 
-    if (const UAssetManager* const AssetManager = UAssetManager::GetIfValid(); IsValid(AssetManager) && AssetManager->HasInitialScanCompleted() && URancInventoryFunctions::HasEmptyParam(AssetFoldersArr))
+    if (const UAssetManager* const AssetManager = UAssetManager::GetIfValid(); IsValid(AssetManager) && AssetManager->HasInitialScanCompleted() && URISInventoryFunctions::HasEmptyParam(AssetFoldersArr))
     {
         FMessageDialog::Open(EAppMsgType::Ok, FText::FromString(TEXT("Asset Manager could not find any folder. Please check your Asset Manager settings.")));
     }
 }
 
-FReply SRancItemCreator::HandleCreateItemButtonClicked() const
+FReply SRISItemCreator::HandleCreateItemButtonClicked() const
 {
     if (AssetFolder.IsNone() || AssetName.IsNone())
     {
@@ -454,9 +453,9 @@ FReply SRancItemCreator::HandleCreateItemButtonClicked() const
 
     UDataAssetFactory* const Factory = NewObject<UDataAssetFactory>();
 
-    if (UObject* const NewData = AssetToolsModule.Get().CreateAsset(AssetName.ToString(), FPackageName::GetLongPackagePath(PackageName), URancItemData::StaticClass(), Factory))
+    if (UObject* const NewData = AssetToolsModule.Get().CreateAsset(AssetName.ToString(), FPackageName::GetLongPackagePath(PackageName), URisItemData::StaticClass(), Factory))
     {
-        URancItemData* const ItemData = Cast<URancItemData>(NewData);
+        URisItemData* const ItemData = Cast<URisItemData>(NewData);
         ItemData->ItemId = ItemId;
         ItemData->ItemWorldMesh = Cast<UStaticMesh>(ObjectMap.FindRef(0)); ;
         ItemData->ItemWorldScale = ItemWorldScale;
@@ -488,7 +487,7 @@ FReply SRancItemCreator::HandleCreateItemButtonClicked() const
     return FReply::Handled();
 }
 
-bool SRancItemCreator::IsCreateEnabled() const
+bool SRISItemCreator::IsCreateEnabled() const
 {
     if (const UAssetManager* const AssetManager = UAssetManager::GetIfInitialized())
     {
@@ -498,7 +497,7 @@ bool SRancItemCreator::IsCreateEnabled() const
     return false;
 }
 
-void SRancItemCreator::OnSetArriveTangent(float value, ETextCommit::Type CommitType, EAxis::Type Axis)
+void SRISItemCreator::OnSetArriveTangent(float value, ETextCommit::Type CommitType, EAxis::Type Axis)
 {
     switch (Axis)
     {

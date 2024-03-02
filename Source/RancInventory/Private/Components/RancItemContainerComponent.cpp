@@ -1,10 +1,11 @@
-﻿#include "Components/RancItemContainerComponent.h"
+﻿// Copyright Rancorous Games, 2024
 
+#include "Components/RancItemContainerComponent.h"
 #include "Management/RancInventoryFunctions.h"
 #include "Net/UnrealNetwork.h"
 #include "Net/Core/PushModel/PushModel.h"
 
-URancItemContainerComponent::URancItemContainerComponent(const FObjectInitializer& ObjectInitializer) :
+URISItemContainerComponent::URISItemContainerComponent(const FObjectInitializer& ObjectInitializer) :
 	Super(ObjectInitializer), MaxWeight(0.f), MaxContainerSlotCount(MAX_int32), CurrentWeight(0.f)
 {
 	PrimaryComponentTick.bCanEverTick = false;
@@ -13,7 +14,7 @@ URancItemContainerComponent::URancItemContainerComponent(const FObjectInitialize
 	SetIsReplicatedByDefault(true);
 }
 
-void URancItemContainerComponent::InitializeComponent()
+void URISItemContainerComponent::InitializeComponent()
 {
 	Super::InitializeComponent();
 
@@ -34,11 +35,11 @@ void URancItemContainerComponent::InitializeComponent()
 	// add all initial items to items
 	for (const FRancInitialItem& InitialItem : InitialItems)
 	{
-		const URancItemData* Data = URancInventoryFunctions::GetSingleItemDataById(InitialItem.ItemId, {}, false);
+		const URisItemData* Data = URISInventoryFunctions::GetSingleItemDataById(InitialItem.ItemId, {}, false);
 
 		if (Data && Data->ItemId.IsValid())
 		{
-			auto ItemInstance = FRancItemInstance(Data->ItemId, InitialItem.Quantity);
+			auto ItemInstance = FRISItemInstance(Data->ItemId, InitialItem.Quantity);
 			Items.Add(ItemInstance);
 		}
 	}
@@ -47,22 +48,22 @@ void URancItemContainerComponent::InitializeComponent()
 
 	if (DropItemClass == nullptr)
 	{
-		DropItemClass = AWorldItem::StaticClass();
+		DropItemClass = ARISWorldItem::StaticClass();
 	}
 }
 
-void URancItemContainerComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+void URISItemContainerComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
 	FDoRepLifetimeParams SharedParams;
 	SharedParams.bIsPushBased = true;
 
-	DOREPLIFETIME_WITH_PARAMS_FAST(URancItemContainerComponent, Items, SharedParams);
+	DOREPLIFETIME_WITH_PARAMS_FAST(URISItemContainerComponent, Items, SharedParams);
 }
 
 
-void URancItemContainerComponent::OnRep_Items()
+void URISItemContainerComponent::OnRep_Items()
 {
 	// Recalculate the total weight of the inventory after replication.
 	UpdateWeightAndSlots();
@@ -70,7 +71,7 @@ void URancItemContainerComponent::OnRep_Items()
 	DetectAndPublishChanges();
 }
 
-int32 URancItemContainerComponent::AddItems_IfServer(const FRancItemInstance& ItemInstance, bool AllowPartial)
+int32 URISItemContainerComponent::AddItems_IfServer(const FRISItemInstance& ItemInstance, bool AllowPartial)
 {
 	if (GetOwnerRole() != ROLE_Authority && GetOwnerRole() != ROLE_None) // none needed for tests
 	{
@@ -97,19 +98,19 @@ int32 URancItemContainerComponent::AddItems_IfServer(const FRancItemInstance& It
 		}
 	}
 
-	Items.Add(FRancItemInstance(ItemInstance.ItemId, AmountToAdd));
+	Items.Add(FRISItemInstance(ItemInstance.ItemId, AmountToAdd));
 	
 Finish:
 	UpdateWeightAndSlots();
 
-	OnItemAddedToContainer.Broadcast(FRancItemInstance(ItemInstance.ItemId, AmountToAdd));
+	OnItemAddedToContainer.Broadcast(FRISItemInstance(ItemInstance.ItemId, AmountToAdd));
 
-	MARK_PROPERTY_DIRTY_FROM_NAME(URancItemContainerComponent, Items, this);
+	MARK_PROPERTY_DIRTY_FROM_NAME(URISItemContainerComponent, Items, this);
 
 	return AmountToAdd; // Return the actual quantity added
 }
 
-int32 URancItemContainerComponent::RemoveItems_IfServer(const FRancItemInstance& ItemInstance, bool AllowPartial)
+int32 URISItemContainerComponent::RemoveItems_IfServer(const FRISItemInstance& ItemInstance, bool AllowPartial)
 {
 	if (GetOwnerRole() != ROLE_Authority && GetOwnerRole() != ROLE_None)
 	{
@@ -149,12 +150,12 @@ int32 URancItemContainerComponent::RemoveItems_IfServer(const FRancItemInstance&
 	OnItemRemovedFromContainer.Broadcast(ItemInstance);
 
 	// Mark the Items array as dirty to ensure replication
-	MARK_PROPERTY_DIRTY_FROM_NAME(URancItemContainerComponent, Items, this);
+	MARK_PROPERTY_DIRTY_FROM_NAME(URISItemContainerComponent, Items, this);
 
 	return AmountRemoved;
 }
 
-AWorldItem* URancItemContainerComponent::SpawnDroppedItem_IfServer(const FRancItemInstance& ItemInstance,
+ARISWorldItem* URISItemContainerComponent::SpawnDroppedItem_IfServer(const FRISItemInstance& ItemInstance,
                                                                    float DropAngle) const
 {
 	if (UWorld* World = GetWorld())
@@ -165,7 +166,7 @@ AWorldItem* URancItemContainerComponent::SpawnDroppedItem_IfServer(const FRancIt
 			                         DropDistance
 			                         : GetOwner()->GetActorLocation() + GetOwner()->GetActorForwardVector().
 			                                                                        RotateAngleAxis(DropAngle, FVector::UpVector) * DropDistance;
-		AWorldItem* WorldItem = World->SpawnActorDeferred<AWorldItem>(DropItemClass, FTransform(DropSpot));
+		ARISWorldItem* WorldItem = World->SpawnActorDeferred<ARISWorldItem>(DropItemClass, FTransform(DropSpot));
 		if (WorldItem)
 		{
 			WorldItem->SetItem(ItemInstance);
@@ -176,7 +177,7 @@ AWorldItem* URancItemContainerComponent::SpawnDroppedItem_IfServer(const FRancIt
 	return nullptr;
 }
 
-FRancItemInstance* URancItemContainerComponent::FindContainerItemInstance(const FGameplayTag& ItemId)
+FRISItemInstance* URISItemContainerComponent::FindContainerItemInstance(const FGameplayTag& ItemId)
 {
 	for (auto& Item : Items)
 	{
@@ -189,7 +190,7 @@ FRancItemInstance* URancItemContainerComponent::FindContainerItemInstance(const 
 	return nullptr;
 }
 
-int32 URancItemContainerComponent::DropItems(const FRancItemInstance& ItemInstance, float DropAngle)
+int32 URISItemContainerComponent::DropItems(const FRISItemInstance& ItemInstance, float DropAngle)
 {
 	DropItems_Server(ItemInstance, DropAngle);
 
@@ -201,7 +202,7 @@ int32 URancItemContainerComponent::DropItems(const FRancItemInstance& ItemInstan
 	return QuantityToDrop;
 }
 
-void URancItemContainerComponent::DropItems_Server_Implementation(const FRancItemInstance& ItemInstance,
+void URISItemContainerComponent::DropItems_Server_Implementation(const FRISItemInstance& ItemInstance,
                                                                   float DropAngle)
 {
 	auto ContainedItemInstance = FindItemById(ItemInstance.ItemId);
@@ -212,7 +213,7 @@ void URancItemContainerComponent::DropItems_Server_Implementation(const FRancIte
 		return;
 	}
 
-	AWorldItem* DroppedItem = SpawnDroppedItem_IfServer(FRancItemInstance(ItemInstance.ItemId, QuantityToDrop),
+	ARISWorldItem* DroppedItem = SpawnDroppedItem_IfServer(FRISItemInstance(ItemInstance.ItemId, QuantityToDrop),
 	                                                    DropAngle);
 	if (DroppedItem)
 	{
@@ -226,12 +227,12 @@ void URancItemContainerComponent::DropItems_Server_Implementation(const FRancIte
 	}
 }
 
-int32 URancItemContainerComponent::DropAllItems_IfServer()
+int32 URISItemContainerComponent::DropAllItems_IfServer()
 {
 	return DropAllItems_ServerImpl();
 }
 
-int32 URancItemContainerComponent::DropAllItems_ServerImpl()
+int32 URISItemContainerComponent::DropAllItems_ServerImpl()
 {
 	if (GetOwnerRole() != ROLE_Authority && GetOwnerRole() != ROLE_None)
 	{
@@ -255,17 +256,17 @@ int32 URancItemContainerComponent::DropAllItems_ServerImpl()
 }
 
 
-float URancItemContainerComponent::GetCurrentWeight() const
+float URISItemContainerComponent::GetCurrentWeight() const
 {
 	return CurrentWeight;
 }
 
-float URancItemContainerComponent::GetMaxWeight() const
+float URISItemContainerComponent::GetMaxWeight() const
 {
 	return MaxWeight <= 0.f ? MAX_flt : MaxWeight;
 }
 
-const FRancItemInstance& URancItemContainerComponent::FindItemById(const FGameplayTag& ItemId) const
+const FRISItemInstance& URISItemContainerComponent::FindItemById(const FGameplayTag& ItemId) const
 {
 	for (const auto& Item : Items)
 	{
@@ -277,17 +278,17 @@ const FRancItemInstance& URancItemContainerComponent::FindItemById(const FGamepl
 
 	// If the item is not found, throw an error or return a reference to a static empty item info
 	UE_LOG(LogTemp, Warning, TEXT("Item with ID %s not found."), *ItemId.ToString());
-	return FRancItemInstance::EmptyItemInstance;
+	return FRISItemInstance::EmptyItemInstance;
 }
 
-bool URancItemContainerComponent::CanContainerReceiveItems(const FRancItemInstance& ItemInstance) const
+bool URISItemContainerComponent::CanContainerReceiveItems(const FRISItemInstance& ItemInstance) const
 {
 	return GetQuantityOfItemContainerCanReceive(ItemInstance.ItemId) >= ItemInstance.Quantity;
 }
 
-int32 URancItemContainerComponent::GetQuantityOfItemContainerCanReceive(const FGameplayTag& ItemId) const
+int32 URISItemContainerComponent::GetQuantityOfItemContainerCanReceive(const FGameplayTag& ItemId) const
 {
-	const URancItemData* ItemData = URancInventoryFunctions::GetItemDataById(ItemId);
+	const URisItemData* ItemData = URISInventoryFunctions::GetItemDataById(ItemId);
 	if (!ItemData)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Could not find item data for item: %s"), *ItemId.ToString());
@@ -307,9 +308,9 @@ int32 URancItemContainerComponent::GetQuantityOfItemContainerCanReceive(const FG
 
 // check just weight
 
-bool URancItemContainerComponent::HasWeightCapacityForItems(const FRancItemInstance& ItemInstance) const
+bool URISItemContainerComponent::HasWeightCapacityForItems(const FRISItemInstance& ItemInstance) const
 {
-	const URancItemData* ItemData = URancInventoryFunctions::GetItemDataById(ItemInstance.ItemId);
+	const URisItemData* ItemData = URISInventoryFunctions::GetItemDataById(ItemInstance.ItemId);
 	if (!ItemData)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Could not find item data for item: %s"), *ItemInstance.ItemId.ToString());
@@ -320,17 +321,17 @@ bool URancItemContainerComponent::HasWeightCapacityForItems(const FRancItemInsta
 	return AcceptableQuantityByWeight >= ItemInstance.Quantity;
 }
 
-bool URancItemContainerComponent::DoesContainerContainItems(const FGameplayTag& ItemId, int32 Quantity) const
+bool URISItemContainerComponent::DoesContainerContainItems(const FGameplayTag& ItemId, int32 Quantity) const
 {
 	return ContainsItemsImpl(ItemId, Quantity);
 }
 
-bool URancItemContainerComponent::ContainsItemsImpl(const FGameplayTag& ItemId, int32 Quantity) const
+bool URISItemContainerComponent::ContainsItemsImpl(const FGameplayTag& ItemId, int32 Quantity) const
 {
 	return GetContainerItemCount(ItemId) >= Quantity;
 }
 
-int32 URancItemContainerComponent::GetContainerItemCount(const FGameplayTag& ItemId) const
+int32 URISItemContainerComponent::GetContainerItemCount(const FGameplayTag& ItemId) const
 {
 	for (const auto& Item : Items)
 	{
@@ -343,17 +344,17 @@ int32 URancItemContainerComponent::GetContainerItemCount(const FGameplayTag& Ite
 	return 0;
 }
 
-TArray<FRancItemInstance> URancItemContainerComponent::GetAllContainerItems() const
+TArray<FRISItemInstance> URISItemContainerComponent::GetAllContainerItems() const
 {
 	return Items;
 }
 
-bool URancItemContainerComponent::IsEmpty() const
+bool URISItemContainerComponent::IsEmpty() const
 {
 	return Items.Num() == 0;
 }
 
-void URancItemContainerComponent::ClearContainer_IfServer()
+void URISItemContainerComponent::ClearContainer_IfServer()
 {
 	if (GetOwnerRole() < ROLE_Authority && GetOwnerRole() != ROLE_None)
 	{
@@ -365,13 +366,13 @@ void URancItemContainerComponent::ClearContainer_IfServer()
 	OnRep_Items();
 }
 
-void URancItemContainerComponent::UpdateWeightAndSlots()
+void URISItemContainerComponent::UpdateWeightAndSlots()
 {
 	CurrentWeight = 0.0f; // Reset weight
 	UsedContainerSlotCount = 0;
 	for (const auto& ItemInstance : Items)
 	{
-		if (const URancItemData* const ItemData = URancInventoryFunctions::GetItemDataById(ItemInstance.ItemId))
+		if (const URisItemData* const ItemData = URISInventoryFunctions::GetItemDataById(ItemInstance.ItemId))
 		{
 			CurrentWeight += ItemData->ItemWeight * ItemInstance.Quantity;
 			UsedContainerSlotCount += FMath::CeilToInt(ItemInstance.Quantity / static_cast<float>(ItemData->MaxStackSize));
@@ -381,7 +382,7 @@ void URancItemContainerComponent::UpdateWeightAndSlots()
 	// This example does not handle the case where item data is not found, which might be important for ensuring accuracy.
 }
 
-void URancItemContainerComponent::CopyItemsToCache()
+void URISItemContainerComponent::CopyItemsToCache()
 {
 	ItemsCache.Reset();
 	ItemsCache.Reserve(Items.Num());
@@ -391,10 +392,10 @@ void URancItemContainerComponent::CopyItemsToCache()
 	}
 }
 
-void URancItemContainerComponent::DetectAndPublishChanges()
+void URISItemContainerComponent::DetectAndPublishChanges()
 {
 	// First pass: Update existing items or add new ones, mark them by setting quantity to negative.
-	for (FRancItemInstance& NewItem : Items)
+	for (FRISItemInstance& NewItem : Items)
 	{
 		int32* OldQuantity = ItemsCache.Find(NewItem.ItemId);
 		if (OldQuantity)
@@ -404,11 +405,11 @@ void URancItemContainerComponent::DetectAndPublishChanges()
 			{
 				if (*OldQuantity < NewItem.Quantity)
 				{
-					OnItemAddedToContainer.Broadcast(FRancItemInstance(NewItem.ItemId, NewItem.Quantity - *OldQuantity));
+					OnItemAddedToContainer.Broadcast(FRISItemInstance(NewItem.ItemId, NewItem.Quantity - *OldQuantity));
 				}
 				else if (*OldQuantity > NewItem.Quantity)
 				{
-					OnItemRemovedFromContainer.Broadcast(FRancItemInstance(NewItem.ItemId, *OldQuantity - NewItem.Quantity));
+					OnItemRemovedFromContainer.Broadcast(FRISItemInstance(NewItem.ItemId, *OldQuantity - NewItem.Quantity));
 				}
 			}
 			// Mark this item as processed by temporarily setting its value to its own negative
@@ -429,7 +430,7 @@ void URancItemContainerComponent::DetectAndPublishChanges()
 		if (Pair.Value >= 0)
 		{
 			// Item was not processed (not found in Items), so it has been removed
-			OnItemRemovedFromContainer.Broadcast(FRancItemInstance(Pair.Key, Pair.Value));
+			OnItemRemovedFromContainer.Broadcast(FRISItemInstance(Pair.Key, Pair.Value));
 			_KeysToRemove.Add(Pair.Key);
 		}
 		else

@@ -1,5 +1,4 @@
-// Author: Lucas Vilas-Boas
-// Year: 2023
+// Copyright Rancorous Games, 2024
 
 #pragma once
 
@@ -9,23 +8,23 @@
 #include "RancInventoryFunctions.generated.h"
 
 UENUM(BlueprintType, Category = "Ranc Inventory | Enumerations")
-enum class ERancItemSearchType : uint8
+enum class ERISItemSearchType : uint8
 {
     Name,
     ID,
     Type
 };
 
-class URancInventoryComponent;
+class URISInventoryComponent;
 class UAssetManager;
-class URancItemData;
+class URisItemData;
 struct FPrimaryRancItemId;
 
 /**
- *
+ * Utility functions for the Ranc Inventory System
  */
 UCLASS(Category = "Ranc Inventory | Functions")
-class RANCINVENTORY_API URancInventoryFunctions final : public UBlueprintFunctionLibrary
+class RANCINVENTORY_API URISInventoryFunctions final : public UBlueprintFunctionLibrary
 {
     GENERATED_BODY()
 
@@ -40,23 +39,23 @@ public:
 
     /* Check if the ids are equal */
     UFUNCTION(BlueprintPure, Category = "Ranc Inventory")
-    static bool CompareItemInfo(const FRancItemInstance& Info1, const FRancItemInstance& Info2);
+    static bool CompareItemInfo(const FRISItemInstance& Info1, const FRISItemInstance& Info2);
 
     /* Check if the ids of the given item datas are equal */
     UFUNCTION(BlueprintPure, Category = "Ranc Inventory")
-    static bool CompareItemData(const URancItemData* Data1, const URancItemData* Data2);
+    static bool CompareItemData(const URisItemData* Data1, const URisItemData* Data2);
 
     /* Return the item data related to the given id */
     UFUNCTION(BlueprintCallable, Category = "Ranc Inventory")
-    static URancItemData* GetSingleItemDataById(const FPrimaryRancItemId& InID, const TArray<FName>& InBundles, const bool bAutoUnload = true);
+    static URisItemData* GetSingleItemDataById(const FPrimaryRancItemId& InID, const TArray<FName>& InBundles, const bool bAutoUnload = true);
 
     /* Return a array of data depending of the given ids */
     UFUNCTION(BlueprintCallable, Category = "Ranc Inventory")
-    static TArray<URancItemData*> GetItemDataArrayById(const TArray<FPrimaryRancItemId>& InIDs, const TArray<FName>& InBundles, const bool bAutoUnload = true);
+    static TArray<URisItemData*> GetItemDataArrayById(const TArray<FPrimaryRancItemId>& InIDs, const TArray<FName>& InBundles, const bool bAutoUnload = true);
 
     /* Search all registered items and return a array of item data that match with the given parameters */
     UFUNCTION(BlueprintCallable, Category = "Ranc Inventory")
-    static TArray<URancItemData*> SearchRancItemData(const ERancItemSearchType SearchType, const FString& SearchString, const TArray<FName>& InBundles, const bool bAutoUnload = true);
+    static TArray<URisItemData*> SearchRancItemData(const ERISItemSearchType SearchType, const FString& SearchString, const TArray<FName>& InBundles, const bool bAutoUnload = true);
     
     /* Get the primary asset ids of all registered items */
     UFUNCTION(BlueprintPure, Category = "Ranc Inventory")
@@ -75,14 +74,14 @@ public:
     
     /* Uses static map from GameplayTag to URancItemData, works faster after having called PermanentlyLoadAllItems */
     UFUNCTION(BlueprintPure, Category = "Ranc Inventory")
-    static URancItemData* GetItemDataById(FGameplayTag TagId);
+    static URisItemData* GetItemDataById(FGameplayTag TagId);
     
     /* Trade items between two inventory components */
     UFUNCTION(BlueprintCallable, Category = "Ranc Inventory")
-    static void TradeRancItem(TArray<FRancItemInstance> ItemsToTrade, URancItemContainerComponent* FromInventory, URancItemContainerComponent* ToInventory);
+    static void TradeRancItem(TArray<FRISItemInstance> ItemsToTrade, URISItemContainerComponent* FromInventory, URISItemContainerComponent* ToInventory);
 
     // Utiltiy function to check if moving an item from one slot to another would cause a swap
-    static bool ShouldItemsBeSwapped(FRancItemInstance* Source, FRancItemInstance* Target);
+    static bool ShouldItemsBeSwapped(FRISItemInstance* Source, FRISItemInstance* Target);
 
     
     /* Moves from a source ItemInstance to a target one, either moving, stacking stackable items or swapping
@@ -90,26 +89,26 @@ public:
      * IgnoreMaxStacks will allow a target slot to go above the item datas maxstacksize (used for itemcontainer)
      * AllowPartial if enabled will allow a move to partially succeed, e.g. only move 2 of requested 3 quantity, if false moves full or nothing
      */
-    static int32 MoveBetweenSlots(FRancItemInstance* Source, FRancItemInstance* Target, bool IgnoreMaxStacks, int32 RequestedQuantity, bool AllowPartial);
+    static int32 MoveBetweenSlots(FRISItemInstance* Source, FRISItemInstance* Target, bool IgnoreMaxStacks, int32 RequestedQuantity, bool AllowPartial);
 
 
     /* Check if the given item info have a valid id */
     UFUNCTION(BlueprintPure, Category = "Ranc Inventory")
-    static bool IsItemValid(const FRancItemInstance InItemInfo);
+    static bool IsItemValid(const FRISItemInstance InItemInfo);
     
     /* Loads all item recipe data assets, allowing use of GetItemById */
     UFUNCTION(BlueprintCallable, Category = "Ranc Inventory")
     static void PermanentlyLoadAllRecipesAsync();
     
     UFUNCTION(BlueprintCallable, Category = "Ranc Inventory")
-    static bool AreAllRecipesLoaded();
+    static bool AreAllRISRecipesLoaded();
     
     UFUNCTION(BlueprintCallable, Category = "Ranc Inventory")
-    static TArray<URancRecipe*> GetAllRancItemRecipes();
+    static TArray<URISRecipe*> GetAllRISItemRecipes();
 
     /* Includes both RancItemRecipe and RancItemCraftingRecipe (for item to item) */
     UFUNCTION(BlueprintPure, Category = "Ranc Inventory")
-    static TArray<FPrimaryAssetId> GetAllRancItemRecipeIds();
+    static TArray<FPrimaryAssetId> GetAllRisItemRecipeIds();
     
     
     template<typename Ty>
@@ -134,28 +133,28 @@ public:
     }
 
     UFUNCTION(BlueprintPure, Category = "Ranc Inventory")
-    static TMap<FGameplayTag, FPrimaryRancItemIdContainer> GetItemRelations(const FRancItemInstance InItemInfo);
+    static TMap<FGameplayTag, FPrimaryRancItemIdContainer> GetItemRelations(const FRISItemInstance InItemInfo);
 
     static void AllItemsLoadedCallback();
     static void AllRecipesLoadedCallback();
 
     // Below are used for e.g. unit tests
-    static void HardcodeItem(FGameplayTag ItemId, URancItemData* ItemData);
-    static void HardcodeRecipe(FGameplayTag RecipeId, URancRecipe* RecipeData);
+    static void HardcodeItem(FGameplayTag ItemId, URisItemData* ItemData);
+    static void HardcodeRecipe(FGameplayTag RecipeId, URISRecipe* RecipeData);
 
 private:
-    static TArray<URancItemData*> LoadRancItemData_Internal(UAssetManager* InAssetManager, const TArray<FPrimaryAssetId>& InIDs, const TArray<FName>& InBundles, const bool bAutoUnload);
-    static TArray<URancItemData*> LoadRancItemData_Internal(UAssetManager* InAssetManager, const TArray<FPrimaryRancItemId>& InIDs, const TArray<FName>& InBundles, const bool bAutoUnload);
+    static TArray<URisItemData*> LoadRancItemData_Internal(UAssetManager* InAssetManager, const TArray<FPrimaryAssetId>& InIDs, const TArray<FName>& InBundles, const bool bAutoUnload);
+    static TArray<URisItemData*> LoadRancItemData_Internal(UAssetManager* InAssetManager, const TArray<FPrimaryRancItemId>& InIDs, const TArray<FName>& InBundles, const bool bAutoUnload);
 
     
-    static TMap<FGameplayTag, URancItemData*> AllLoadedItemsByTag;
+    static TMap<FGameplayTag, URisItemData*> AllLoadedItemsByTag;
    // static TMap<FGameplayTag, FName> AllLoadedItemAssetNamesByTag;
     static TArray<FGameplayTag> AllItemIds;
     
-    static TArray<URancRecipe*> AllLoadedRecipes;
+    static TArray<URISRecipe*> AllLoadedRecipes;
 
 public:
     /* Filter the container and return only items that can be traded at the current context */
     UFUNCTION(BlueprintPure, Category = "Ranc Inventory")
-    static TArray<FRancItemInstance> FilterTradeableItems(URancInventoryComponent* FromInventory, URancInventoryComponent* ToInventory, const TArray<FRancItemInstance>& Items);
+    static TArray<FRISItemInstance> FilterTradeableItems(URISInventoryComponent* FromInventory, URISInventoryComponent* ToInventory, const TArray<FRISItemInstance>& Items);
 };

@@ -1,7 +1,5 @@
-// Author: Lucas Vilas-Boas
-// Year: 2023
+// Copyright Rancorous Games, 2024
 
 #include "LogRancInventory.h"
 
-DEFINE_LOG_CATEGORY(LogRancInventory);
-DEFINE_LOG_CATEGORY(LogRancInventory_Internal);
+DEFINE_LOG_CATEGORY(LogRISInventory);

@@ -1,4 +1,4 @@
-// Copyright Rancorous Games, 2023
+// Copyright Rancorous Games, 2024
 
 #include "RancInventoryEditor.h"
 #include "SFRancInventoryDetailsPanel.h"
@@ -45,7 +45,7 @@ TSharedRef<SDockTab> FRancInventoryEditorModule::OnSpawnTab([[maybe_unused]] con
     }
     else if (TabId == ItemCreatorTabId)
     {
-        OutContent = SNew(SRancItemCreator);
+        OutContent = SNew(SRISItemCreator);
     }
 
     if (OutContent.IsValid())

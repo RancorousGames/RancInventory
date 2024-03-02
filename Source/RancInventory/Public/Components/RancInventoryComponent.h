@@ -1,3 +1,5 @@
+// Copyright Rancorous Games, 2024
+
 #pragma once
 
 #include <CoreMinimal.h>
@@ -7,12 +9,12 @@
 
 
 UCLASS(Blueprintable, ClassGroup = (Custom), Category = "Ranc Inventory | Classes", EditInlineNew, meta = (BlueprintSpawnableComponent))
-class RANCINVENTORY_API URancInventoryComponent : public URancItemContainerComponent
+class RANCINVENTORY_API URISInventoryComponent : public URISItemContainerComponent
 {
 	GENERATED_BODY()
 
 public:
-	explicit URancInventoryComponent(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
+	explicit URISInventoryComponent(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
 
 	virtual void InitializeComponent() override;
 
@@ -20,7 +22,7 @@ public:
 
 	// Add an item to a tagged slot, if the slot is already occupied it will return the quantity that was added. Allows partial when stacking
 	UFUNCTION(BlueprintCallable, Category="Ranc Inventory | Equipment", Meta = (HidePin="OverrideExistingItem"))
-	int32 AddItemsToTaggedSlot_IfServer(const FGameplayTag& SlotTag, const FRancItemInstance& ItemsToAdd,
+	int32 AddItemsToTaggedSlot_IfServer(const FGameplayTag& SlotTag, const FRISItemInstance& ItemsToAdd,
 	                                    bool OverrideExistingItem = false);
 
 	/* Attempts to add an item to a generic or tagged slot, PreferTaggedSlots determines which is tried first.
@@ -28,7 +30,7 @@ public:
 	 * If PreferTaggedSlots is true, an item with category e.g. HelmetSlot will go into HelmetSlot first
 	 * Returns amount added, and always allows partial adding */
 	UFUNCTION(BlueprintCallable, Category="Ranc Inventory | Equipment")
-	int32 AddItemsToAnySlots_IfServer(FRancItemInstance ItemsToAdd, bool PreferTaggedSlots = true);
+	int32 AddItemsToAnySlots_IfServer(FRISItemInstance ItemsToAdd, bool PreferTaggedSlots = true);
 
 	// Remove up to Quantity item from a tagged slot, will return the count that was removed
 	UFUNCTION(BlueprintCallable, Category="Ranc Inventory | Equipment")
@@ -42,11 +44,11 @@ public:
 	/* Moves items from one tagged slot to another, always allows partial moves but source must contain right amount
 	 * Leave SourceTaggedSlot as empty tag to move from container or leave TargetTaggedSlot empty to move to container */
 	UFUNCTION(Server, Reliable, BlueprintCallable, Category="Ranc Inventory")
-	void MoveItems_Server(const FRancItemInstance& ItemInstance,
+	void MoveItems_Server(const FRISItemInstance& ItemInstance,
 							   const FGameplayTag& SourceTaggedSlot = FGameplayTag(),
 							   const FGameplayTag& TargetTaggedSlot = FGameplayTag());
 	
-	int32 MoveItems_ServerImpl(const FRancItemInstance& ItemInstance,
+	int32 MoveItems_ServerImpl(const FRISItemInstance& ItemInstance,
 	                           const FGameplayTag& SourceTaggedSlot = FGameplayTag(),
 	                           const FGameplayTag& TargetTaggedSlot = FGameplayTag());
 	
@@ -59,7 +61,7 @@ public:
 
 	// Checks weight and count limits and compatability
 	UFUNCTION(BlueprintCallable, Category="Inventory Mapping")
-	bool CanTaggedSlotReceiveItem(const FRancItemInstance& ItemInfo, const FGameplayTag& SlotTag) const;
+	bool CanTaggedSlotReceiveItem(const FRISItemInstance& ItemInfo, const FGameplayTag& SlotTag) const;
 	
 	UFUNCTION(BlueprintPure, Category="Ranc Inventory")
 	int32 GetItemCountIncludingTaggedSlots(const FGameplayTag& ItemId) const;
@@ -76,12 +78,12 @@ public:
 	void ClearInventory_IfServer();
 	
 	// New events for slot equipment changes, this also gets called if an already held stackable item has its stack quantity increased
-	DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnItemAddedToTaggedSlot, const FGameplayTag&, SlotTag, const FRancItemInstance&, ItemInfo);
+	DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnItemAddedToTaggedSlot, const FGameplayTag&, SlotTag, const FRISItemInstance&, ItemInfo);
 
 	UPROPERTY(BlueprintAssignable, Category="Ranc Inventory | Equipment")
 	FOnItemAddedToTaggedSlot OnItemAddedToTaggedSlot;
 
-	DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnItemRemovedFromTaggedSlot, const FGameplayTag&, SlotTag, const FRancItemInstance&, ItemInfo);
+	DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnItemRemovedFromTaggedSlot, const FGameplayTag&, SlotTag, const FRISItemInstance&, ItemInfo);
 
 	// Note: This also gets called for partial removing, e.g. moving 1 apple in a stack of 5
 	UPROPERTY(BlueprintAssignable, Category="Ranc Inventory | Equipment")
@@ -98,9 +100,9 @@ public:
 	TArray<FGameplayTag> SpecializedTaggedSlots; // E.g., head, feet
 
 	UFUNCTION()
-	void OnInventoryItemAddedHandler(const FRancItemInstance& ItemInfo);
+	void OnInventoryItemAddedHandler(const FRISItemInstance& ItemInfo);
 	UFUNCTION()
-	void OnInventoryItemRemovedHandler(const FRancItemInstance& ItemInfo);
+	void OnInventoryItemRemovedHandler(const FRISItemInstance& ItemInfo);
 
 	////////////////// CRAFTING ///////////////////
 
@@ -108,7 +110,7 @@ public:
 	bool CanCraftRecipeId(const FPrimaryAssetId& RecipeId) const;
 
 	UFUNCTION(BlueprintCallable, Category="Ranc Inventory | Crafting")
-	bool CanCraftRecipe(const URancRecipe* Recipe) const;
+	bool CanCraftRecipe(const URISRecipe* Recipe) const;
 
 	UFUNCTION(BlueprintCallable, Category="Ranc Inventory | Crafting")
 	bool CanCraftCraftingRecipe(const FPrimaryAssetId& RecipeId) const;
@@ -117,7 +119,7 @@ public:
 	void CraftRecipeId_Server(const FPrimaryAssetId& RecipeId);
 
 	UFUNCTION(BlueprintCallable, Category="Ranc Inventory | Crafting")
-	bool CraftRecipe_IfServer(const URancRecipe* Recipe);
+	bool CraftRecipe_IfServer(const URISRecipe* Recipe);
 
 
 	UFUNCTION(BlueprintPure, Category="Ranc Inventory")
@@ -127,11 +129,11 @@ public:
 	void SetRecipeLock_Server(const FPrimaryAssetId& RecipeId, bool LockState);
 
 	UFUNCTION(BlueprintCallable, Category="Ranc Inventory | Recipes")
-	URancRecipe* GetRecipeById(const FPrimaryAssetId& RecipeId);
+	URISRecipe* GetRecipeById(const FPrimaryAssetId& RecipeId);
 
 	// Available recipes are ones that are unlocked and for which we have the necessary materials
 	UFUNCTION(BlueprintCallable, Category="Ranc Inventory | Recipes")
-	TArray<URancRecipe*> GetAvailableRecipes(FGameplayTag TagFilter);
+	TArray<URISRecipe*> GetAvailableRecipes(FGameplayTag TagFilter);
 
 	DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnCraftConfirmed, TSubclassOf<UObject>, CraftedClass, int32, QuantityCrafted);
 
@@ -172,12 +174,12 @@ protected:
 	UPROPERTY(ReplicatedUsing=OnRep_Slots, BlueprintReadOnly, Category="Ranc Inventory")
 	TArray<FRancTaggedItemInstance> TaggedSlotItemInstances;
 
-	TMap<FGameplayTag, TArray<URancRecipe*>> CurrentAvailableRecipes;
+	TMap<FGameplayTag, TArray<URISRecipe*>> CurrentAvailableRecipes;
 
 private:
 	TArray<FGameplayTag> _SlotsToRemove; // Could be a local value but just slight optimization to avoid creating a new array every time.
 	// The cache is a copy of Items that is not replicated, used to detect changes after replication, only used on client
-	TMap<FGameplayTag, FRancItemInstance> TaggedItemsCache; // Slot to quantity;
+	TMap<FGameplayTag, FRISItemInstance> TaggedItemsCache; // Slot to quantity;
 	void DetectAndPublishChanges();
 
 	UFUNCTION()
@@ -186,5 +188,5 @@ private:
 	UFUNCTION()
 	void OnRep_Recipes();
 
-	friend class URancInventorySlotMapper;
+	friend class URISGridViewModel;
 };

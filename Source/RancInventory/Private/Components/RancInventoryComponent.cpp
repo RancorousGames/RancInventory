@@ -1,4 +1,4 @@
-// Rancorous Games, 2024
+// Copyright Rancorous Games, 2024
 
 #include "Components/RancInventoryComponent.h"
 #include <GameFramework/Actor.h>
@@ -9,23 +9,23 @@
 #include "Net/Core/PushModel/PushModel.h"
 
 
-URancInventoryComponent::URancInventoryComponent(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
+URISInventoryComponent::URISInventoryComponent(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
 }
 
-void URancInventoryComponent::InitializeComponent()
+void URISInventoryComponent::InitializeComponent()
 {
 	Super::InitializeComponent();
 
 	// Subscribe to base class inventory events
-	OnItemAddedToContainer.AddDynamic(this, &URancInventoryComponent::OnInventoryItemAddedHandler);
-	OnItemRemovedFromContainer.AddDynamic(this, &URancInventoryComponent::OnInventoryItemRemovedHandler);
+	OnItemAddedToContainer.AddDynamic(this, &URISInventoryComponent::OnInventoryItemAddedHandler);
+	OnItemRemovedFromContainer.AddDynamic(this, &URISInventoryComponent::OnInventoryItemRemovedHandler);
 
 	// Initialize available recipes based on initial inventory and recipes
 	CheckAndUpdateRecipeAvailability();
 }
 
-int32 URancInventoryComponent::GetItemCountIncludingTaggedSlots(const FGameplayTag& ItemId) const
+int32 URISInventoryComponent::GetItemCountIncludingTaggedSlots(const FGameplayTag& ItemId) const
 {
 	int32 Quantity = GetContainerItemCount(ItemId);
 	for (const FRancTaggedItemInstance& TaggedItem : TaggedSlotItemInstances)
@@ -38,13 +38,13 @@ int32 URancInventoryComponent::GetItemCountIncludingTaggedSlots(const FGameplayT
 	return Quantity;
 }
 
-void URancInventoryComponent::UpdateWeightAndSlots()
+void URISInventoryComponent::UpdateWeightAndSlots()
 {
 	Super::UpdateWeightAndSlots();
 
 	for (const FRancTaggedItemInstance& TaggedInstance : TaggedSlotItemInstances)
 	{
-		if (const URancItemData* const ItemData = URancInventoryFunctions::GetItemDataById(
+		if (const URisItemData* const ItemData = URISInventoryFunctions::GetItemDataById(
 			TaggedInstance.ItemInstance.ItemId))
 		{
 			CurrentWeight += ItemData->ItemWeight * TaggedInstance.ItemInstance.Quantity;
@@ -52,26 +52,26 @@ void URancInventoryComponent::UpdateWeightAndSlots()
 	}
 }
 
-bool URancInventoryComponent::ContainsItemsImpl(const FGameplayTag& ItemId, int32 Quantity) const
+bool URISInventoryComponent::ContainsItemsImpl(const FGameplayTag& ItemId, int32 Quantity) const
 {
 	return GetItemCountIncludingTaggedSlots(ItemId) >= Quantity;
 }
 
-void URancInventoryComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+void URISInventoryComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
 	FDoRepLifetimeParams SharedParams;
 	SharedParams.bIsPushBased = true;
-	DOREPLIFETIME_WITH_PARAMS_FAST(URancInventoryComponent, TaggedSlotItemInstances, SharedParams);
+	DOREPLIFETIME_WITH_PARAMS_FAST(URISInventoryComponent, TaggedSlotItemInstances, SharedParams);
 
-	DOREPLIFETIME(URancInventoryComponent, AllUnlockedRecipes);
+	DOREPLIFETIME(URISInventoryComponent, AllUnlockedRecipes);
 }
 
 
 ////////////////////////////////////////////////////// TAGGED SLOTS ///////////////////////////////////////////////////////
-int32 URancInventoryComponent::AddItemsToTaggedSlot_IfServer(const FGameplayTag& SlotTag,
-                                                             const FRancItemInstance& ItemsToAdd,
+int32 URISInventoryComponent::AddItemsToTaggedSlot_IfServer(const FGameplayTag& SlotTag,
+                                                             const FRISItemInstance& ItemsToAdd,
                                                              bool OverrideExistingItem)
 {
 	if (GetOwnerRole() < ROLE_Authority && GetOwnerRole() != ROLE_None)
@@ -93,11 +93,11 @@ int32 URancInventoryComponent::AddItemsToTaggedSlot_IfServer(const FGameplayTag&
 	int32 Index = GetIndexForTaggedSlot(SlotTag);
 
 	FRancTaggedItemInstance& ExistingItem = EmptyCopy;
-	URancItemData* ItemData = nullptr;
+	URisItemData* ItemData = nullptr;
 	if (TaggedSlotItemInstances.IsValidIndex(Index))
 	{
 		ExistingItem = TaggedSlotItemInstances[Index];
-		ItemData = URancInventoryFunctions::GetItemDataById(ItemsToAdd.ItemId);
+		ItemData = URISInventoryFunctions::GetItemDataById(ItemsToAdd.ItemId);
 	}
 
 	// Determine the quantity to add
@@ -119,14 +119,14 @@ int32 URancInventoryComponent::AddItemsToTaggedSlot_IfServer(const FGameplayTag&
 	}
 
 	UpdateWeightAndSlots(); // Recalculate the current weight
-	OnItemAddedToTaggedSlot.Broadcast(SlotTag, FRancItemInstance(ItemsToAdd.ItemId, QuantityToAdd));
-	MARK_PROPERTY_DIRTY_FROM_NAME(URancInventoryComponent, TaggedSlotItemInstances, this);
+	OnItemAddedToTaggedSlot.Broadcast(SlotTag, FRISItemInstance(ItemsToAdd.ItemId, QuantityToAdd));
+	MARK_PROPERTY_DIRTY_FROM_NAME(URISInventoryComponent, TaggedSlotItemInstances, this);
 
 	return QuantityToAdd;
 }
 
 
-int32 URancInventoryComponent::AddItemsToAnySlots_IfServer(FRancItemInstance ItemsToAdd, bool PreferTaggedSlots)
+int32 URISInventoryComponent::AddItemsToAnySlots_IfServer(FRISItemInstance ItemsToAdd, bool PreferTaggedSlots)
 {
 	if (GetOwnerRole() < ROLE_Authority && GetOwnerRole() != ROLE_None)
 	{
@@ -146,7 +146,7 @@ int32 URancInventoryComponent::AddItemsToAnySlots_IfServer(FRancItemInstance Ite
 	if (!PreferTaggedSlots)
 	{
 		// Try adding to generic slots first if not preferring tagged slots
-		int32 QuantityAddedToGeneric = AddItems_IfServer(FRancItemInstance(ItemsToAdd.ItemId, RemainingQuantity), true);
+		int32 QuantityAddedToGeneric = AddItems_IfServer(FRISItemInstance(ItemsToAdd.ItemId, RemainingQuantity), true);
 		TotalAdded += QuantityAddedToGeneric;
 		RemainingQuantity -= QuantityAddedToGeneric;
 	}
@@ -159,7 +159,7 @@ int32 URancInventoryComponent::AddItemsToAnySlots_IfServer(FRancItemInstance Ite
 			if (RemainingQuantity <= 0) break;
 			if (IsTaggedSlotCompatible(ItemsToAdd.ItemId, SlotTag))
 			{
-				int32 QuantityAdded = AddItemsToTaggedSlot_IfServer(SlotTag, FRancItemInstance(ItemsToAdd.ItemId, RemainingQuantity), false);
+				int32 QuantityAdded = AddItemsToTaggedSlot_IfServer(SlotTag, FRISItemInstance(ItemsToAdd.ItemId, RemainingQuantity), false);
 				TotalAdded += QuantityAdded;
 				RemainingQuantity -= QuantityAdded;
 			}
@@ -168,7 +168,7 @@ int32 URancInventoryComponent::AddItemsToAnySlots_IfServer(FRancItemInstance Ite
 		for (const FGameplayTag& SlotTag : UniversalTaggedSlots)
 		{
 			if (RemainingQuantity <= 0) break;
-			const int32 QuantityAdded = AddItemsToTaggedSlot_IfServer(SlotTag, FRancItemInstance(ItemsToAdd.ItemId, RemainingQuantity), false);
+			const int32 QuantityAdded = AddItemsToTaggedSlot_IfServer(SlotTag, FRISItemInstance(ItemsToAdd.ItemId, RemainingQuantity), false);
 			TotalAdded += QuantityAdded;
 			RemainingQuantity -= QuantityAdded;
 		}
@@ -177,7 +177,7 @@ int32 URancInventoryComponent::AddItemsToAnySlots_IfServer(FRancItemInstance Ite
 	// If there's still remaining quantity and we didn't prefer tagged slots first, try adding back to generic slots
 	if (RemainingQuantity > 0 && !PreferTaggedSlots)
 	{
-		int32 QuantityAddedBackToGeneric = AddItems_IfServer(FRancItemInstance(ItemsToAdd.ItemId, RemainingQuantity), true);
+		int32 QuantityAddedBackToGeneric = AddItems_IfServer(FRISItemInstance(ItemsToAdd.ItemId, RemainingQuantity), true);
 		TotalAdded += QuantityAddedBackToGeneric;
 		RemainingQuantity -= QuantityAddedBackToGeneric;
 	}
@@ -185,7 +185,7 @@ int32 URancInventoryComponent::AddItemsToAnySlots_IfServer(FRancItemInstance Ite
 	return TotalAdded; // Total quantity successfully added across slots
 }
 
-int32 URancInventoryComponent::RemoveQuantityFromTaggedSlot_IfServer(const FGameplayTag& SlotTag, int32 QuantityToRemove, bool AllowPartial)
+int32 URISInventoryComponent::RemoveQuantityFromTaggedSlot_IfServer(const FGameplayTag& SlotTag, int32 QuantityToRemove, bool AllowPartial)
 {
 	if (GetOwnerRole() < ROLE_Authority && GetOwnerRole() != ROLE_None)
 	{
@@ -212,7 +212,7 @@ int32 URancInventoryComponent::RemoveQuantityFromTaggedSlot_IfServer(const FGame
 		return 0;
 
 	const int32 ActualRemovedQuantity = FMath::Min(QuantityToRemove, InstanceToRemoveFrom->ItemInstance.Quantity);
-	const FRancItemInstance Removed(InstanceToRemoveFrom->ItemInstance.ItemId, ActualRemovedQuantity);
+	const FRISItemInstance Removed(InstanceToRemoveFrom->ItemInstance.ItemId, ActualRemovedQuantity);
 	InstanceToRemoveFrom->ItemInstance.Quantity -= ActualRemovedQuantity;
 	if (InstanceToRemoveFrom->ItemInstance.Quantity <= 0)
 	{
@@ -221,11 +221,11 @@ int32 URancInventoryComponent::RemoveQuantityFromTaggedSlot_IfServer(const FGame
 
 	UpdateWeightAndSlots();
 	OnItemRemovedFromTaggedSlot.Broadcast(SlotTag, Removed);
-	MARK_PROPERTY_DIRTY_FROM_NAME(URancInventoryComponent, TaggedSlotItemInstances, this);
+	MARK_PROPERTY_DIRTY_FROM_NAME(URISInventoryComponent, TaggedSlotItemInstances, this);
 	return ActualRemovedQuantity;
 }
 
-int32 URancInventoryComponent::RemoveItemsFromAnyTaggedSlots_IfServer(FGameplayTag ItemId, int32 QuantityToRemove)
+int32 URISInventoryComponent::RemoveItemsFromAnyTaggedSlots_IfServer(FGameplayTag ItemId, int32 QuantityToRemove)
 {
 	int32 RemovedCount = 0;
 	for (int i = TaggedSlotItemInstances.Num() - 1; i >= 0; i--)
@@ -243,7 +243,7 @@ int32 URancInventoryComponent::RemoveItemsFromAnyTaggedSlots_IfServer(FGameplayT
 	return RemovedCount;
 }
 
-void URancInventoryComponent::MoveItems_Server_Implementation(const FRancItemInstance& ItemInstance,
+void URISInventoryComponent::MoveItems_Server_Implementation(const FRISItemInstance& ItemInstance,
                                                               const FGameplayTag& SourceTaggedSlot,
                                                               const FGameplayTag& TargetTaggedSlot)
 {
@@ -251,7 +251,7 @@ void URancInventoryComponent::MoveItems_Server_Implementation(const FRancItemIns
 }
 
 
-int32 URancInventoryComponent::MoveItems_ServerImpl(const FRancItemInstance& ItemInstance,
+int32 URISInventoryComponent::MoveItems_ServerImpl(const FRISItemInstance& ItemInstance,
                                                     const FGameplayTag& SourceTaggedSlot,
                                                     const FGameplayTag& TargetTaggedSlot)
 {
@@ -270,7 +270,7 @@ int32 URancInventoryComponent::MoveItems_ServerImpl(const FRancItemInstance& Ite
 		return 0;
 	}
 
-	FRancItemInstance* SourceItem = nullptr;
+	FRISItemInstance* SourceItem = nullptr;
 	int32 SourceItemContainerIndex = -1;
 	if (SourceIsTaggedSlot)
 	{
@@ -302,7 +302,7 @@ int32 URancInventoryComponent::MoveItems_ServerImpl(const FRancItemInstance& Ite
 		}
 	}
 
-	FRancItemInstance* TargetItem;
+	FRISItemInstance* TargetItem;
 	if (TargetIsTaggedSlot)
 	{
 		if (!IsTaggedSlotCompatible(ItemInstance.ItemId, TargetTaggedSlot))
@@ -321,7 +321,7 @@ int32 URancInventoryComponent::MoveItems_ServerImpl(const FRancItemInstance& Ite
 				return 0;
 			}
 
-			TaggedSlotItemInstances.Add(FRancTaggedItemInstance(TargetTaggedSlot, FRancItemInstance::EmptyItemInstance));
+			TaggedSlotItemInstances.Add(FRancTaggedItemInstance(TargetTaggedSlot, FRISItemInstance::EmptyItemInstance));
 			TargetItem = &TaggedSlotItemInstances.Last().ItemInstance;
 		}
 		else
@@ -334,18 +334,18 @@ int32 URancInventoryComponent::MoveItems_ServerImpl(const FRancItemInstance& Ite
 		TargetItem = FindContainerItemInstance(ItemInstance.ItemId);;
 		if (TargetItem == nullptr)
 		{
-			Items.Add(FRancItemInstance::EmptyItemInstance);
+			Items.Add(FRISItemInstance::EmptyItemInstance);
 			TargetItem = &Items.Last();
 		}
 	}
 
-	if (TargetItem && SourceIsTaggedSlot && URancInventoryFunctions::ShouldItemsBeSwapped(SourceItem, TargetItem) && !IsTaggedSlotCompatible(TargetItem->ItemId, SourceTaggedSlot))
+	if (TargetItem && SourceIsTaggedSlot && URISInventoryFunctions::ShouldItemsBeSwapped(SourceItem, TargetItem) && !IsTaggedSlotCompatible(TargetItem->ItemId, SourceTaggedSlot))
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Item is not compatible with the source slot"));
 		return 0;
 	}
 
-	const int32 MovedQuantity = URancInventoryFunctions::MoveBetweenSlots(SourceItem, TargetItem, !TargetIsTaggedSlot, ItemInstance.Quantity, true);
+	const int32 MovedQuantity = URISInventoryFunctions::MoveBetweenSlots(SourceItem, TargetItem, !TargetIsTaggedSlot, ItemInstance.Quantity, true);
 	
 	if (MovedQuantity > 0)
 	{
@@ -357,9 +357,9 @@ int32 URancInventoryComponent::MoveItems_ServerImpl(const FRancItemInstance& Ite
 				Items.RemoveAt(SourceItemContainerIndex);
 		}
 		
-		const FRancItemInstance ActualMovedItem(ItemInstance.ItemId, MovedQuantity);
-		MARK_PROPERTY_DIRTY_FROM_NAME(URancInventoryComponent, TaggedSlotItemInstances, this);
-		MARK_PROPERTY_DIRTY_FROM_NAME(URancItemContainerComponent, Items, this);
+		const FRISItemInstance ActualMovedItem(ItemInstance.ItemId, MovedQuantity);
+		MARK_PROPERTY_DIRTY_FROM_NAME(URISInventoryComponent, TaggedSlotItemInstances, this);
+		MARK_PROPERTY_DIRTY_FROM_NAME(URISItemContainerComponent, Items, this);
 
 		if (SourceIsTaggedSlot)
 			OnItemRemovedFromTaggedSlot.Broadcast(SourceTaggedSlot, ActualMovedItem);
@@ -374,7 +374,7 @@ int32 URancInventoryComponent::MoveItems_ServerImpl(const FRancItemInstance& Ite
 	return MovedQuantity;
 }
 
-int32 URancInventoryComponent::DropFromTaggedSlot(const FGameplayTag& SlotTag, int32 Quantity, float DropAngle)
+int32 URISInventoryComponent::DropFromTaggedSlot(const FGameplayTag& SlotTag, int32 Quantity, float DropAngle)
 {
 	// On client the below is just a guess
 	const FRancTaggedItemInstance Item = GetItemForTaggedSlot(SlotTag);
@@ -386,12 +386,12 @@ int32 URancInventoryComponent::DropFromTaggedSlot(const FGameplayTag& SlotTag, i
 	return QuantityToDrop;
 }
 
-bool URancInventoryComponent::CanTaggedSlotReceiveItem(const FRancItemInstance& ItemInstance, const FGameplayTag& SlotTag) const
+bool URISInventoryComponent::CanTaggedSlotReceiveItem(const FRISItemInstance& ItemInstance, const FGameplayTag& SlotTag) const
 {
 	return IsTaggedSlotCompatible(ItemInstance.ItemId, SlotTag) && CanContainerReceiveItems(ItemInstance);
 }
 
-void URancInventoryComponent::DropFromTaggedSlot_Server_Implementation(const FGameplayTag& SlotTag, int32 Quantity,
+void URISInventoryComponent::DropFromTaggedSlot_Server_Implementation(const FGameplayTag& SlotTag, int32 Quantity,
                                                                        float DropAngle)
 {
 	const FRancTaggedItemInstance Item = GetItemForTaggedSlot(SlotTag);
@@ -403,14 +403,14 @@ void URancInventoryComponent::DropFromTaggedSlot_Server_Implementation(const FGa
 
 		if (DroppedCount > 0)
 		{
-			const FRancItemInstance ItemToDrop(Item.ItemInstance.ItemId, QuantityToDrop);
+			const FRISItemInstance ItemToDrop(Item.ItemInstance.ItemId, QuantityToDrop);
 			// ReSharper disable once CppExpressionWithoutSideEffects
 			SpawnDroppedItem_IfServer(ItemToDrop);
 		}
 	}
 }
 
-const FRancTaggedItemInstance& URancInventoryComponent::GetItemForTaggedSlot(const FGameplayTag& SlotTag) const
+const FRancTaggedItemInstance& URISInventoryComponent::GetItemForTaggedSlot(const FGameplayTag& SlotTag) const
 {
 	int32 Index = GetIndexForTaggedSlot(SlotTag);
 
@@ -423,7 +423,7 @@ const FRancTaggedItemInstance& URancInventoryComponent::GetItemForTaggedSlot(con
 	return TaggedSlotItemInstances[Index];
 }
 
-int32 URancInventoryComponent::GetIndexForTaggedSlot(const FGameplayTag& SlotTag) const
+int32 URISInventoryComponent::GetIndexForTaggedSlot(const FGameplayTag& SlotTag) const
 {
 	// loop over SpecialSlotItems
 	for (int i = 0; i < TaggedSlotItemInstances.Num(); i++)
@@ -435,7 +435,7 @@ int32 URancInventoryComponent::GetIndexForTaggedSlot(const FGameplayTag& SlotTag
 	return -1;
 }
 
-void URancInventoryComponent::ClearInventory_IfServer()
+void URISInventoryComponent::ClearInventory_IfServer()
 {
 	if (GetOwnerRole() < ROLE_Authority && GetOwnerRole() != ROLE_None)
 	{
@@ -451,17 +451,17 @@ void URancInventoryComponent::ClearInventory_IfServer()
 	}
 }
 
-TArray<FRancTaggedItemInstance> URancInventoryComponent::GetAllTaggedItems() const
+TArray<FRancTaggedItemInstance> URISInventoryComponent::GetAllTaggedItems() const
 {
 	return TaggedSlotItemInstances;
 }
 
-void URancInventoryComponent::DetectAndPublishChanges()
+void URISInventoryComponent::DetectAndPublishChanges()
 {
 	// First pass: Update existing items or add new ones, mark them by setting quantity to negative.
 	for (FRancTaggedItemInstance& NewItem : TaggedSlotItemInstances)
 	{
-		FRancItemInstance* OldItem = TaggedItemsCache.Find(NewItem.Tag);
+		FRISItemInstance* OldItem = TaggedItemsCache.Find(NewItem.Tag);
 
 		if (OldItem)
 		{
@@ -473,14 +473,14 @@ void URancInventoryComponent::DetectAndPublishChanges()
 					if (OldItem->Quantity < NewItem.ItemInstance.Quantity)
 					{
 						OnItemAddedToTaggedSlot.Broadcast(NewItem.Tag,
-						                                  FRancItemInstance(
+						                                  FRISItemInstance(
 							                                  NewItem.ItemInstance.ItemId,
 							                                  NewItem.ItemInstance.Quantity - OldItem->Quantity));
 					}
 					else if (OldItem->Quantity > NewItem.ItemInstance.Quantity)
 					{
 						OnItemRemovedFromTaggedSlot.Broadcast(NewItem.Tag,
-						                                      FRancItemInstance(
+						                                      FRISItemInstance(
 							                                      NewItem.ItemInstance.ItemId,
 							                                      OldItem->Quantity - NewItem.ItemInstance.Quantity));
 					}
@@ -488,9 +488,9 @@ void URancInventoryComponent::DetectAndPublishChanges()
 				else // Item has changed
 				{
 					OnItemRemovedFromTaggedSlot.Broadcast(NewItem.Tag,
-					                                      FRancItemInstance(OldItem->ItemId, OldItem->Quantity));
+					                                      FRISItemInstance(OldItem->ItemId, OldItem->Quantity));
 					OnItemAddedToTaggedSlot.Broadcast(NewItem.Tag,
-					                                  FRancItemInstance(NewItem.ItemInstance.ItemId,
+					                                  FRISItemInstance(NewItem.ItemInstance.ItemId,
 					                                                    NewItem.ItemInstance.Quantity));
 				}
 			}
@@ -501,10 +501,10 @@ void URancInventoryComponent::DetectAndPublishChanges()
 		else // New slot has been added to
 		{
 			OnItemAddedToTaggedSlot.Broadcast(NewItem.Tag,
-			                                  FRancItemInstance(NewItem.ItemInstance.ItemId,
+			                                  FRISItemInstance(NewItem.ItemInstance.ItemId,
 			                                                    NewItem.ItemInstance.Quantity));
 			TaggedItemsCache.Add(NewItem.Tag,
-			                     FRancItemInstance(NewItem.ItemInstance.ItemId, -NewItem.ItemInstance.Quantity));
+			                     FRISItemInstance(NewItem.ItemInstance.ItemId, -NewItem.ItemInstance.Quantity));
 			// Mark as processed
 		}
 	}
@@ -533,9 +533,9 @@ void URancInventoryComponent::DetectAndPublishChanges()
 	}
 }
 
-bool URancInventoryComponent::IsTaggedSlotCompatible(const FGameplayTag& ItemId, const FGameplayTag& SlotTag) const
+bool URISInventoryComponent::IsTaggedSlotCompatible(const FGameplayTag& ItemId, const FGameplayTag& SlotTag) const
 {
-	const URancItemData* ItemData = URancInventoryFunctions::GetItemDataById(ItemId);
+	const URisItemData* ItemData = URISInventoryFunctions::GetItemDataById(ItemId);
 	if (!ItemData)
 	{
 		return false; // Item data not found, assume slot cannot receive item
@@ -549,7 +549,7 @@ bool URancInventoryComponent::IsTaggedSlotCompatible(const FGameplayTag& ItemId,
 	return true; // Slot is compatible
 }
 
-void URancInventoryComponent::OnRep_Slots()
+void URISInventoryComponent::OnRep_Slots()
 {
 	UpdateWeightAndSlots();
 	DetectAndPublishChanges();
@@ -558,14 +558,14 @@ void URancInventoryComponent::OnRep_Slots()
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////// CRAFTING /////////////////////////////////////////////////////////////////
 
-bool URancInventoryComponent::CanCraftRecipeId(const FPrimaryAssetId& RecipeId) const
+bool URISInventoryComponent::CanCraftRecipeId(const FPrimaryAssetId& RecipeId) const
 {
-	const URancRecipe* Recipe = Cast<URancRecipe>(
+	const URISRecipe* Recipe = Cast<URISRecipe>(
 		UAssetManager::GetIfInitialized()->GetPrimaryAssetObject(RecipeId));
 	return CanCraftRecipe(Recipe);
 }
 
-bool URancInventoryComponent::CanCraftRecipe(const URancRecipe* Recipe) const
+bool URISInventoryComponent::CanCraftRecipe(const URISRecipe* Recipe) const
 {
 	if (!Recipe) return false;
 
@@ -579,20 +579,20 @@ bool URancInventoryComponent::CanCraftRecipe(const URancRecipe* Recipe) const
 	return true;
 }
 
-bool URancInventoryComponent::CanCraftCraftingRecipe(const FPrimaryAssetId& RecipeId) const
+bool URISInventoryComponent::CanCraftCraftingRecipe(const FPrimaryAssetId& RecipeId) const
 {
 	URancItemRecipe* CraftingRecipe = Cast<URancItemRecipe>(
 		UAssetManager::GetIfInitialized()->GetPrimaryAssetObject(RecipeId));
 	return CanCraftRecipe(CraftingRecipe);
 }
 
-void URancInventoryComponent::CraftRecipeId_Server_Implementation(const FPrimaryAssetId& RecipeId)
+void URISInventoryComponent::CraftRecipeId_Server_Implementation(const FPrimaryAssetId& RecipeId)
 {
-	const URancRecipe* Recipe = Cast<URancRecipe>(UAssetManager::GetIfInitialized()->GetPrimaryAssetObject(RecipeId));
+	const URISRecipe* Recipe = Cast<URISRecipe>(UAssetManager::GetIfInitialized()->GetPrimaryAssetObject(RecipeId));
 	CraftRecipe_IfServer(Recipe);
 }
 
-bool URancInventoryComponent::CraftRecipe_IfServer(const URancRecipe* Recipe)
+bool URISInventoryComponent::CraftRecipe_IfServer(const URISRecipe* Recipe)
 {
 	if (GetOwnerRole() < ROLE_Authority && GetOwnerRole() != ROLE_None)
 	{
@@ -605,7 +605,7 @@ bool URancInventoryComponent::CraftRecipe_IfServer(const URancRecipe* Recipe)
 		for (const auto& Component : Recipe->Components)
 		{
 			int QuantityToRemoveFromGenericSlots = FMath::Min(GetContainerItemCount(Component.ItemId), Component.Quantity);
-			int32 RemovedFromGeneric = RemoveItems_IfServer(FRancItemInstance(Component.ItemId, QuantityToRemoveFromGenericSlots));
+			int32 RemovedFromGeneric = RemoveItems_IfServer(FRISItemInstance(Component.ItemId, QuantityToRemoveFromGenericSlots));
 			int32 RemovedFromTaggedSlots = RemoveItemsFromAnyTaggedSlots_IfServer(Component.ItemId, Component.Quantity - QuantityToRemoveFromGenericSlots);
 			if (RemovedFromGeneric + RemovedFromTaggedSlots < Component.Quantity)
 			{
@@ -618,13 +618,13 @@ bool URancInventoryComponent::CraftRecipe_IfServer(const URancRecipe* Recipe)
 		if (const URancItemRecipe* ItemRecipe = Cast<URancItemRecipe>(Recipe))
 		{
 			// If it is an item recipe, add the resulting item to the inventory
-			auto CraftedItem = FRancItemInstance(ItemRecipe->ResultingItemId, ItemRecipe->QuantityCreated);
+			auto CraftedItem = FRISItemInstance(ItemRecipe->ResultingItemId, ItemRecipe->QuantityCreated);
 			const int32 AmountAdded = AddItemsToAnySlots_IfServer(CraftedItem, false);
 			if (AmountAdded < ItemRecipe->QuantityCreated)
 			{
 				UE_LOG(LogTemp, Display, TEXT("Failed to add crafted item to inventory, dropping item instead"));
 				/*AWorldItem* DroppedItem =*/
-				SpawnDroppedItem_IfServer(FRancItemInstance(ItemRecipe->ResultingItemId, ItemRecipe->QuantityCreated - AmountAdded));
+				SpawnDroppedItem_IfServer(FRISItemInstance(ItemRecipe->ResultingItemId, ItemRecipe->QuantityCreated - AmountAdded));
 			}
 		}
 		else
@@ -635,7 +635,7 @@ bool URancInventoryComponent::CraftRecipe_IfServer(const URancRecipe* Recipe)
 	return bSuccess;
 }
 
-void URancInventoryComponent::SetRecipeLock_Server_Implementation(const FPrimaryAssetId& RecipeId, bool LockState)
+void URISInventoryComponent::SetRecipeLock_Server_Implementation(const FPrimaryAssetId& RecipeId, bool LockState)
 {
 	if (AllUnlockedRecipes.Contains(RecipeId) != LockState)
 	{
@@ -655,17 +655,17 @@ void URancInventoryComponent::SetRecipeLock_Server_Implementation(const FPrimary
 	}
 }
 
-URancRecipe* URancInventoryComponent::GetRecipeById(const FPrimaryAssetId& RecipeId)
+URISRecipe* URISInventoryComponent::GetRecipeById(const FPrimaryAssetId& RecipeId)
 {
-	return Cast<URancRecipe>(UAssetManager::GetIfInitialized()->GetPrimaryAssetObject(RecipeId));
+	return Cast<URISRecipe>(UAssetManager::GetIfInitialized()->GetPrimaryAssetObject(RecipeId));
 }
 
-TArray<URancRecipe*> URancInventoryComponent::GetAvailableRecipes(FGameplayTag TagFilter)
+TArray<URISRecipe*> URISInventoryComponent::GetAvailableRecipes(FGameplayTag TagFilter)
 {
-	return CurrentAvailableRecipes.Contains(TagFilter) ? CurrentAvailableRecipes[TagFilter] : TArray<URancRecipe*>();
+	return CurrentAvailableRecipes.Contains(TagFilter) ? CurrentAvailableRecipes[TagFilter] : TArray<URISRecipe*>();
 }
 
-void URancInventoryComponent::CheckAndUpdateRecipeAvailability()
+void URISInventoryComponent::CheckAndUpdateRecipeAvailability()
 {
 	// Clear current available recipes
 	CurrentAvailableRecipes.Empty();
@@ -673,7 +673,7 @@ void URancInventoryComponent::CheckAndUpdateRecipeAvailability()
 	// Iterate through all available recipes and check if they can be crafted
 	for (const FPrimaryAssetId& RecipeId : AllUnlockedRecipes)
 	{
-		URancRecipe* Recipe = GetRecipeById(RecipeId);
+		URISRecipe* Recipe = GetRecipeById(RecipeId);
 		if (CanCraftRecipe(Recipe))
 		{
 			for (const FGameplayTag& Category : RecipeTagFilters)
@@ -694,7 +694,7 @@ void URancInventoryComponent::CheckAndUpdateRecipeAvailability()
 	OnAvailableRecipesUpdated.Broadcast();
 }
 
-int32 URancInventoryComponent::DropAllItems_ServerImpl()
+int32 URISInventoryComponent::DropAllItems_ServerImpl()
 {
 	int32 DropCount = Super::DropAllItems_ServerImpl();
 
@@ -710,17 +710,17 @@ int32 URancInventoryComponent::DropAllItems_ServerImpl()
 }
 
 
-void URancInventoryComponent::OnInventoryItemAddedHandler(const FRancItemInstance& ItemInfo)
+void URISInventoryComponent::OnInventoryItemAddedHandler(const FRISItemInstance& ItemInfo)
 {
 	CheckAndUpdateRecipeAvailability();
 }
 
-void URancInventoryComponent::OnInventoryItemRemovedHandler(const FRancItemInstance& ItemInfo)
+void URISInventoryComponent::OnInventoryItemRemovedHandler(const FRISItemInstance& ItemInfo)
 {
 	CheckAndUpdateRecipeAvailability();
 }
 
-void URancInventoryComponent::OnRep_Recipes()
+void URISInventoryComponent::OnRep_Recipes()
 {
 	CheckAndUpdateRecipeAvailability();
 }

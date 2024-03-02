@@ -1,3 +1,4 @@
+// Copyright Rancorous Games, 2024
 
 #include "RancInventoryTest/Public/RancInventoryTest.h"
 

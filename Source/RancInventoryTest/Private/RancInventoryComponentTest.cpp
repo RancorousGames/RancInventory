@@ -1,18 +1,17 @@
-﻿#include "RancInventoryComponentTest.h"
+﻿// Copyright Rancorous Games, 2024
 
+#include "RancInventoryComponentTest.h"
 #include "NativeGameplayTags.h"
-
 #include "Management/RancInventoryData.h"
 #include "Components/RancItemContainerComponent.h"
 #include "Components/RancInventoryComponent.h"
 #include "Misc/AutomationTest.h"
-
 #include "InventorySetup.cpp"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRancInventoryComponentTest, "GameTests.RancInventory.Tests", EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::ProductFilter)
 
-#define SETUP_RANCINVENTORY(CarryCapacity) \
-URancInventoryComponent* InventoryComponent = NewObject<URancInventoryComponent>(); \
+#define SETUP_RISINVENTORY(CarryCapacity) \
+URISInventoryComponent* InventoryComponent = NewObject<URISInventoryComponent>(); \
 InventoryComponent->UniversalTaggedSlots.Add(LeftHandSlot); \
 InventoryComponent->UniversalTaggedSlots.Add(RightHandSlot); \
 InventoryComponent->SpecializedTaggedSlots.Add(HelmetSlot); \
@@ -25,7 +24,7 @@ FRancInventoryComponentTest* RITest;
 
 bool TestAddingTaggedSlotItems()
 {
-	SETUP_RANCINVENTORY(100);
+	SETUP_RISINVENTORY(100);
 
 	bool Res = true;
 
@@ -60,7 +59,7 @@ bool TestAddingTaggedSlotItems()
 
 	// Test adding a stackable item to an empty slot and then adding a different stackable item to the same slot without override
 	InventoryComponent->AddItemsToTaggedSlot_IfServer(RightHandSlot, ThreeRocks, false); // Assuming this is reset from previous tests
-	InventoryComponent->AddItemsToTaggedSlot_IfServer(RightHandSlot, FRancItemInstance(ItemIdSticks, 2), false);
+	InventoryComponent->AddItemsToTaggedSlot_IfServer(RightHandSlot, FRISItemInstance(ItemIdSticks, 2), false);
 	Res &= RITest->TestFalse(
 		TEXT("Different stackable item (Sticks) should not be added to a slot already containing a stackable item (Rock) without override"),
 		InventoryComponent->GetItemForTaggedSlot(RightHandSlot).ItemInstance.ItemId.MatchesTag(ItemIdSticks));
@@ -79,7 +78,7 @@ bool TestAddingTaggedSlotItems()
 	Res &= RITest->TestEqual(TEXT("Stackable Item (Rock) amount added should be 3 with override"), AmountAdded, 3);
 
 	// Test adding a stackable item to a slot that has a different stackable item with override enabled
-	InventoryComponent->AddItemsToTaggedSlot_IfServer(RightHandSlot, FRancItemInstance(ItemIdSticks, 4), true); // Assuming different item than before
+	InventoryComponent->AddItemsToTaggedSlot_IfServer(RightHandSlot, FRISItemInstance(ItemIdSticks, 4), true); // Assuming different item than before
 	Res &= RITest->TestTrue(
 		TEXT("Different stackable item (Sticks) should replace existing item (Rock) in slot with override"),
 		InventoryComponent->GetItemForTaggedSlot(RightHandSlot).ItemInstance.ItemId.MatchesTag(ItemIdSticks) && InventoryComponent->GetItemForTaggedSlot(RightHandSlot).ItemInstance
@@ -90,7 +89,7 @@ bool TestAddingTaggedSlotItems()
 
 bool TestRemovingTaggedSlotItems()
 {
-	SETUP_RANCINVENTORY(100);
+	SETUP_RISINVENTORY(100);
 
 	bool Res = true;
 
@@ -126,7 +125,7 @@ bool TestRemovingTaggedSlotItems()
 
 bool TestMoveTaggedSlotItems()
 {
-	SETUP_RANCINVENTORY(100);
+	SETUP_RISINVENTORY(100);
 
 	bool Res = true;
 
@@ -228,13 +227,13 @@ bool TestMoveTaggedSlotItems()
 	Res &= RITest->TestTrue(TEXT("Right hand slot should be empty"), !InventoryComponent->GetItemForTaggedSlot(RightHandSlot).IsValid());
 
 	// Test moving stackable rocks
-	InventoryComponent->AddItems_IfServer(FRancItemInstance(ItemIdRock, 8));
+	InventoryComponent->AddItems_IfServer(FRISItemInstance(ItemIdRock, 8));
 	MovedQuantity = InventoryComponent->MoveItems_ServerImpl(ThreeRocks, FGameplayTag::EmptyTag, RightHandSlot);
 	Res &= RITest->TestEqual(TEXT("Should move 3 rocks to right hand slot"), MovedQuantity, 3);
 	Res &= RITest->TestTrue(TEXT("Right hand slot should contain 3 rocks"), InventoryComponent->GetItemForTaggedSlot(RightHandSlot).ItemInstance.Quantity == 3);
 	Res &= RITest->TestTrue(TEXT("Generic inventory should contain 5 rocks"), InventoryComponent->GetContainerItemCount(ItemIdRock) == 5);
 	// Try to move remaining 5, expecting 2 to be moved
-	MovedQuantity = InventoryComponent->MoveItems_ServerImpl(FRancItemInstance(ItemIdRock, 5), FGameplayTag::EmptyTag, RightHandSlot);
+	MovedQuantity = InventoryComponent->MoveItems_ServerImpl(FRISItemInstance(ItemIdRock, 5), FGameplayTag::EmptyTag, RightHandSlot);
 	Res &= RITest->TestEqual(TEXT("Should move 2 rocks to right hand slot"), MovedQuantity, 2);
 	Res &= RITest->TestTrue(TEXT("Right hand slot should contain 5 rocks"), InventoryComponent->GetItemForTaggedSlot(RightHandSlot).ItemInstance.Quantity == 5);
 	Res &= RITest->TestTrue(TEXT("Generic inventory should contain 3 rocks"), InventoryComponent->GetContainerItemCount(ItemIdRock) == 3);
@@ -323,7 +322,7 @@ bool TestMoveTaggedSlotItems()
 
 bool TestDroppingFromTaggedSlot()
 {
-	SETUP_RANCINVENTORY(100);
+	SETUP_RISINVENTORY(100);
 
 	bool Res = true;
 
@@ -356,12 +355,12 @@ bool TestDroppingFromTaggedSlot()
 
 bool TestCanCraftRecipe()
 {
-	SETUP_RANCINVENTORY(100); // Setup with a weight capacity for the test
+	SETUP_RISINVENTORY(100); // Setup with a weight capacity for the test
 
 	bool Res = true;
 
 	// Create a recipe for crafting
-	URancRecipe* TestRecipe = NewObject<URancRecipe>();
+	URISRecipe* TestRecipe = NewObject<URISRecipe>();
 	TestRecipe->Components.Add(TwoRocks); // Requires 2 Rocks
 	TestRecipe->Components.Add(ThreeSticks); // Requires 3 Sticks
 
@@ -375,7 +374,7 @@ bool TestCanCraftRecipe()
 	Res &= RITest->TestFalse(TEXT("CanCraftRecipe should return false when a component is missing"), InventoryComponent->CanCraftRecipe(TestRecipe));
 
 	// Step 3: Inventory has insufficient quantity of one component
-	InventoryComponent->AddItemsToTaggedSlot_IfServer(LeftHandSlot, FRancItemInstance(ItemIdSticks, 1), true); // Add only 1 Stick
+	InventoryComponent->AddItemsToTaggedSlot_IfServer(LeftHandSlot, FRISItemInstance(ItemIdSticks, 1), true); // Add only 1 Stick
 	Res &= RITest->TestFalse(TEXT("CanCraftRecipe should return false when components are present but in insufficient quantities"), InventoryComponent->CanCraftRecipe(TestRecipe));
 
 	// Step 4: Crafting with an empty or null recipe reference
@@ -404,12 +403,12 @@ bool TestCanCraftRecipe()
 
 bool TestCraftRecipe()
 {
-	SETUP_RANCINVENTORY(100); // Setup with a sufficient weight capacity for the test
+	SETUP_RISINVENTORY(100); // Setup with a sufficient weight capacity for the test
 
 	bool Res = true;
 
 	// Create a test recipe
-	URancRecipe* TestRecipe = NewObject<URancRecipe>();
+	URISRecipe* TestRecipe = NewObject<URISRecipe>();
 	TestRecipe->ResultingObject = UObject::StaticClass(); // Assuming UMyCraftedObject is a valid class
 	TestRecipe->QuantityCreated = 1;
 	TestRecipe->Components.Add(TwoRocks); // Requires 2 Rocks
@@ -450,7 +449,7 @@ bool TestCraftRecipe()
 
 	// Step 7: Crafting failure when tagged slots contain all necessary components but in insufficient quantities
 	InventoryComponent->AddItemsToTaggedSlot_IfServer(LeftHandSlot, OneRock, true); // Add only 1 Rock to a tagged slot, insufficient for the recipe
-	InventoryComponent->AddItemsToTaggedSlot_IfServer(RightHandSlot, FRancItemInstance(ItemIdSticks, 2), true); // Add only 2 Sticks to a tagged slot, insufficient for the recipe
+	InventoryComponent->AddItemsToTaggedSlot_IfServer(RightHandSlot, FRISItemInstance(ItemIdSticks, 2), true); // Add only 2 Sticks to a tagged slot, insufficient for the recipe
 	Res &= RITest->TestFalse(
 		TEXT("CraftRecipe_IfServer should return false when not all components are present in sufficient quantities"), InventoryComponent->CraftRecipe_IfServer(TestRecipe));
 
@@ -459,7 +458,7 @@ bool TestCraftRecipe()
 
 bool TestInventoryMaxCapacity()
 {
-	SETUP_RANCINVENTORY(5); // Setup with a weight capacity of 5
+	SETUP_RISINVENTORY(5); // Setup with a weight capacity of 5
 
 	bool Res = true;
 
@@ -478,7 +477,7 @@ bool TestInventoryMaxCapacity()
 
 	// Step 3: Adding Stackable items
 	InventoryComponent->RemoveItemsFromAnyTaggedSlots_IfServer(ItemIdHelmet, 1); // Reset tagged slot
-	QuantityAdded = InventoryComponent->AddItemsToTaggedSlot_IfServer(RightHandSlot, FRancItemInstance(ItemIdSticks, 5)); // Try Adding 5 sticks, which should fail
+	QuantityAdded = InventoryComponent->AddItemsToTaggedSlot_IfServer(RightHandSlot, FRISItemInstance(ItemIdSticks, 5)); // Try Adding 5 sticks, which should fail
 	Res &= RITest->TestEqual(TEXT("AddItemsToTaggedSlot_IfServer does not do partial adding and weight exceeds capacity"), QuantityAdded, 0);
 	QuantityAdded = InventoryComponent->AddItemsToTaggedSlot_IfServer(RightHandSlot, TwoRocks);
 	Res &= RITest->TestEqual(TEXT("Should successfully add 2 rocks within capacity"), QuantityAdded, 2);
@@ -486,7 +485,7 @@ bool TestInventoryMaxCapacity()
 	URancItemRecipe* BoulderRecipe = NewObject<URancItemRecipe>();
 	BoulderRecipe->ResultingItemId = ItemIdGiantBoulder; // a boulder weighs 10
 	BoulderRecipe->QuantityCreated = 1;
-	BoulderRecipe->Components.Add(FRancItemInstance(ItemIdRock, 5)); // Requires 2 Rocks
+	BoulderRecipe->Components.Add(FRISItemInstance(ItemIdRock, 5)); // Requires 2 Rocks
 
 	// Step 4: Crafting Items That Exceed Capacity
 	bool CraftSuccess = InventoryComponent->CraftRecipe_IfServer(BoulderRecipe);
@@ -499,13 +498,13 @@ bool TestInventoryMaxCapacity()
 
 bool TestAddItemToAnySlots()
 {
-	SETUP_RANCINVENTORY(20);
+	SETUP_RISINVENTORY(20);
 	InventoryComponent->MaxContainerSlotCount = 2;
 
 	bool Res = true;
 	// Create item instances with specified quantities and weights
-	FRancItemInstance RockInstance(ItemIdRock, 5);
-	FRancItemInstance StickInstance(ItemIdSticks, 2);
+	FRISItemInstance RockInstance(ItemIdRock, 5);
+	FRISItemInstance StickInstance(ItemIdSticks, 2);
 
 	// PreferTaggedSlots = true, adding items directly to tagged slots first
 	int32 Added = InventoryComponent->AddItemsToAnySlots_IfServer(RockInstance, true);
@@ -528,7 +527,7 @@ bool TestAddItemToAnySlots()
 	Res &= RITest->TestEqual(TEXT("First universal tagged slot (left hand) should contain sticks"), InventoryComponent->GetItemForTaggedSlot(InventoryComponent->UniversalTaggedSlots[0]).ItemInstance.Quantity, 2);
 
 	// Weight limit almost reached, no heavy items should be added despite right hand being available
-	FRancItemInstance HeavyItem(ItemIdGiantBoulder, 1); // Weight 22 exceeding capacity
+	FRISItemInstance HeavyItem(ItemIdGiantBoulder, 1); // Weight 22 exceeding capacity
 	Added = InventoryComponent->AddItemsToAnySlots_IfServer(HeavyItem, true);
 	Res &= RITest->TestEqual(TEXT("Should not add heavy items beyond weight capacity"), Added, 0);
 	

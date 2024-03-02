@@ -1,4 +1,6 @@
-﻿#pragma once
+﻿// Copyright Rancorous Games, 2024
+
+#pragma once
 
 #include "NativeGameplayTags.h"
 #include "CoreMinimal.h"
@@ -24,22 +26,22 @@ UE_DEFINE_GAMEPLAY_TAG(ItemIdChestArmor, "Items.IDs.ChestArmor");
 UE_DEFINE_GAMEPLAY_TAG(ItemIdGiantBoulder, "Items.IDs.GiantBoulder");
 
 
-FRancItemInstance OneSpear(ItemIdSpear, 1);
-FRancItemInstance OneRock(ItemIdRock, 1);
-FRancItemInstance TwoRocks(ItemIdRock, 2);
-FRancItemInstance ThreeRocks(ItemIdRock, 3);
-FRancItemInstance FourRocks(ItemIdRock, 4);
-FRancItemInstance FiveRocks(ItemIdRock, 5);
-FRancItemInstance ThreeSticks(ItemIdSticks, 3);
-FRancItemInstance OneHelmet(ItemIdHelmet, 1);
-FRancItemInstance OneSpecialHelmet(ItemIdSpecialHelmet, 1);
-FRancItemInstance OneChestArmor(ItemIdChestArmor, 1);
-FRancItemInstance GiantBoulder(ItemIdGiantBoulder, 1);
+FRISItemInstance OneSpear(ItemIdSpear, 1);
+FRISItemInstance OneRock(ItemIdRock, 1);
+FRISItemInstance TwoRocks(ItemIdRock, 2);
+FRISItemInstance ThreeRocks(ItemIdRock, 3);
+FRISItemInstance FourRocks(ItemIdRock, 4);
+FRISItemInstance FiveRocks(ItemIdRock, 5);
+FRISItemInstance ThreeSticks(ItemIdSticks, 3);
+FRISItemInstance OneHelmet(ItemIdHelmet, 1);
+FRISItemInstance OneSpecialHelmet(ItemIdSpecialHelmet, 1);
+FRISItemInstance OneChestArmor(ItemIdChestArmor, 1);
+FRISItemInstance GiantBoulder(ItemIdGiantBoulder, 1);
 FGameplayTag NoTag = FGameplayTag::EmptyTag;
 
 void InitializeTestItems()
 {
-	URancItemData* RockItemData = NewObject<URancItemData>();
+	URisItemData* RockItemData = NewObject<URisItemData>();
 	RockItemData->ItemId = ItemIdRock;
 	RockItemData->ItemName = FName("Rock");
 	RockItemData->ItemDescription = FText::FromString("A sturdy rock, useful for crafting and building.");
@@ -48,9 +50,9 @@ void InitializeTestItems()
 	RockItemData->MaxStackSize = 5;
 	RockItemData->ItemWeight = 1;
 	RockItemData->ItemCategories.AddTag(ItemTypeResource);
-	URancInventoryFunctions::HardcodeItem(ItemIdRock, RockItemData);
+	URISInventoryFunctions::HardcodeItem(ItemIdRock, RockItemData);
 
-	URancItemData* SticksItemData = NewObject<URancItemData>();
+	URisItemData* SticksItemData = NewObject<URisItemData>();
 	SticksItemData->ItemId = ItemIdRock;
 	SticksItemData->ItemName = FName("Sticks");
 	SticksItemData->ItemDescription = FText::FromString("Some sticks");
@@ -59,9 +61,9 @@ void InitializeTestItems()
 	SticksItemData->MaxStackSize = 5;
 	SticksItemData->ItemWeight = 1;
 	SticksItemData->ItemCategories.AddTag(ItemTypeResource);
-	URancInventoryFunctions::HardcodeItem(ItemIdSticks, SticksItemData);
+	URISInventoryFunctions::HardcodeItem(ItemIdSticks, SticksItemData);
 
-	URancItemData* HelmetItemData = NewObject<URancItemData>();
+	URisItemData* HelmetItemData = NewObject<URisItemData>();
 	HelmetItemData->ItemId = ItemIdHelmet;
 	HelmetItemData->ItemName = FName("Helmet");
 	HelmetItemData->ItemDescription = FText::FromString("Protective gear for the head.");
@@ -70,9 +72,9 @@ void InitializeTestItems()
 	HelmetItemData->MaxStackSize = 1;
 	HelmetItemData->ItemWeight = 2;
 	HelmetItemData->ItemCategories.AddTag(HelmetSlot);
-	URancInventoryFunctions::HardcodeItem(ItemIdHelmet, HelmetItemData);
+	URISInventoryFunctions::HardcodeItem(ItemIdHelmet, HelmetItemData);
 	
-	URancItemData* SpecialHelmetItemData = NewObject<URancItemData>();
+	URisItemData* SpecialHelmetItemData = NewObject<URisItemData>();
 	SpecialHelmetItemData->ItemId = ItemIdSpecialHelmet;
 	SpecialHelmetItemData->ItemName = FName("SpecialHelmet");
 	SpecialHelmetItemData->ItemDescription = FText::FromString("Protective gear for the head.");
@@ -81,9 +83,9 @@ void InitializeTestItems()
 	SpecialHelmetItemData->MaxStackSize = 1;
 	SpecialHelmetItemData->ItemWeight = 2;
 	SpecialHelmetItemData->ItemCategories.AddTag(HelmetSlot);
-	URancInventoryFunctions::HardcodeItem(ItemIdSpecialHelmet, SpecialHelmetItemData);
+	URISInventoryFunctions::HardcodeItem(ItemIdSpecialHelmet, SpecialHelmetItemData);
 
-	URancItemData* ChestItemData = NewObject<URancItemData>();
+	URisItemData* ChestItemData = NewObject<URisItemData>();
 	ChestItemData->ItemId = ItemIdChestArmor;
 	ChestItemData->ItemName = FName("Chest Armor");
 	ChestItemData->ItemDescription = FText::FromString("Armor protecting the torso.");
@@ -92,9 +94,9 @@ void InitializeTestItems()
 	ChestItemData->MaxStackSize = 1;
 	ChestItemData->ItemWeight = 5; // Adjusted weight for chest armor
 	ChestItemData->ItemCategories.AddTag(ChestSlot); // Adjust for chest slot
-	URancInventoryFunctions::HardcodeItem(ItemIdChestArmor, ChestItemData);
+	URISInventoryFunctions::HardcodeItem(ItemIdChestArmor, ChestItemData);
 
-	URancItemData* SpearItemData = NewObject<URancItemData>();
+	URisItemData* SpearItemData = NewObject<URisItemData>();
 	SpearItemData->ItemId = ItemIdSpear;
 	SpearItemData->ItemName = FName("Spear");
 	SpearItemData->ItemDescription = FText::FromString("Sharp!");
@@ -103,10 +105,10 @@ void InitializeTestItems()
 	SpearItemData->MaxStackSize = 5; // should not matter
 	SpearItemData->ItemWeight = 3;
 	SpearItemData->ItemCategories.AddTag(ItemTypeWeapon);
-	URancInventoryFunctions::HardcodeItem(ItemIdSpear, SpearItemData);
+	URISInventoryFunctions::HardcodeItem(ItemIdSpear, SpearItemData);
 
 
-	URancItemData* GiantBoulderItemData = NewObject<URancItemData>();
+	URisItemData* GiantBoulderItemData = NewObject<URisItemData>();
 	GiantBoulderItemData->ItemId = ItemIdGiantBoulder;
 	GiantBoulderItemData->ItemName = FName("Giant Boulder");
 	GiantBoulderItemData->ItemDescription = FText::FromString("HEAVY!");
@@ -115,5 +117,5 @@ void InitializeTestItems()
 	GiantBoulderItemData->MaxStackSize = 1;
 	GiantBoulderItemData->ItemWeight = 10;
 	GiantBoulderItemData->ItemCategories.AddTag(ItemTypeResource);
-	URancInventoryFunctions::HardcodeItem(ItemIdGiantBoulder, GiantBoulderItemData);
+	URISInventoryFunctions::HardcodeItem(ItemIdGiantBoulder, GiantBoulderItemData);
 }

@@ -1,15 +1,17 @@
-﻿#include "RancInventory/Public/Actors/AWorldItem.h"
+﻿// Copyright Rancorous Games, 2024
+
+#include "RancInventory/Public/Actors/AWorldItem.h"
 
 #include "Management/RancInventoryFunctions.h"
 #include "Net/UnrealNetwork.h"
 
 
-void AWorldItem::OnConstruction(const FTransform& Transform)
+void ARISWorldItem::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
 }
 
-void AWorldItem::BeginPlay()
+void ARISWorldItem::BeginPlay()
 {
 	Super::BeginPlay();
 
@@ -19,20 +21,20 @@ void AWorldItem::BeginPlay()
 	}
 }
 
-void AWorldItem::SetItem(const FRancItemInstance& NewItem)
+void ARISWorldItem::SetItem(const FRISItemInstance& NewItem)
 {
 	Item = NewItem;
 	Initialize();
 }
 
-void AWorldItem::OnRep_Item()
+void ARISWorldItem::OnRep_Item()
 {
 	Initialize();
 }
 
-void AWorldItem::Initialize()
+void ARISWorldItem::Initialize()
 {
-	ItemData = URancInventoryFunctions::GetItemDataById(Item.ItemId);
+	ItemData = URISInventoryFunctions::GetItemDataById(Item.ItemId);
 
 	auto* mesh = GetStaticMeshComponent();
 
@@ -50,14 +52,14 @@ void AWorldItem::Initialize()
 	}
 }
 
-void AWorldItem::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+void ARISWorldItem::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
-	DOREPLIFETIME_CONDITION(AWorldItem, Item, COND_InitialOnly);
+	DOREPLIFETIME_CONDITION(ARISWorldItem, Item, COND_InitialOnly);
 }
 
-void AWorldItem::PreReplication(IRepChangedPropertyTracker& ChangedPropertyTracker)
+void ARISWorldItem::PreReplication(IRepChangedPropertyTracker& ChangedPropertyTracker)
 {
 	Super::PreReplication(ChangedPropertyTracker);
 }
