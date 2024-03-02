@@ -1,7 +1,7 @@
 // Copyright Rancorous Games, 2024
 
 #include "SFRancInventoryDetailsPanel.h"
-#include <Management/RancInventoryData.h>
+#include <..\..\RancInventory\Public\Management\RISInventoryData.h>
 #include <Engine/AssetManager.h>
 
 void SFRancInventoryDetailsPanel::CustomizeHeader(const TSharedRef<IPropertyHandle> PropertyHandle, FDetailWidgetRow& HeaderRow, IPropertyTypeCustomizationUtils& CustomizationUtils)
@@ -16,7 +16,7 @@ void SFRancInventoryDetailsPanel::CustomizeHeader(const TSharedRef<IPropertyHand
         .ValueContent()
         [
             SNew(SObjectPropertyEntryBox)
-                .AllowedClass(URisItemData::StaticClass())
+                .AllowedClass(URISItemData::StaticClass())
                 .PropertyHandle(PropertyHandle)
                 .DisplayThumbnail(true)
                 .ThumbnailPool(CustomizationUtils.GetThumbnailPool())

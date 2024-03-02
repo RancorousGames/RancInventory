@@ -4,8 +4,8 @@
 
 #include <CoreMinimal.h>
 #include <Components/ActorComponent.h>
-#include "RancItemContainerComponent.h"
-#include "RancInventoryComponent.generated.h"
+#include "RISItemContainerComponent.h"
+#include "RISInventoryComponent.generated.h"
 
 
 UCLASS(Blueprintable, ClassGroup = (Custom), Category = "Ranc Inventory | Classes", EditInlineNew, meta = (BlueprintSpawnableComponent))

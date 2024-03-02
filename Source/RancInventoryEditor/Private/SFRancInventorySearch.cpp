@@ -1,7 +1,7 @@
 // Copyright Rancorous Games, 2024
 
 #include "SFRancInventorySearch.h"
-#include <Management/RancInventoryData.h>
+#include <..\..\RancInventory\Public\Management\RISInventoryData.h>
 #include <Widgets/Input/SSearchBox.h>
 
 #include "SGameplayTagContainerCombo.h"

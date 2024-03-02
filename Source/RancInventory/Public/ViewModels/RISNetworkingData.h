@@ -2,9 +2,26 @@
 
 #pragma once
 #include "GameplayTagContainer.h"
-#include "Components/RancItemContainerComponent.h"
 #include <CoreMinimal.h>
+#include "Management/RISInventoryData.h"
 #include "RISNetworkingData.generated.h"
+
+
+USTRUCT(BlueprintType)
+struct FVersionedItemInstanceArray
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	int32 Version = 0;
+
+	UPROPERTY()
+	TArray<FRISItemInstance> Items;
+
+	FVersionedItemInstanceArray() = default;
+	FVersionedItemInstanceArray(int32 InVersion, const TArray<FRISItemInstance>& InItems)
+		: Version(InVersion), Items(InItems) { }
+};
 
 UENUM()
 enum RISSlotOperation
@@ -36,3 +53,4 @@ struct FRISExpectedOperation
 	// Default constructor
 	FRISExpectedOperation() = default;
 };
+

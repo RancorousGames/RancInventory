@@ -1,8 +1,8 @@
 // Copyright Rancorous Games, 2024
 
 #include "SFRancInventoryTable.h"
-#include <Management/RancInventoryFunctions.h>
-#include <Management/RancInventoryData.h>
+#include <..\..\RancInventory\Public\Management\RISInventoryFunctions.h>
+#include <..\..\RancInventory\Public\Management\RISInventoryData.h>
 #include <Subsystems/AssetEditorSubsystem.h>
 #include <Engine/AssetManager.h>
 

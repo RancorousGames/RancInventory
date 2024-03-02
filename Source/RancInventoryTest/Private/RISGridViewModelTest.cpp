@@ -1,12 +1,12 @@
 ﻿// Copyright Rancorous Games, 2024
 
-#include "SlotMapperTest.h" // header empty
+#include "RISGridViewModelTest.h" // header empty
 
 #include "NativeGameplayTags.h"
-#include "Components/RancInventoryComponent.h"
+#include "..\..\RancInventory\Public\Components\RISInventoryComponent.h"
 #include "Misc/AutomationTest.h"
-#include "ViewModels/RancInventorySlotMapper.h"
-#include "InventorySetup.cpp"
+#include "..\..\RancInventory\Public\ViewModels\RISGridViewModel.h"
+#include "RISInventoryTestSetup.cpp"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRISGridViewModelTest, "GameTests.RIS.GridViewModel", EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::ProductFilter)
 

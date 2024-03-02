@@ -1,9 +1,11 @@
 ﻿// Copyright Rancorous Games, 2024
 
 #pragma once
-#include "Actors/AWorldItem.h"
-#include "Management/RancInventoryData.h"
-#include "RancItemContainerComponent.generated.h"
+#include "Actors/RISWorldItem.h"
+#include "Management/RISInventoryData.h"
+#include "ViewModels/RISNetworkingData.h"
+#include "RISItemContainerComponent.generated.h"
+
 
 UCLASS(Blueprintable, ClassGroup = (Custom), Category = "Ranc Inventory | Classes", EditInlineNew, meta = (BlueprintSpawnableComponent))
 class RANCINVENTORY_API URISItemContainerComponent : public UActorComponent
@@ -109,8 +111,8 @@ protected:
     TArray<FRancInitialItem> InitialItems;
     
     UPROPERTY(ReplicatedUsing=OnRep_Items, BlueprintReadOnly, Category="Ranc Inventory")
-    TArray<FRISItemInstance> Items;
-	
+	FVersionedItemInstanceArray ItemsVer;
+//   TArray<FRISItemInstance> Items;
 
     UFUNCTION(Server, Reliable)
     void DropItems_Server(const FRISItemInstance& ItemInstance, float DropAngle = 0);

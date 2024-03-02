@@ -1,8 +1,8 @@
 // Copyright Rancorous Games, 2024
 
 #include "SRancItemCreator.h"
-#include <Management/RancInventoryData.h>
-#include <Management/RancInventoryFunctions.h>
+#include <..\..\RancInventory\Public\Management\RISInventoryData.h>
+#include <..\..\RancInventory\Public\Management\RISInventoryFunctions.h>
 #include <PropertyCustomizationHelpers.h>
 #include <AssetThumbnail.h>
 #include <AssetToolsModule.h>
@@ -453,9 +453,9 @@ FReply SRISItemCreator::HandleCreateItemButtonClicked() const
 
     UDataAssetFactory* const Factory = NewObject<UDataAssetFactory>();
 
-    if (UObject* const NewData = AssetToolsModule.Get().CreateAsset(AssetName.ToString(), FPackageName::GetLongPackagePath(PackageName), URisItemData::StaticClass(), Factory))
+    if (UObject* const NewData = AssetToolsModule.Get().CreateAsset(AssetName.ToString(), FPackageName::GetLongPackagePath(PackageName), URISItemData::StaticClass(), Factory))
     {
-        URisItemData* const ItemData = Cast<URisItemData>(NewData);
+        URISItemData* const ItemData = Cast<URISItemData>(NewData);
         ItemData->ItemId = ItemId;
         ItemData->ItemWorldMesh = Cast<UStaticMesh>(ObjectMap.FindRef(0)); ;
         ItemData->ItemWorldScale = ItemWorldScale;

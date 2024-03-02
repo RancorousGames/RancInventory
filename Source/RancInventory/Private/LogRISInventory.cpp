@@ -1,5 +1,5 @@
 // Copyright Rancorous Games, 2024
 
-#include "LogRancInventory.h"
+#include "..\Public\LogRISInventory.h"
 
 DEFINE_LOG_CATEGORY(LogRISInventory);

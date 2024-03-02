@@ -2,8 +2,8 @@
 
 #pragma once
 #include "Engine/StaticMeshActor.h"
-#include "Management/RancInventoryData.h"
-#include "AWorldItem.generated.h"
+#include "..\Management\RISInventoryData.h"
+#include "RISWorldItem.generated.h"
 
 UCLASS()
 class RANCINVENTORY_API ARISWorldItem : public AStaticMeshActor
@@ -14,7 +14,7 @@ public:
 	FRISItemInstance Item;
 	
 	UPROPERTY(BlueprintReadOnly, Meta = (DisplayName = "ItemData"), Category = "Item")
-	URisItemData* ItemData = nullptr;
+	URISItemData* ItemData = nullptr;
 
 	virtual void OnConstruction(const FTransform& Transform) override;
 	

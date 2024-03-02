@@ -1,12 +1,12 @@
 ﻿// Copyright Rancorous Games, 2024
 
-#include "RancItemContainerComponentTest.h"
+#include "RISItemContainerComponentTest.h"
 
 #include "NativeGameplayTags.h"
 
-#include "Management/RancInventoryData.h"
+#include "..\..\RancInventory\Public\Management\RISInventoryData.h"
 #include "Misc/AutomationTest.h"
-#include "InventorySetup.cpp"
+#include "RISInventoryTestSetup.cpp"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRancItemContainerComponentTest, "GameTests.RancItemContainer.Tests", EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::ProductFilter)
 

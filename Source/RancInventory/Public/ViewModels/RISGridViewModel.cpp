@@ -1,8 +1,8 @@
 ﻿// Copyright Rancorous Games, 2024
 
-#include "RancInventorySlotMapper.h"
-#include "Management/RancInventoryFunctions.h"
-#include "RancInventory/public/Components/RancInventoryComponent.h"
+#include "RISGridViewModel.h"
+#include "..\Management\RISInventoryFunctions.h"
+#include "..\Components\RISInventoryComponent.h"
 
 void URISGridViewModel::Initialize_Implementation(URISInventoryComponent* InventoryComponent, int32 NumSlots,  bool bPreferEmptyUniversalSlots)
 {
@@ -37,7 +37,7 @@ void URISGridViewModel::Initialize_Implementation(URISInventoryComponent* Invent
 
 	for (FRISItemInstance BackingItem : Items)
 	{
-		if (const URisItemData* const ItemData = URISInventoryFunctions::GetItemDataById(BackingItem.ItemId))
+		if (const URISItemData* const ItemData = URISInventoryFunctions::GetItemDataById(BackingItem.ItemId))
 		{
 			int32 RemainingQuantity = BackingItem.Quantity;
 			while (RemainingQuantity > 0)
@@ -153,7 +153,7 @@ bool URISGridViewModel::SplitItems_Implementation(FGameplayTag SourceTaggedSlot,
 		return false;
 	}
 
-	const URisItemData* ItemData = URISInventoryFunctions::GetItemDataById(SourceItem.ItemId);
+	const URISItemData* ItemData = URISInventoryFunctions::GetItemDataById(SourceItem.ItemId);
 	if (!ItemData) return false; // Item data not found
 
 	// Calculate total quantity after split and check against max stack size
@@ -402,7 +402,7 @@ bool URISGridViewModel::CanSlotReceiveItem_Implementation(const FRISItemInstance
 	const FRISItemInstance& TargetSlotItem = ViewableGridSlots[SlotIndex];
 	if (TargetSlotEmpty || TargetSlotItem.ItemId == ItemInstance.ItemId)
 	{
-		const URisItemData* ItemData = URISInventoryFunctions::GetItemDataById(ItemInstance.ItemId);
+		const URISItemData* ItemData = URISInventoryFunctions::GetItemDataById(ItemInstance.ItemId);
 		if (!ItemData)
 		{
 			return false; // Item data not found
@@ -426,7 +426,7 @@ bool URISGridViewModel::CanTaggedSlotReceiveItem_Implementation(const FRISItemIn
 	const FRISItemInstance& TargetSlotItem = ViewableTaggedSlots.FindChecked(SlotTag);
 	if (TargetSlotEmpty || TargetSlotItem.ItemId == ItemInstance.ItemId)
 	{
-		const URisItemData* ItemData = URISInventoryFunctions::GetItemDataById(ItemInstance.ItemId);
+		const URISItemData* ItemData = URISInventoryFunctions::GetItemDataById(ItemInstance.ItemId);
 		if (!ItemData)
 		{
 			return false; // Item data not found
@@ -466,7 +466,7 @@ void URISGridViewModel::HandleItemAdded_Implementation(const FRISItemInstance& I
 		}
 
 		// get item data
-		const URisItemData* ItemData = URISInventoryFunctions::GetItemDataById(Item.ItemId);
+		const URISItemData* ItemData = URISInventoryFunctions::GetItemDataById(Item.ItemId);
 
 		if (ItemData == nullptr)
 		{
@@ -613,7 +613,7 @@ const FRISItemInstance& URISGridViewModel::GetItemForTaggedSlot(const FGameplayT
 
 int32 URISGridViewModel::FindSlotIndexForItem_Implementation(const FRISItemInstance& Item)
 {
-	const URisItemData* ItemData = URISInventoryFunctions::GetItemDataById(Item.ItemId);
+	const URISItemData* ItemData = URISInventoryFunctions::GetItemDataById(Item.ItemId);
 	for (int32 Index = 0; Index < ViewableGridSlots.Num(); ++Index)
 	{
 		const FRISItemInstance& ExistingItem = ViewableGridSlots[Index];
@@ -639,7 +639,7 @@ FGameplayTag URISGridViewModel::FindTaggedSlotForItem(const FRISItemInstance& It
 	// Validate
 	if (!Item.IsValid()) return FGameplayTag::EmptyTag;
 
-	const URisItemData* ItemData = URISInventoryFunctions::GetItemDataById(Item.ItemId);
+	const URISItemData* ItemData = URISInventoryFunctions::GetItemDataById(Item.ItemId);
 	if (!ItemData) return FGameplayTag::EmptyTag; // Ensure the item data is valid
 
 	FGameplayTag FallbackSwapSlot = FGameplayTag::EmptyTag;

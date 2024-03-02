@@ -1,7 +1,7 @@
 ﻿// Copyright Rancorous Games, 2024
 
-#include "Components/RancItemContainerComponent.h"
-#include "Management/RancInventoryFunctions.h"
+#include "..\..\Public\Components\RISItemContainerComponent.h"
+#include "..\..\Public\Management\RISInventoryFunctions.h"
 #include "Net/UnrealNetwork.h"
 #include "Net/Core/PushModel/PushModel.h"
 
@@ -35,12 +35,12 @@ void URISItemContainerComponent::InitializeComponent()
 	// add all initial items to items
 	for (const FRancInitialItem& InitialItem : InitialItems)
 	{
-		const URisItemData* Data = URISInventoryFunctions::GetSingleItemDataById(InitialItem.ItemId, {}, false);
+		const URISItemData* Data = URISInventoryFunctions::GetSingleItemDataById(InitialItem.ItemId, {}, false);
 
 		if (Data && Data->ItemId.IsValid())
 		{
 			auto ItemInstance = FRISItemInstance(Data->ItemId, InitialItem.Quantity);
-			Items.Add(ItemInstance);
+			ItemsVer.Items.Add(ItemInstance);
 		}
 	}
 	UpdateWeightAndSlots();
@@ -59,7 +59,7 @@ void URISItemContainerComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProp
 	FDoRepLifetimeParams SharedParams;
 	SharedParams.bIsPushBased = true;
 
-	DOREPLIFETIME_WITH_PARAMS_FAST(URISItemContainerComponent, Items, SharedParams);
+	DOREPLIFETIME_WITH_PARAMS_FAST(URISItemContainerComponent, ItemsVer, SharedParams);
 }
 
 
@@ -88,7 +88,7 @@ int32 URISItemContainerComponent::AddItems_IfServer(const FRISItemInstance& Item
 	}
 
 	const int32 AmountToAdd = FMath::Min(AcceptableQuantity, ItemInstance.Quantity);
-	for (auto& ExistingItem : Items)
+	for (auto& ExistingItem : ItemsVer.Items)
 	{
 		// If item exists, increase the quantity up to the acceptable amount
 		if (ExistingItem.ItemId == ItemInstance.ItemId)
@@ -98,14 +98,14 @@ int32 URISItemContainerComponent::AddItems_IfServer(const FRISItemInstance& Item
 		}
 	}
 
-	Items.Add(FRISItemInstance(ItemInstance.ItemId, AmountToAdd));
+	ItemsVer.Items.Add(FRISItemInstance(ItemInstance.ItemId, AmountToAdd));
 	
 Finish:
 	UpdateWeightAndSlots();
 
 	OnItemAddedToContainer.Broadcast(FRISItemInstance(ItemInstance.ItemId, AmountToAdd));
 
-	MARK_PROPERTY_DIRTY_FROM_NAME(URISItemContainerComponent, Items, this);
+	MARK_PROPERTY_DIRTY_FROM_NAME(URISItemContainerComponent, ItemsVer, this);
 
 	return AmountToAdd; // Return the actual quantity added
 }
@@ -127,9 +127,9 @@ int32 URISItemContainerComponent::RemoveItems_IfServer(const FRISItemInstance& I
 
 	int32 AmountRemoved = 0;
 
-	for (int i = Items.Num() - 1; i >= 0; --i)
+	for (int i = ItemsVer.Items.Num() - 1; i >= 0; --i)
 	{
-		auto& ExistingItem = Items[i];
+		auto& ExistingItem = ItemsVer.Items[i];
 		if (ExistingItem.ItemId == ItemInstance.ItemId)
 		{
 			AmountRemoved += FMath::Min(ExistingItem.Quantity, ItemInstance.Quantity);
@@ -138,7 +138,7 @@ int32 URISItemContainerComponent::RemoveItems_IfServer(const FRISItemInstance& I
 			// If the quantity drops to zero or below, remove the item from the inventory
 			if (ExistingItem.Quantity <= 0)
 			{
-				Items.RemoveAt(i);
+				ItemsVer.Items.RemoveAt(i);
 				break; // Assuming ItemId is unique and only one instance exists in the inventory
 			}
 		}
@@ -150,7 +150,7 @@ int32 URISItemContainerComponent::RemoveItems_IfServer(const FRISItemInstance& I
 	OnItemRemovedFromContainer.Broadcast(ItemInstance);
 
 	// Mark the Items array as dirty to ensure replication
-	MARK_PROPERTY_DIRTY_FROM_NAME(URISItemContainerComponent, Items, this);
+	MARK_PROPERTY_DIRTY_FROM_NAME(URISItemContainerComponent, ItemsVer, this);
 
 	return AmountRemoved;
 }
@@ -179,7 +179,7 @@ ARISWorldItem* URISItemContainerComponent::SpawnDroppedItem_IfServer(const FRISI
 
 FRISItemInstance* URISItemContainerComponent::FindContainerItemInstance(const FGameplayTag& ItemId)
 {
-	for (auto& Item : Items)
+	for (auto& Item : ItemsVer.Items)
 	{
 		if (Item.ItemId == ItemId)
 		{
@@ -203,7 +203,7 @@ int32 URISItemContainerComponent::DropItems(const FRISItemInstance& ItemInstance
 }
 
 void URISItemContainerComponent::DropItems_Server_Implementation(const FRISItemInstance& ItemInstance,
-                                                                  float DropAngle)
+                                                                 float DropAngle)
 {
 	auto ContainedItemInstance = FindItemById(ItemInstance.ItemId);
 	const int32 QuantityToDrop = FMath::Min(ItemInstance.Quantity, ContainedItemInstance.Quantity);
@@ -220,7 +220,7 @@ void URISItemContainerComponent::DropItems_Server_Implementation(const FRISItemI
 		ContainedItemInstance.Quantity -= QuantityToDrop;
 		if (ContainedItemInstance.Quantity <= 0)
 		{
-			Items.Remove(ContainedItemInstance);
+			ItemsVer.Items.Remove(ContainedItemInstance);
 		}
 		OnItemRemovedFromContainer.Broadcast(ItemInstance);
 		UpdateWeightAndSlots();
@@ -242,11 +242,11 @@ int32 URISItemContainerComponent::DropAllItems_ServerImpl()
 
 	// drop with incrementing angle
 	int32 DroppedCount = 0;
-	float AngleStep = 360.f / Items.Num();
+	float AngleStep = 360.f / ItemsVer.Items.Num();
 
-	for (int i = Items.Num() - 1; i >= 0; --i)
+	for (int i = ItemsVer.Items.Num() - 1; i >= 0; --i)
 	{
-		DropItems(Items[i], AngleStep * DroppedCount);
+		DropItems(ItemsVer.Items[i], AngleStep * DroppedCount);
 		DroppedCount++;
 	}
 
@@ -268,7 +268,7 @@ float URISItemContainerComponent::GetMaxWeight() const
 
 const FRISItemInstance& URISItemContainerComponent::FindItemById(const FGameplayTag& ItemId) const
 {
-	for (const auto& Item : Items)
+	for (const auto& Item : ItemsVer.Items)
 	{
 		if (Item.ItemId == ItemId)
 		{
@@ -288,7 +288,7 @@ bool URISItemContainerComponent::CanContainerReceiveItems(const FRISItemInstance
 
 int32 URISItemContainerComponent::GetQuantityOfItemContainerCanReceive(const FGameplayTag& ItemId) const
 {
-	const URisItemData* ItemData = URISInventoryFunctions::GetItemDataById(ItemId);
+	const URISItemData* ItemData = URISInventoryFunctions::GetItemDataById(ItemId);
 	if (!ItemData)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Could not find item data for item: %s"), *ItemId.ToString());
@@ -310,7 +310,7 @@ int32 URISItemContainerComponent::GetQuantityOfItemContainerCanReceive(const FGa
 
 bool URISItemContainerComponent::HasWeightCapacityForItems(const FRISItemInstance& ItemInstance) const
 {
-	const URisItemData* ItemData = URISInventoryFunctions::GetItemDataById(ItemInstance.ItemId);
+	const URISItemData* ItemData = URISInventoryFunctions::GetItemDataById(ItemInstance.ItemId);
 	if (!ItemData)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Could not find item data for item: %s"), *ItemInstance.ItemId.ToString());
@@ -333,7 +333,7 @@ bool URISItemContainerComponent::ContainsItemsImpl(const FGameplayTag& ItemId, i
 
 int32 URISItemContainerComponent::GetContainerItemCount(const FGameplayTag& ItemId) const
 {
-	for (const auto& Item : Items)
+	for (const auto& Item : ItemsVer.Items)
 	{
 		if (Item.ItemId == ItemId)
 		{
@@ -346,12 +346,12 @@ int32 URISItemContainerComponent::GetContainerItemCount(const FGameplayTag& Item
 
 TArray<FRISItemInstance> URISItemContainerComponent::GetAllContainerItems() const
 {
-	return Items;
+	return ItemsVer.Items;
 }
 
 bool URISItemContainerComponent::IsEmpty() const
 {
-	return Items.Num() == 0;
+	return ItemsVer.Items.Num() == 0;
 }
 
 void URISItemContainerComponent::ClearContainer_IfServer()
@@ -362,7 +362,7 @@ void URISItemContainerComponent::ClearContainer_IfServer()
 		return;
 	}
 
-	Items.Reset();
+	ItemsVer.Items.Reset();
 	OnRep_Items();
 }
 
@@ -370,9 +370,9 @@ void URISItemContainerComponent::UpdateWeightAndSlots()
 {
 	CurrentWeight = 0.0f; // Reset weight
 	UsedContainerSlotCount = 0;
-	for (const auto& ItemInstance : Items)
+	for (const auto& ItemInstance : ItemsVer.Items)
 	{
-		if (const URisItemData* const ItemData = URISInventoryFunctions::GetItemDataById(ItemInstance.ItemId))
+		if (const URISItemData* const ItemData = URISInventoryFunctions::GetItemDataById(ItemInstance.ItemId))
 		{
 			CurrentWeight += ItemData->ItemWeight * ItemInstance.Quantity;
 			UsedContainerSlotCount += FMath::CeilToInt(ItemInstance.Quantity / static_cast<float>(ItemData->MaxStackSize));
@@ -385,17 +385,17 @@ void URISItemContainerComponent::UpdateWeightAndSlots()
 void URISItemContainerComponent::CopyItemsToCache()
 {
 	ItemsCache.Reset();
-	ItemsCache.Reserve(Items.Num());
-	for (int i = 0; i < Items.Num(); ++i)
+	ItemsCache.Reserve(ItemsVer.Items.Num());
+	for (int i = 0; i < ItemsVer.Items.Num(); ++i)
 	{
-		ItemsCache[Items[i].ItemId] = Items[i].Quantity;
+		ItemsCache[ItemsVer.Items[i].ItemId] = ItemsVer.Items[i].Quantity;
 	}
 }
 
 void URISItemContainerComponent::DetectAndPublishChanges()
 {
 	// First pass: Update existing items or add new ones, mark them by setting quantity to negative.
-	for (FRISItemInstance& NewItem : Items)
+	for (FRISItemInstance& NewItem : ItemsVer.Items)
 	{
 		int32* OldQuantity = ItemsCache.Find(NewItem.ItemId);
 		if (OldQuantity)

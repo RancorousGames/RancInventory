@@ -5,7 +5,7 @@
 #include "CoreMinimal.h"
 #include "UObject/Object.h"
 #include "RISNetworkingData.h"
-#include "RancInventorySlotMapper.generated.h"
+#include "RISGridViewModel.generated.h"
 
 class RancInventoryComponent;
 
@@ -66,7 +66,7 @@ public:
     UFUNCTION(BlueprintNativeEvent, Category=RIS)
     bool SplitItems(FGameplayTag SourceTaggedSlot, int32 SourceSlotIndex, FGameplayTag TargetTaggedSlot, int32 TargetSlotIndex, int32 Quantity);
     
-    UFUNCTION(BlueprintNativeEvent, Category=RIS)
+    UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category=RIS)
     bool MoveItems(FGameplayTag SourceTaggedSlot, int32 SourceSlotIndex = -1,
                   FGameplayTag TargetTaggedSlot = FGameplayTag(), int32 TargetSlotIndex = -1);
 

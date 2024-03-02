@@ -5,7 +5,7 @@
 #include <CoreMinimal.h>
 #include <Kismet/BlueprintFunctionLibrary.h>
 #include <Runtime/Launch/Resources/Version.h>
-#include "RancInventoryFunctions.generated.h"
+#include "RISInventoryFunctions.generated.h"
 
 UENUM(BlueprintType, Category = "Ranc Inventory | Enumerations")
 enum class ERISItemSearchType : uint8
@@ -17,7 +17,7 @@ enum class ERISItemSearchType : uint8
 
 class URISInventoryComponent;
 class UAssetManager;
-class URisItemData;
+class URISItemData;
 struct FPrimaryRancItemId;
 
 /**
@@ -43,19 +43,19 @@ public:
 
     /* Check if the ids of the given item datas are equal */
     UFUNCTION(BlueprintPure, Category = "Ranc Inventory")
-    static bool CompareItemData(const URisItemData* Data1, const URisItemData* Data2);
+    static bool CompareItemData(const URISItemData* Data1, const URISItemData* Data2);
 
     /* Return the item data related to the given id */
     UFUNCTION(BlueprintCallable, Category = "Ranc Inventory")
-    static URisItemData* GetSingleItemDataById(const FPrimaryRancItemId& InID, const TArray<FName>& InBundles, const bool bAutoUnload = true);
+    static URISItemData* GetSingleItemDataById(const FPrimaryRancItemId& InID, const TArray<FName>& InBundles, const bool bAutoUnload = true);
 
     /* Return a array of data depending of the given ids */
     UFUNCTION(BlueprintCallable, Category = "Ranc Inventory")
-    static TArray<URisItemData*> GetItemDataArrayById(const TArray<FPrimaryRancItemId>& InIDs, const TArray<FName>& InBundles, const bool bAutoUnload = true);
+    static TArray<URISItemData*> GetItemDataArrayById(const TArray<FPrimaryRancItemId>& InIDs, const TArray<FName>& InBundles, const bool bAutoUnload = true);
 
     /* Search all registered items and return a array of item data that match with the given parameters */
     UFUNCTION(BlueprintCallable, Category = "Ranc Inventory")
-    static TArray<URisItemData*> SearchRancItemData(const ERISItemSearchType SearchType, const FString& SearchString, const TArray<FName>& InBundles, const bool bAutoUnload = true);
+    static TArray<URISItemData*> SearchRancItemData(const ERISItemSearchType SearchType, const FString& SearchString, const TArray<FName>& InBundles, const bool bAutoUnload = true);
     
     /* Get the primary asset ids of all registered items */
     UFUNCTION(BlueprintPure, Category = "Ranc Inventory")
@@ -74,7 +74,7 @@ public:
     
     /* Uses static map from GameplayTag to URancItemData, works faster after having called PermanentlyLoadAllItems */
     UFUNCTION(BlueprintPure, Category = "Ranc Inventory")
-    static URisItemData* GetItemDataById(FGameplayTag TagId);
+    static URISItemData* GetItemDataById(FGameplayTag TagId);
     
     /* Trade items between two inventory components */
     UFUNCTION(BlueprintCallable, Category = "Ranc Inventory")
@@ -139,15 +139,15 @@ public:
     static void AllRecipesLoadedCallback();
 
     // Below are used for e.g. unit tests
-    static void HardcodeItem(FGameplayTag ItemId, URisItemData* ItemData);
+    static void HardcodeItem(FGameplayTag ItemId, URISItemData* ItemData);
     static void HardcodeRecipe(FGameplayTag RecipeId, URISRecipe* RecipeData);
 
 private:
-    static TArray<URisItemData*> LoadRancItemData_Internal(UAssetManager* InAssetManager, const TArray<FPrimaryAssetId>& InIDs, const TArray<FName>& InBundles, const bool bAutoUnload);
-    static TArray<URisItemData*> LoadRancItemData_Internal(UAssetManager* InAssetManager, const TArray<FPrimaryRancItemId>& InIDs, const TArray<FName>& InBundles, const bool bAutoUnload);
+    static TArray<URISItemData*> LoadRancItemData_Internal(UAssetManager* InAssetManager, const TArray<FPrimaryAssetId>& InIDs, const TArray<FName>& InBundles, const bool bAutoUnload);
+    static TArray<URISItemData*> LoadRancItemData_Internal(UAssetManager* InAssetManager, const TArray<FPrimaryRancItemId>& InIDs, const TArray<FName>& InBundles, const bool bAutoUnload);
 
     
-    static TMap<FGameplayTag, URisItemData*> AllLoadedItemsByTag;
+    static TMap<FGameplayTag, URISItemData*> AllLoadedItemsByTag;
    // static TMap<FGameplayTag, FName> AllLoadedItemAssetNamesByTag;
     static TArray<FGameplayTag> AllItemIds;
     

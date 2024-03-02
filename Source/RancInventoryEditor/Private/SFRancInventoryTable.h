@@ -3,8 +3,8 @@
 #pragma once
 
 #include <CoreMinimal.h>
-#include "Management/RancInventoryData.h"
-#include "Management/RancInventoryFunctions.h"
+#include "..\..\RancInventory\Public\Management\RISInventoryData.h"
+#include "..\..\RancInventory\Public\Management\RISInventoryFunctions.h"
 
 struct FRancItemRowData
 {

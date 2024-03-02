@@ -5,7 +5,7 @@
 #include <CoreMinimal.h>
 #include <GameplayTagContainer.h>
 #include <Engine/DataAsset.h>
-#include "RancInventoryData.generated.h"
+#include "RISInventoryData.generated.h"
 
 class UTexture2D;
 
@@ -118,12 +118,12 @@ struct FRancInitialItem
 };
 
 UCLASS(NotBlueprintable, NotPlaceable, Category = "Ranc Inventory | Classes | Data")
-class RANCINVENTORY_API URisItemData : public UPrimaryDataAsset
+class RANCINVENTORY_API URISItemData : public UPrimaryDataAsset
 {
     GENERATED_BODY()
 
 public:
-    explicit URisItemData(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
+    explicit URISItemData(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
 
     FORCEINLINE virtual FPrimaryAssetId GetPrimaryAssetId() const override
     {
@@ -177,7 +177,7 @@ public:
 
 
 UCLASS(Blueprintable, Category = "Ranc Inventory | Classes | Data")
-class RANCINVENTORY_API USpawnableRancItemData : public URisItemData
+class RANCINVENTORY_API USpawnableRancItemData : public URISItemData
 {
     GENERATED_BODY()
 
@@ -237,12 +237,12 @@ public:
 
 
 UCLASS(NotBlueprintable, NotPlaceable, Category = "Ranc Inventory | Classes | Data")
-class RANCINVENTORY_API URancItemRecipe : public URISRecipe
+class RANCINVENTORY_API URISItemRecipe : public URISRecipe
 {
     GENERATED_BODY()
 
 public:
-    explicit URancItemRecipe(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get())
+    explicit URISItemRecipe(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get())
     {
         
     }

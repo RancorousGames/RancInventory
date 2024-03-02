@@ -1,10 +1,10 @@
 // Copyright Rancorous Games, 2024
 
-#include "Components/RancInventoryComponent.h"
+#include "Components\RISInventoryComponent.h"
 #include <GameFramework/Actor.h>
 
 #include <Engine/AssetManager.h>
-#include "Management/RancInventoryFunctions.h"
+#include "Management\RISInventoryFunctions.h"
 #include "Net/UnrealNetwork.h"
 #include "Net/Core/PushModel/PushModel.h"
 
@@ -44,7 +44,7 @@ void URISInventoryComponent::UpdateWeightAndSlots()
 
 	for (const FRancTaggedItemInstance& TaggedInstance : TaggedSlotItemInstances)
 	{
-		if (const URisItemData* const ItemData = URISInventoryFunctions::GetItemDataById(
+		if (const URISItemData* const ItemData = URISInventoryFunctions::GetItemDataById(
 			TaggedInstance.ItemInstance.ItemId))
 		{
 			CurrentWeight += ItemData->ItemWeight * TaggedInstance.ItemInstance.Quantity;
@@ -93,7 +93,7 @@ int32 URISInventoryComponent::AddItemsToTaggedSlot_IfServer(const FGameplayTag& 
 	int32 Index = GetIndexForTaggedSlot(SlotTag);
 
 	FRancTaggedItemInstance& ExistingItem = EmptyCopy;
-	URisItemData* ItemData = nullptr;
+	URISItemData* ItemData = nullptr;
 	if (TaggedSlotItemInstances.IsValidIndex(Index))
 	{
 		ExistingItem = TaggedSlotItemInstances[Index];
@@ -285,12 +285,12 @@ int32 URISInventoryComponent::MoveItems_ServerImpl(const FRISItemInstance& ItemI
 	}
 	else
 	{
-		for (int i = 0; i < Items.Num(); i++)
+		for (int i = 0; i < ItemsVer.Items.Num(); i++)
 		{
-			if (Items[i].ItemId == ItemInstance.ItemId)
+			if (ItemsVer.Items[i].ItemId == ItemInstance.ItemId)
 			{
 				SourceItemContainerIndex = i;
-				SourceItem = &Items[i];
+				SourceItem = &ItemsVer.Items[i];
 				break;
 			}
 		}
@@ -334,8 +334,8 @@ int32 URISInventoryComponent::MoveItems_ServerImpl(const FRISItemInstance& ItemI
 		TargetItem = FindContainerItemInstance(ItemInstance.ItemId);;
 		if (TargetItem == nullptr)
 		{
-			Items.Add(FRISItemInstance::EmptyItemInstance);
-			TargetItem = &Items.Last();
+			ItemsVer.Items.Add(FRISItemInstance::EmptyItemInstance);
+			TargetItem = &ItemsVer.Items.Last();
 		}
 	}
 
@@ -354,12 +354,12 @@ int32 URISInventoryComponent::MoveItems_ServerImpl(const FRISItemInstance& ItemI
 			if (SourceIsTaggedSlot)
 				TaggedSlotItemInstances.RemoveAt(GetIndexForTaggedSlot(SourceTaggedSlot));
 			else
-				Items.RemoveAt(SourceItemContainerIndex);
+				ItemsVer.Items.RemoveAt(SourceItemContainerIndex);
 		}
 		
 		const FRISItemInstance ActualMovedItem(ItemInstance.ItemId, MovedQuantity);
 		MARK_PROPERTY_DIRTY_FROM_NAME(URISInventoryComponent, TaggedSlotItemInstances, this);
-		MARK_PROPERTY_DIRTY_FROM_NAME(URISItemContainerComponent, Items, this);
+		MARK_PROPERTY_DIRTY_FROM_NAME(URISItemContainerComponent, ItemsVer, this);
 
 		if (SourceIsTaggedSlot)
 			OnItemRemovedFromTaggedSlot.Broadcast(SourceTaggedSlot, ActualMovedItem);
@@ -535,7 +535,7 @@ void URISInventoryComponent::DetectAndPublishChanges()
 
 bool URISInventoryComponent::IsTaggedSlotCompatible(const FGameplayTag& ItemId, const FGameplayTag& SlotTag) const
 {
-	const URisItemData* ItemData = URISInventoryFunctions::GetItemDataById(ItemId);
+	const URISItemData* ItemData = URISInventoryFunctions::GetItemDataById(ItemId);
 	if (!ItemData)
 	{
 		return false; // Item data not found, assume slot cannot receive item
@@ -581,7 +581,7 @@ bool URISInventoryComponent::CanCraftRecipe(const URISRecipe* Recipe) const
 
 bool URISInventoryComponent::CanCraftCraftingRecipe(const FPrimaryAssetId& RecipeId) const
 {
-	URancItemRecipe* CraftingRecipe = Cast<URancItemRecipe>(
+	URISItemRecipe* CraftingRecipe = Cast<URISItemRecipe>(
 		UAssetManager::GetIfInitialized()->GetPrimaryAssetObject(RecipeId));
 	return CanCraftRecipe(CraftingRecipe);
 }
@@ -615,7 +615,7 @@ bool URISInventoryComponent::CraftRecipe_IfServer(const URISRecipe* Recipe)
 		}
 		bSuccess = true;
 
-		if (const URancItemRecipe* ItemRecipe = Cast<URancItemRecipe>(Recipe))
+		if (const URISItemRecipe* ItemRecipe = Cast<URISItemRecipe>(Recipe))
 		{
 			// If it is an item recipe, add the resulting item to the inventory
 			auto CraftedItem = FRISItemInstance(ItemRecipe->ResultingItemId, ItemRecipe->QuantityCreated);

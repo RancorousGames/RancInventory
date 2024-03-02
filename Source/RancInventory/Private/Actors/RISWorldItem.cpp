@@ -1,8 +1,8 @@
 ﻿// Copyright Rancorous Games, 2024
 
-#include "RancInventory/Public/Actors/AWorldItem.h"
+#include "..\..\Public\Actors\RISWorldItem.h"
 
-#include "Management/RancInventoryFunctions.h"
+#include "..\..\Public\Management\RISInventoryFunctions.h"
 #include "Net/UnrealNetwork.h"
 
 

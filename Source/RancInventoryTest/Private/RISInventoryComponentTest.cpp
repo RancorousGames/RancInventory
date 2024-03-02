@@ -1,12 +1,12 @@
 ﻿// Copyright Rancorous Games, 2024
 
-#include "RancInventoryComponentTest.h"
+#include "RISInventoryComponentTest.h"
 #include "NativeGameplayTags.h"
-#include "Management/RancInventoryData.h"
-#include "Components/RancItemContainerComponent.h"
-#include "Components/RancInventoryComponent.h"
+#include "..\..\RancInventory\Public\Management\RISInventoryData.h"
+#include "..\..\RancInventory\Public\Components\RISItemContainerComponent.h"
+#include "..\..\RancInventory\Public\Components\RISInventoryComponent.h"
 #include "Misc/AutomationTest.h"
-#include "InventorySetup.cpp"
+#include "RISInventoryTestSetup.cpp"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRancInventoryComponentTest, "GameTests.RancInventory.Tests", EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::ProductFilter)
 
@@ -482,7 +482,7 @@ bool TestInventoryMaxCapacity()
 	QuantityAdded = InventoryComponent->AddItemsToTaggedSlot_IfServer(RightHandSlot, TwoRocks);
 	Res &= RITest->TestEqual(TEXT("Should successfully add 2 rocks within capacity"), QuantityAdded, 2);
 
-	URancItemRecipe* BoulderRecipe = NewObject<URancItemRecipe>();
+	URISItemRecipe* BoulderRecipe = NewObject<URISItemRecipe>();
 	BoulderRecipe->ResultingItemId = ItemIdGiantBoulder; // a boulder weighs 10
 	BoulderRecipe->QuantityCreated = 1;
 	BoulderRecipe->Components.Add(FRISItemInstance(ItemIdRock, 5)); // Requires 2 Rocks
