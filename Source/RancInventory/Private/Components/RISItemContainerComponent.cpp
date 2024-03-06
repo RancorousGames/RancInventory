@@ -6,7 +6,7 @@
 #include "Net/Core/PushModel/PushModel.h"
 
 URISItemContainerComponent::URISItemContainerComponent(const FObjectInitializer& ObjectInitializer) :
-	Super(ObjectInitializer), MaxWeight(0.f), MaxContainerSlotCount(MAX_int32), CurrentWeight(0.f)
+	Super(ObjectInitializer), MaxWeight(999999), MaxContainerSlotCount(MAX_int32), CurrentWeight(0.f)
 {
 	PrimaryComponentTick.bCanEverTick = false;
 	PrimaryComponentTick.bStartWithTickEnabled = false;
@@ -81,8 +81,9 @@ int32 URISItemContainerComponent::AddItems_IfServer(const FRISItemInstance& Item
 
 	// Check if the inventory can receive the item and calculate the acceptable quantity
 	const int32 AcceptableQuantity = GetQuantityOfItemContainerCanReceive(ItemInstance.ItemId);
-
-	if (AcceptableQuantity <= 0 || (!AllowPartial && AcceptableQuantity < ItemInstance.Quantity))
+	
+	if (AcceptableQuantity <= 0 || (!AllowPartial && AcceptableQuantity < ItemInstance.Quantity) ||
+		OnValidateAddItem.IsBound() && !OnValidateAddItem.Execute(ItemInstance)) // custom validation
 	{
 		return 0; // No items added
 	}
@@ -283,7 +284,8 @@ const FRISItemInstance& URISItemContainerComponent::FindItemById(const FGameplay
 
 bool URISItemContainerComponent::CanContainerReceiveItems(const FRISItemInstance& ItemInstance) const
 {
-	return GetQuantityOfItemContainerCanReceive(ItemInstance.ItemId) >= ItemInstance.Quantity;
+	return (OnValidateAddItem.IsBound() ? OnValidateAddItem.Execute(ItemInstance) : true) &&
+	GetQuantityOfItemContainerCanReceive(ItemInstance.ItemId) >= ItemInstance.Quantity;
 }
 
 int32 URISItemContainerComponent::GetQuantityOfItemContainerCanReceive(const FGameplayTag& ItemId) const
@@ -364,6 +366,11 @@ void URISItemContainerComponent::ClearContainer_IfServer()
 
 	ItemsVer.Items.Reset();
 	OnRep_Items();
+}
+
+void URISItemContainerComponent::SetAddItemValidationCallback_IfServer(const FAddItemValidationDelegate& ValidationDelegate)
+{
+	OnValidateAddItem = ValidationDelegate;
 }
 
 void URISItemContainerComponent::UpdateWeightAndSlots()

@@ -6,7 +6,6 @@
 #include "CoreMinimal.h"
 #include "..\..\RancInventory\Public\Management\RISInventoryFunctions.h"
 #include "..\..\RancInventory\Public\Management\RISInventoryData.h"
-#include "..\..\RancInventory\Public\Components\RISInventoryComponent.h"
 
 UE_DEFINE_GAMEPLAY_TAG(LeftHandSlot, "Hands.LeftHand");
 UE_DEFINE_GAMEPLAY_TAG(RightHandSlot, "Hands.RightHand");

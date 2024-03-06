@@ -36,6 +36,7 @@ void ARISWorldItem::Initialize()
 {
 	ItemData = URISInventoryFunctions::GetItemDataById(Item.ItemId);
 
+	SetMobility(EComponentMobility::Movable);
 	auto* mesh = GetStaticMeshComponent();
 
 	if (ItemData && ItemData->ItemWorldMesh)

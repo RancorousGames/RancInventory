@@ -8,7 +8,7 @@
 #include "Misc/AutomationTest.h"
 #include "RISInventoryTestSetup.cpp"
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRancInventoryComponentTest, "GameTests.RancInventory.Tests", EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRancInventoryComponentTest, "GameTests.RIS.RancInventory", EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::ProductFilter)
 
 #define SETUP_RISINVENTORY(CarryCapacity) \
 URISInventoryComponent* InventoryComponent = NewObject<URISInventoryComponent>(); \

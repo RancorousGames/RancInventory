@@ -23,7 +23,7 @@ public:
      * NumSlots: The number of slots to be initialized
      * bPreferEmptyUniversalSlots: Whether MoveItemToAnyTaggedSlot will prefer to use empty universal slots over occupied specialized slots
      */
-    UFUNCTION(BlueprintNativeEvent, Category=RIS)
+    UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category=RIS)
     void Initialize(URISInventoryComponent* InventoryComponent, int32 NumSlots = 9,  bool bPreferEmptyUniversalSlots = false);
 
     // Checks if a given slot is empty
@@ -63,20 +63,20 @@ public:
      * @param TargetSlotIndex The index of the target generic slot, if applicable.
      * @param Quantity The number of items to be split from the source slot to the target slot.
      */
-    UFUNCTION(BlueprintNativeEvent, Category=RIS)
+    UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category=RIS)
     bool SplitItems(FGameplayTag SourceTaggedSlot, int32 SourceSlotIndex, FGameplayTag TargetTaggedSlot, int32 TargetSlotIndex, int32 Quantity);
     
     UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category=RIS)
     bool MoveItems(FGameplayTag SourceTaggedSlot, int32 SourceSlotIndex = -1,
                   FGameplayTag TargetTaggedSlot = FGameplayTag(), int32 TargetSlotIndex = -1);
 
-    UFUNCTION(BlueprintNativeEvent, Category=RIS)
+    UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category=RIS)
     bool MoveItemToAnyTaggedSlot(const FGameplayTag& SourceTaggedSlot, int32 SourceSlotIndex);
     
-    UFUNCTION(BlueprintNativeEvent, Category=RIS)
+    UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category=RIS)
     bool CanSlotReceiveItem(const FRISItemInstance& ItemInstance, int32 SlotIndex) const;
     
-    UFUNCTION(BlueprintNativeEvent, Category=RIS)
+    UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category=RIS)
     bool CanTaggedSlotReceiveItem(const FRISItemInstance& ItemInstance, const FGameplayTag& SlotTag, bool CheckContainerLimits = true) const;
     
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category=RIS)

@@ -17,72 +17,77 @@ public:
 
     virtual void InitializeComponent() override;
 	
-    UFUNCTION(BlueprintPure, Category="Ranc Inventory")
+    UFUNCTION(BlueprintPure, Category=RIS)
     float GetCurrentWeight() const;
 
-    UFUNCTION(BlueprintPure, Category="Ranc Inventory")
+    UFUNCTION(BlueprintPure, Category=RIS)
     float GetMaxWeight() const;
 
-    UFUNCTION(BlueprintPure, Category="Ranc Inventory")
+    UFUNCTION(BlueprintPure, Category=RIS)
     const FRISItemInstance& FindItemById(const FGameplayTag& ItemId) const;
 
     /* Add items to the inventory
      * Should only be called on server as we can't trust client to provide trustworthy ItemInstance
      * Instead have the client send an input like CraftItem or PickupItem to the server which results in server call to AddItem
      * Returns the amount added */
-    UFUNCTION(BlueprintCallable, Category="Ranc Inventory")
+    UFUNCTION(BlueprintCallable, Category=RIS)
     int32 AddItems_IfServer(const FRISItemInstance& ItemInstance, bool AllowPartial = false);
 
     /* For most games we could probably trust the client to specify ItemInstance but for e.g. a hot potato we can't
      * Instead have the client send an input like UseItem or DropItem
      * Returns the amount removed, if AllowPartial is false and there is insufficient quantity then removes 0*/
-    UFUNCTION(BlueprintCallable, Category="Ranc Inventory")
+    UFUNCTION(BlueprintCallable, Category=RIS)
     int32 RemoveItems_IfServer(const FRISItemInstance& ItemInstance, bool AllowPartial = false);
     
     /* Attempts to drop the item from the inventory, attempting to spawn an Item object in the world
      * Specify DropItemClass and DropDistance properties to customize the drop
      * Called on client it will request the drop on the server
      * Returns the quantity actually dropped, on client this is only a "guess" */
-    UFUNCTION(BlueprintCallable, Category="Ranc Inventory")
+    UFUNCTION(BlueprintCallable, Category=RIS)
     int32 DropItems(const FRISItemInstance& ItemInstance, float DropAngle = 0);
 
     /* Useful for e.g. Death, drops items evenly spaced in a circle with radius DropDistance */
-    UFUNCTION(BlueprintCallable, Category="Ranc Inventory")
+    UFUNCTION(BlueprintCallable, Category=RIS)
     int32 DropAllItems_IfServer();
     
 	/* Checks weight and container slot count */
-    UFUNCTION(BlueprintPure, Category="Ranc Inventory")
+    UFUNCTION(BlueprintPure, Category=RIS)
     bool CanContainerReceiveItems(const FRISItemInstance& ItemInstance) const;
 
 	/* Checks weight and container slot count */
-    UFUNCTION(BlueprintPure, Category="Ranc Inventory")
+    UFUNCTION(BlueprintPure, Category=RIS)
     int32 GetQuantityOfItemContainerCanReceive(const FGameplayTag& ItemId) const;
 	
-	UFUNCTION(BlueprintPure, Category="Ranc Inventory")
+	UFUNCTION(BlueprintPure, Category=RIS)
     bool HasWeightCapacityForItems(const FRISItemInstance& ItemInstance) const;
 
-    UFUNCTION(BlueprintPure, Category="Ranc Inventory")
+    UFUNCTION(BlueprintPure, Category=RIS)
     bool DoesContainerContainItems(const FGameplayTag& ItemId, int32 Quantity = 1) const;
     
-    UFUNCTION(BlueprintPure, Category="Ranc Inventory")
+    UFUNCTION(BlueprintPure, Category=RIS)
     int32 GetContainerItemCount(const FGameplayTag& ItemId) const;
 
-    UFUNCTION(BlueprintPure, Category="Ranc Inventory")
+    UFUNCTION(BlueprintPure, Category=RIS)
     TArray<FRISItemInstance> GetAllContainerItems() const;
     
-    UFUNCTION(BlueprintPure, Category="Ranc Inventory")
+    UFUNCTION(BlueprintPure, Category=RIS)
     bool IsEmpty() const;
 
     // Removes all items and publishes the removals
-    UFUNCTION(BlueprintCallable, Category="Ranc Inventory")
+    UFUNCTION(BlueprintCallable, Category=RIS)
     void ClearContainer_IfServer();
-    
+
+	// This allows you to set a delegate that will be called to validate whether an item can be added to the container
+	DECLARE_DYNAMIC_DELEGATE_RetVal_OneParam(bool, FAddItemValidationDelegate, const FRISItemInstance&, Item);
+	UFUNCTION(BlueprintCallable, Category = "Inventory")
+	void SetAddItemValidationCallback_IfServer(const FAddItemValidationDelegate& ValidationDelegate);
+	
     DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnInventoryItemAdded, const FRISItemInstance&, ItemInstance);
-    UPROPERTY(BlueprintAssignable, Category="Ranc Inventory")
+    UPROPERTY(BlueprintAssignable, Category=RIS)
     FOnInventoryItemAdded OnItemAddedToContainer;
-    
+
     DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnInventoryItemRemoved, const FRISItemInstance&, ItemInstance);
-    UPROPERTY(BlueprintAssignable, Category="Ranc Inventory")
+    UPROPERTY(BlueprintAssignable, Category=RIS)
     FOnInventoryItemRemoved OnItemRemovedFromContainer;
     
     /* Distance away from the owning actor to drop items. Only used on server */ 
@@ -98,21 +103,23 @@ public:
     float MaxWeight;
 
     /* Max number of slots contained items are allowed to take up.
-     * Note: The inventory doesn't actually store items in slots, the slots are calculated */
+     * Note: The inventory doesn't actually store items in slots, it just uses it to calculate whether items can be added */
     UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Ranc Inventory", meta = (AllowPrivateAccess = "true", ClampMin = "1", UIMin = "1"))
     int32 MaxContainerSlotCount;
 
-	UPROPERTY(BlueprintReadOnly, Category="Ranc Inventory")
+	UPROPERTY(BlueprintReadOnly, Category=RIS)
 	int32 UsedContainerSlotCount;
 	
 protected:
 
-    UPROPERTY(EditAnywhere, Category="Ranc Inventory")
+    UPROPERTY(EditAnywhere, Category=RIS)
     TArray<FRancInitialItem> InitialItems;
     
-    UPROPERTY(ReplicatedUsing=OnRep_Items, BlueprintReadOnly, Category="Ranc Inventory")
+    UPROPERTY(ReplicatedUsing=OnRep_Items, BlueprintReadOnly, Category=RIS)
 	FVersionedItemInstanceArray ItemsVer;
 //   TArray<FRISItemInstance> Items;
+	
+	FAddItemValidationDelegate OnValidateAddItem;
 
     UFUNCTION(Server, Reliable)
     void DropItems_Server(const FRISItemInstance& ItemInstance, float DropAngle = 0);

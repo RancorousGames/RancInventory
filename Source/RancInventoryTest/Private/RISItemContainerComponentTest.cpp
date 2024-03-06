@@ -7,8 +7,9 @@
 #include "..\..\RancInventory\Public\Management\RISInventoryData.h"
 #include "Misc/AutomationTest.h"
 #include "RISInventoryTestSetup.cpp"
+#include "TestDelegateForwardHelper.h"
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRancItemContainerComponentTest, "GameTests.RancItemContainer.Tests", EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRancItemContainerComponentTest, "GameTests.RIS.RancItemContainer", EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::ProductFilter)
 
 #define SETUP_RANCITEMCONTAINER(MaxItems, CarryCapacity) \
 URISItemContainerComponent* ItemContainerComponent = NewObject<URISItemContainerComponent>(); \
@@ -229,6 +230,42 @@ bool TestMiscFunctions(FRancItemContainerComponentTest* Test)
     return Res;
 }
 
+bool TestSetAddItemValidationCallback(FRancItemContainerComponentTest* Test)
+{
+    SETUP_RANCITEMCONTAINER(10, 50); // Assuming max items and weight capacity are sufficient for the test
+    bool Res = true;
+
+    // We have to do this weird workaround because we can't bind a lambda to a delegate directly
+    const auto DelegateHelper = NewObject<UTestDelegateForwardHelper>();
+    URISItemContainerComponent::FAddItemValidationDelegate MyDelegateInstance;
+    MyDelegateInstance.BindUFunction(DelegateHelper, FName("DispatchItemToBool"));
+    ItemContainerComponent->SetAddItemValidationCallback_IfServer(MyDelegateInstance);
+    // we can then set DelegateHelper->CallFuncItemToBool to whatever we want the callback to be
+
+    // Define a lambda function as the validation callback which only allows adding rocks
+    DelegateHelper->CallFuncItemToBool = [](const FRISItemInstance& ItemInstance)
+    {
+        return ItemInstance.ItemId.MatchesTag(ItemIdRock);
+    };
+  
+    // Attempt to add a rock, which should be allowed
+    int32 AddedQuantity = ItemContainerComponent->AddItems_IfServer(FiveRocks, false);
+    Res &= Test->TestEqual(TEXT("Should add 5 rocks since rocks are allowed"), AddedQuantity, 5);
+
+    // Attempt to add a helmet, which should be denied
+    AddedQuantity = ItemContainerComponent->AddItems_IfServer(OneHelmet, false);
+    Res &= Test->TestEqual(TEXT("Should not add the helmet since only rocks are allowed"), AddedQuantity, 0);
+
+    // Change the validation callback to allow all items
+    DelegateHelper->CallFuncItemToBool = [&](const FRISItemInstance& ItemInstance){return true;};
+
+    // Now, adding a helmet should be allowed
+    AddedQuantity = ItemContainerComponent->AddItems_IfServer(OneHelmet, false);
+    Res &= Test->TestEqual(TEXT("Should add the helmet now that all items are allowed"), AddedQuantity, 1);
+
+    return Res;
+}
+
 bool FRancItemContainerComponentTest::RunTest(const FString& Parameters)
 {
     bool Res = true;
@@ -237,6 +274,7 @@ bool FRancItemContainerComponentTest::RunTest(const FString& Parameters)
     Res &= TestCanReceiveItems(this);
     Res &= TestItemCountsAndPresence(this);
     Res &= TestMiscFunctions(this);
+    Res &= TestSetAddItemValidationCallback(this);
     // Can't currently test drop because it tries to get world from the component, which tries to get owning actor (null) to call getworld on
     
     return Res;

@@ -16,10 +16,12 @@ public:
 	UPROPERTY(BlueprintReadOnly, Meta = (DisplayName = "ItemData"), Category = "Item")
 	URISItemData* ItemData = nullptr;
 
+	UFUNCTION(BlueprintCallable, Category = "Item")
+	void SetItem(const FRISItemInstance& NewItem);
+
 	virtual void OnConstruction(const FTransform& Transform) override;
 	
 	virtual void BeginPlay() override;
-	void SetItem(const FRISItemInstance& NewItem);
 	void OnRep_Item();
 	void Initialize();
 
