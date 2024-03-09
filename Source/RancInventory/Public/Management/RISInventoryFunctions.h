@@ -18,7 +18,7 @@ enum class ERISItemSearchType : uint8
 class URISInventoryComponent;
 class UAssetManager;
 class URISItemData;
-struct FPrimaryRancItemId;
+struct FPrimaryRISItemId;
 
 /**
  * Utility functions for the Ranc Inventory System
@@ -35,7 +35,7 @@ public:
 
     /* Unload a item that was loaded by Asset Manager */
     UFUNCTION(BlueprintCallable, Category = "Ranc Inventory")
-    static void UnloadRancItem(const FPrimaryRancItemId& InItemId);
+    static void UnloadRancItem(const FPrimaryRISItemId& InItemId);
 
     /* Check if the ids are equal */
     UFUNCTION(BlueprintPure, Category = "Ranc Inventory")
@@ -47,11 +47,11 @@ public:
 
     /* Return the item data related to the given id */
     UFUNCTION(BlueprintCallable, Category = "Ranc Inventory")
-    static URISItemData* GetSingleItemDataById(const FPrimaryRancItemId& InID, const TArray<FName>& InBundles, const bool bAutoUnload = true);
+    static URISItemData* GetSingleItemDataById(const FPrimaryRISItemId& InID, const TArray<FName>& InBundles, const bool bAutoUnload = true);
 
     /* Return a array of data depending of the given ids */
     UFUNCTION(BlueprintCallable, Category = "Ranc Inventory")
-    static TArray<URISItemData*> GetItemDataArrayById(const TArray<FPrimaryRancItemId>& InIDs, const TArray<FName>& InBundles, const bool bAutoUnload = true);
+    static TArray<URISItemData*> GetItemDataArrayById(const TArray<FPrimaryRISItemId>& InIDs, const TArray<FName>& InBundles, const bool bAutoUnload = true);
 
     /* Search all registered items and return a array of item data that match with the given parameters */
     UFUNCTION(BlueprintCallable, Category = "Ranc Inventory")
@@ -104,7 +104,7 @@ public:
     static bool AreAllRISRecipesLoaded();
     
     UFUNCTION(BlueprintCallable, Category = "Ranc Inventory")
-    static TArray<URISRecipe*> GetAllRISItemRecipes();
+    static TArray<URISObjectRecipeData*> GetAllRISItemRecipes();
 
     /* Includes both RancItemRecipe and RancItemCraftingRecipe (for item to item) */
     UFUNCTION(BlueprintPure, Category = "Ranc Inventory")
@@ -133,25 +133,25 @@ public:
     }
 
     UFUNCTION(BlueprintPure, Category = "Ranc Inventory")
-    static TMap<FGameplayTag, FPrimaryRancItemIdContainer> GetItemRelations(const FRISItemInstance InItemInfo);
+    static TMap<FGameplayTag, FPrimaryRISItemIdContainer> GetItemRelations(const FRISItemInstance InItemInfo);
 
     static void AllItemsLoadedCallback();
     static void AllRecipesLoadedCallback();
 
     // Below are used for e.g. unit tests
     static void HardcodeItem(FGameplayTag ItemId, URISItemData* ItemData);
-    static void HardcodeRecipe(FGameplayTag RecipeId, URISRecipe* RecipeData);
+    static void HardcodeRecipe(FGameplayTag RecipeId, URISObjectRecipeData* RecipeData);
 
 private:
     static TArray<URISItemData*> LoadRancItemData_Internal(UAssetManager* InAssetManager, const TArray<FPrimaryAssetId>& InIDs, const TArray<FName>& InBundles, const bool bAutoUnload);
-    static TArray<URISItemData*> LoadRancItemData_Internal(UAssetManager* InAssetManager, const TArray<FPrimaryRancItemId>& InIDs, const TArray<FName>& InBundles, const bool bAutoUnload);
+    static TArray<URISItemData*> LoadRancItemData_Internal(UAssetManager* InAssetManager, const TArray<FPrimaryRISItemId>& InIDs, const TArray<FName>& InBundles, const bool bAutoUnload);
 
     
     static TMap<FGameplayTag, URISItemData*> AllLoadedItemsByTag;
    // static TMap<FGameplayTag, FName> AllLoadedItemAssetNamesByTag;
     static TArray<FGameplayTag> AllItemIds;
     
-    static TArray<URISRecipe*> AllLoadedRecipes;
+    static TArray<URISObjectRecipeData*> AllLoadedRecipes;
 
 public:
     /* Filter the container and return only items that can be traded at the current context */

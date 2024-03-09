@@ -423,7 +423,7 @@ void SRISItemCreator::UpdateFolders()
 
     if (const UAssetManager* const AssetManager = UAssetManager::GetIfValid())
     {
-        if (FPrimaryAssetTypeInfo Info; AssetManager->GetPrimaryAssetTypeInfo(FPrimaryAssetType(RancItemDataType), Info))
+        if (FPrimaryAssetTypeInfo Info; AssetManager->GetPrimaryAssetTypeInfo(FPrimaryAssetType(RancInventoryItemDataType), Info))
         {
             for (const FString& Path : Info.AssetScanPaths)
             {
@@ -491,7 +491,7 @@ bool SRISItemCreator::IsCreateEnabled() const
 {
     if (const UAssetManager* const AssetManager = UAssetManager::GetIfInitialized())
     {
-        return ItemId.IsValid() && !AssetManager->GetPrimaryAssetPath(FPrimaryAssetId(RancItemDataType, *ItemId.ToString())).IsValid();
+        return ItemId.IsValid() && !AssetManager->GetPrimaryAssetPath(FPrimaryAssetId(RancInventoryItemDataType, *ItemId.ToString())).IsValid();
     }
 
     return false;

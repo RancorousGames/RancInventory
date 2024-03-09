@@ -4,4 +4,5 @@
 
 static const FName RancInventoryEditorTabId("Ranc Inventory");
 static const FName ItemCreatorTabId("Ranc Item Creator");
-static const FName ItemStackPropertyId("PrimaryRancItemId");
+static const FName PrimaryItemIdName("PrimaryRISItemId");
+static const FName PrimaryRecipeIdName("PrimaryRISRecipeId");

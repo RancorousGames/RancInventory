@@ -13,6 +13,6 @@ URISItemData::URISItemData(const FObjectInitializer& ObjectInitializer) : Super(
 {
 }
 
-URISRecipe::URISRecipe(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
+URISObjectRecipeData::URISObjectRecipeData(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
 }

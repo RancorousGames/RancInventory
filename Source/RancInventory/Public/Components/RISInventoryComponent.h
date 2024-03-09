@@ -107,33 +107,33 @@ public:
 	////////////////// CRAFTING ///////////////////
 
 	UFUNCTION(BlueprintCallable, Category="Ranc Inventory | Crafting")
-	bool CanCraftRecipeId(const FPrimaryAssetId& RecipeId) const;
+	bool CanCraftRecipeId(const FPrimaryRISRecipeId& RecipeId) const;
 
 	UFUNCTION(BlueprintCallable, Category="Ranc Inventory | Crafting")
-	bool CanCraftRecipe(const URISRecipe* Recipe) const;
+	bool CanCraftRecipe(const URISObjectRecipeData* Recipe) const;
 
 	UFUNCTION(BlueprintCallable, Category="Ranc Inventory | Crafting")
-	bool CanCraftCraftingRecipe(const FPrimaryAssetId& RecipeId) const;
+	bool CanCraftCraftingRecipe(const FPrimaryRISRecipeId& RecipeId) const;
 
 	UFUNCTION(Server, Reliable, BlueprintCallable, Category="Ranc Inventory | Crafting")
-	void CraftRecipeId_Server(const FPrimaryAssetId& RecipeId);
+	void CraftRecipeId_Server(const FPrimaryRISRecipeId& RecipeId);
 
 	UFUNCTION(BlueprintCallable, Category="Ranc Inventory | Crafting")
-	bool CraftRecipe_IfServer(const URISRecipe* Recipe);
+	bool CraftRecipe_IfServer(const URISObjectRecipeData* Recipe);
 
 
 	UFUNCTION(BlueprintPure, Category="Ranc Inventory")
 	TArray<FRancTaggedItemInstance> GetAllTaggedItems() const;
 
 	UFUNCTION(Server, Reliable, BlueprintCallable, Category="Ranc Inventory | Recipes")
-	void SetRecipeLock_Server(const FPrimaryAssetId& RecipeId, bool LockState);
+	void SetRecipeLock_Server(const FPrimaryRISRecipeId& RecipeId, bool LockState);
 
 	UFUNCTION(BlueprintCallable, Category="Ranc Inventory | Recipes")
-	URISRecipe* GetRecipeById(const FPrimaryAssetId& RecipeId);
+	URISObjectRecipeData* GetRecipeById(const FPrimaryRISRecipeId& RecipeId);
 
 	// Available recipes are ones that are unlocked and for which we have the necessary materials
 	UFUNCTION(BlueprintCallable, Category="Ranc Inventory | Recipes")
-	TArray<URISRecipe*> GetAvailableRecipes(FGameplayTag TagFilter);
+	TArray<URISObjectRecipeData*> GetAvailableRecipes(FGameplayTag TagFilter);
 
 	DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnCraftConfirmed, TSubclassOf<UObject>, CraftedClass, int32, QuantityCrafted);
 
@@ -153,7 +153,7 @@ public:
 
 	// All possible recipes, not just ones we can craft
 	UPROPERTY(ReplicatedUsing=OnRep_Recipes, EditAnywhere, BlueprintReadOnly, Category="Ranc Inventory | Recipes")
-	TArray<FPrimaryAssetId> AllUnlockedRecipes;
+	TArray<FPrimaryRISRecipeId> AllUnlockedRecipes;
 
 protected:
 	void CheckAndUpdateRecipeAvailability();
@@ -174,7 +174,7 @@ protected:
 	UPROPERTY(ReplicatedUsing=OnRep_Slots, BlueprintReadOnly, Category="Ranc Inventory")
 	TArray<FRancTaggedItemInstance> TaggedSlotItemInstances;
 
-	TMap<FGameplayTag, TArray<URISRecipe*>> CurrentAvailableRecipes;
+	TMap<FGameplayTag, TArray<URISObjectRecipeData*>> CurrentAvailableRecipes;
 
 private:
 	TArray<FGameplayTag> _SlotsToRemove; // Could be a local value but just slight optimization to avoid creating a new array every time.

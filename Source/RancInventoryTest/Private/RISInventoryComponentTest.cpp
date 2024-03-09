@@ -360,7 +360,7 @@ bool TestCanCraftRecipe()
 	bool Res = true;
 
 	// Create a recipe for crafting
-	URISRecipe* TestRecipe = NewObject<URISRecipe>();
+	URISObjectRecipeData* TestRecipe = NewObject<URISObjectRecipeData>();
 	TestRecipe->Components.Add(TwoRocks); // Requires 2 Rocks
 	TestRecipe->Components.Add(ThreeSticks); // Requires 3 Sticks
 
@@ -408,7 +408,7 @@ bool TestCraftRecipe()
 	bool Res = true;
 
 	// Create a test recipe
-	URISRecipe* TestRecipe = NewObject<URISRecipe>();
+	URISObjectRecipeData* TestRecipe = NewObject<URISObjectRecipeData>();
 	TestRecipe->ResultingObject = UObject::StaticClass(); // Assuming UMyCraftedObject is a valid class
 	TestRecipe->QuantityCreated = 1;
 	TestRecipe->Components.Add(TwoRocks); // Requires 2 Rocks
@@ -482,7 +482,7 @@ bool TestInventoryMaxCapacity()
 	QuantityAdded = InventoryComponent->AddItemsToTaggedSlot_IfServer(RightHandSlot, TwoRocks);
 	Res &= RITest->TestEqual(TEXT("Should successfully add 2 rocks within capacity"), QuantityAdded, 2);
 
-	URISItemRecipe* BoulderRecipe = NewObject<URISItemRecipe>();
+	URISItemRecipeData* BoulderRecipe = NewObject<URISItemRecipeData>();
 	BoulderRecipe->ResultingItemId = ItemIdGiantBoulder; // a boulder weighs 10
 	BoulderRecipe->QuantityCreated = 1;
 	BoulderRecipe->Components.Add(FRISItemInstance(ItemIdRock, 5)); // Requires 2 Rocks

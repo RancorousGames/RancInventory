@@ -18,10 +18,12 @@ void FRancInventoryEditorModule::StartupModule()
 
     UToolMenus::RegisterStartupCallback(RegisterDelegate);
 
-    const auto MakeInstanceDelegate = FOnGetPropertyTypeCustomizationInstance::CreateStatic(&SFRancInventoryDetailsPanel::MakeInstance);
+    const auto MakeItemInstanceDelegate = FOnGetPropertyTypeCustomizationInstance::CreateStatic(&SFRancInventoryItemDetailsPanel::MakeItemInstance);
+    const auto MakeRecipeInstanceDelegate = FOnGetPropertyTypeCustomizationInstance::CreateStatic(&SFRancInventoryRecipeDetailsPanel::MakeRecipeInstance);
 
     PropertyEditorModule = &FModuleManager::LoadModuleChecked<FPropertyEditorModule>(TEXT("PropertyEditor"));
-    PropertyEditorModule->RegisterCustomPropertyTypeLayout(ItemStackPropertyId, MakeInstanceDelegate);
+    PropertyEditorModule->RegisterCustomPropertyTypeLayout(PrimaryItemIdName, MakeItemInstanceDelegate);
+    PropertyEditorModule->RegisterCustomPropertyTypeLayout(PrimaryRecipeIdName, MakeRecipeInstanceDelegate);
 }
 
 void FRancInventoryEditorModule::ShutdownModule()
@@ -32,7 +34,8 @@ void FRancInventoryEditorModule::ShutdownModule()
     FGlobalTabmanager::Get()->UnregisterNomadTabSpawner(RancInventoryEditorTabId);
     FGlobalTabmanager::Get()->UnregisterNomadTabSpawner(ItemCreatorTabId);
 
-    PropertyEditorModule->UnregisterCustomPropertyTypeLayout(ItemStackPropertyId);
+    PropertyEditorModule->UnregisterCustomPropertyTypeLayout(PrimaryItemIdName);
+    PropertyEditorModule->UnregisterCustomPropertyTypeLayout(PrimaryRecipeIdName);
 }
 
 TSharedRef<SDockTab> FRancInventoryEditorModule::OnSpawnTab([[maybe_unused]] const FSpawnTabArgs&, const FName TabId) const

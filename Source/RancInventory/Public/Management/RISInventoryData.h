@@ -9,47 +9,80 @@
 
 class UTexture2D;
 
-constexpr auto RancItemDataType = TEXT("RancInventory_ItemData");
-constexpr auto RISItemRecipeType = TEXT("RancInventory_ItemRecipe");
+constexpr auto RancInventoryItemDataType = TEXT("RancInventory_ItemData");
+constexpr auto RancInventoryRecipeDataType = TEXT("RancInventory_ItemRecipe");
 
-USTRUCT(BlueprintType, Category = "Ranc Inventory | Structs")
-struct FPrimaryRancItemId : public FPrimaryAssetId
+USTRUCT(BlueprintType, Category = "RIS | Structs")
+struct FPrimaryRISItemId : public FPrimaryAssetId
 {
     GENERATED_BODY()
 
-    FPrimaryRancItemId() : Super()
+    FPrimaryRISItemId() : Super()
     {
     }
 
-    explicit FPrimaryRancItemId(const FPrimaryAssetId& InId) : Super(InId.PrimaryAssetType, InId.PrimaryAssetName)
+    explicit FPrimaryRISItemId(const FPrimaryAssetId& InId) : Super(InId.PrimaryAssetType, InId.PrimaryAssetName)
     {
     }
 
-    explicit FPrimaryRancItemId(const FString& TypeAndName) : Super(TypeAndName)
+    explicit FPrimaryRISItemId(const FString& TypeAndName) : Super(TypeAndName)
     {
     }
 
-    bool operator>(const FPrimaryRancItemId& Other) const
+    bool operator>(const FPrimaryRISItemId& Other) const
     {
         return ToString() > Other.ToString();
     }
 
-    bool operator<(const FPrimaryRancItemId& Other) const
+    bool operator<(const FPrimaryRISItemId& Other) const
     {
         return ToString() < Other.ToString();
     }
 };
 
-USTRUCT(BlueprintType, Category = "Ranc Inventory | Structs")
-struct FPrimaryRancItemIdContainer
+
+USTRUCT(BlueprintType, Category = "RIS | Structs")
+struct FPrimaryRISRecipeId : public FPrimaryAssetId
 {
     GENERATED_BODY()
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ranc Inventory")
-    TArray<FPrimaryRancItemId> Items;
+    FPrimaryRISRecipeId() : Super()
+    {
+    }
+
+    FPrimaryRISRecipeId(FPrimaryAssetType InAssetType, FName InAssetName)
+        : Super(InAssetType, InAssetName)
+    {}
+    
+    explicit FPrimaryRISRecipeId(const FPrimaryRISRecipeId& InId) : Super(InId.PrimaryAssetType, InId.PrimaryAssetName)
+    {
+    }
+
+    explicit FPrimaryRISRecipeId(const FString& TypeAndName) : Super(TypeAndName)
+    {
+    }
+
+    bool operator>(const FPrimaryRISRecipeId& Other) const
+    {
+        return ToString() > Other.ToString();
+    }
+
+    bool operator<(const FPrimaryRISRecipeId& Other) const
+    {
+        return ToString() < Other.ToString();
+    }
 };
 
-USTRUCT(BlueprintType, Category = "Ranc Inventory | Structs")
+USTRUCT(BlueprintType, Category = "RIS | Structs")
+struct FPrimaryRISItemIdContainer
+{
+    GENERATED_BODY()
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RIS")
+    TArray<FPrimaryRISItemId> Items;
+};
+
+USTRUCT(BlueprintType, Category = "RIS | Structs")
 struct FRISItemInstance
 {
     GENERATED_BODY()
@@ -86,14 +119,14 @@ struct FRISItemInstance
         return ItemId.IsValid();
     }
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ranc Inventory")
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RIS")
     FGameplayTag ItemId;
     
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ranc Inventory")
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RIS")
     int32 Quantity = 0;
 };
 
-USTRUCT(BlueprintType, Category = "Ranc Inventory | Structs")
+USTRUCT(BlueprintType, Category = "RIS | Structs")
 struct FRancInitialItem
 {
     GENERATED_BODY()
@@ -102,22 +135,22 @@ struct FRancInitialItem
 
     FRancInitialItem() = default;
 
-    explicit FRancInitialItem(FPrimaryRancItemId InItemId) : ItemId(InItemId)
+    explicit FRancInitialItem(FPrimaryRISItemId InItemId) : ItemId(InItemId)
     {
     }
 
-    explicit FRancInitialItem(FPrimaryRancItemId InItemId, const int32& InQuant) : ItemId(InItemId), Quantity(InQuant)
+    explicit FRancInitialItem(FPrimaryRISItemId InItemId, const int32& InQuant) : ItemId(InItemId), Quantity(InQuant)
     {
     }
     
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ranc Inventory")
-    FPrimaryRancItemId ItemId;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RIS")
+    FPrimaryRISItemId ItemId;
     
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ranc Inventory")
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RIS")
     int32 Quantity = 1;
 };
 
-UCLASS(NotBlueprintable, NotPlaceable, Category = "Ranc Inventory | Classes | Data")
+UCLASS(NotBlueprintable, NotPlaceable, Category = "RIS | Classes | Data")
 class RANCINVENTORY_API URISItemData : public UPrimaryDataAsset
 {
     GENERATED_BODY()
@@ -130,53 +163,53 @@ public:
         return FPrimaryAssetId(TEXT("RancInventory_ItemData"), *(ItemId.ToString()));
     }
     
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ranc Inventory", meta = (AssetBundles = "Data"))
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS", meta = (AssetBundles = "Data"))
     FGameplayTag ItemId;
     
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ranc Inventory", meta = (AssetBundles = "Data"))
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS", meta = (AssetBundles = "Data"))
     FName ItemName;
 
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ranc Inventory", meta = (AssetBundles = "Data", MultiLine = "true"))
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS", meta = (AssetBundles = "Data", MultiLine = "true"))
     FText ItemDescription;
 
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ranc Inventory", meta = (AssetBundles = "Data"))
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS", meta = (AssetBundles = "Data"))
     FGameplayTag ItemPrimaryType;
 
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ranc Inventory", meta = (AssetBundles = "Data"))
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS", meta = (AssetBundles = "Data"))
     bool bIsStackable = true;
     
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ranc Inventory", meta = (AssetBundles = "Data"))
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS", meta = (AssetBundles = "Data"))
     int32 MaxStackSize = 5;
     
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ranc Inventory", meta = (UIMin = 0, ClampMin = 0, AssetBundles = "Data"))
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS", meta = (UIMin = 0, ClampMin = 0, AssetBundles = "Data"))
     float ItemValue;
 
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ranc Inventory", meta = (UIMin = 0, ClampMin = 0, AssetBundles = "Data"))
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS", meta = (UIMin = 0, ClampMin = 0, AssetBundles = "Data"))
     float ItemWeight;
 
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ranc Inventory", meta = (AssetBundles = "UI"))
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS", meta = (AssetBundles = "UI"))
     TSoftObjectPtr<UTexture2D> ItemIcon;
 
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ranc Inventory", meta = (AssetBundles = "Data"))
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS", meta = (AssetBundles = "Data"))
     FGameplayTagContainer ItemCategories;
 
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ranc Inventory", meta = (AssetBundles = "Data"))
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS", meta = (AssetBundles = "Data"))
     UStaticMesh* ItemWorldMesh = nullptr;
 
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ranc Inventory", meta = (UIMin = 0, ClampMin = 0, AssetBundles = "Data"))
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS", meta = (UIMin = 0, ClampMin = 0, AssetBundles = "Data"))
     FVector ItemWorldScale = FVector(1.0f, 1.0f, 1.0f);
 
     /* Allows to implement custom properties in this item data */
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ranc Inventory", meta = (DisplayName = "Custom Metadatas", AssetBundles = "Custom"))
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS", meta = (DisplayName = "Custom Metadatas", AssetBundles = "Custom"))
     TMap<FGameplayTag, FName> Metadatas;
 
     /* Map containing a tag as key and a ID container as value to add relations to other items such as crafting requirements, etc. */
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ranc Inventory", meta = (DisplayName = "Item Relations", AssetBundles = "Custom"))
-    TMap<FGameplayTag, FPrimaryRancItemIdContainer> Relations;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS", meta = (DisplayName = "Item Relations", AssetBundles = "Custom"))
+    TMap<FGameplayTag, FPrimaryRISItemIdContainer> Relations;
 };
 
 
-UCLASS(Blueprintable, Category = "Ranc Inventory | Classes | Data")
+UCLASS(Blueprintable, Category = "RIS | Classes | Data")
 class RANCINVENTORY_API USpawnableRancItemData : public URISItemData
 {
     GENERATED_BODY()
@@ -192,17 +225,18 @@ public:
         Super::PostLoad();
     }
 
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ranc Inventory", meta = (AssetBundles = "Data"))
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS", meta = (AssetBundles = "Data"))
     TSubclassOf<UObject> SpawnableObjectClass;
 };
 
-UCLASS(NotBlueprintable, NotPlaceable, Category = "Ranc Inventory | Classes | Data")
-class RANCINVENTORY_API URISRecipe : public UPrimaryDataAsset
+// This class is used to define a recipe for crafting any object type, RIS helps you specify the class but not instantiating the object
+UCLASS(NotBlueprintable, NotPlaceable, Category = "RIS | Classes | Data")
+class RANCINVENTORY_API URISObjectRecipeData : public UPrimaryDataAsset
 {
     GENERATED_BODY()
 
 public:
-    explicit URISRecipe(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
+    explicit URISObjectRecipeData(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
     
     FORCEINLINE virtual FPrimaryAssetId GetPrimaryAssetId() const override
     {
@@ -213,36 +247,36 @@ public:
             ResultingItemIdString += Component.ItemId.ToString();
         }
         
-        return FPrimaryAssetId(TEXT("RancInventory_ItemRecipe"), *ResultingItemIdString);
+        return FPrimaryRISRecipeId(TEXT("RancInventory_ItemRecipe"), *ResultingItemIdString);
     }
     
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ranc Inventory", meta = (AssetBundles = "Data"))
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS", meta = (AssetBundles = "Data"))
     TSubclassOf<UObject> ResultingObject;
     
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ranc Inventory", meta = (AssetBundles = "Data"))
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS", meta = (AssetBundles = "Data"))
     int32 QuantityCreated = 1;
 
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ranc Inventory", meta = (AssetBundles = "Data"))
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS", meta = (AssetBundles = "Data"))
     TArray<FRISItemInstance> Components;
 
     /* Tags can be used to group recipes, e.g. you might have Recipes.Items and Recipes.Buildings */
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ranc Inventory", meta = (AssetBundles = "Data"))
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS", meta = (AssetBundles = "Data"))
     FGameplayTagContainer Tags;
     
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ranc Inventory", meta = (AssetBundles = "UI"))
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS", meta = (AssetBundles = "UI"))
     TSoftObjectPtr<UTexture2D> Icon;
 
 };
 
 
-
-UCLASS(NotBlueprintable, NotPlaceable, Category = "Ranc Inventory | Classes | Data")
-class RANCINVENTORY_API URISItemRecipe : public URISRecipe
+// This class is used to define a recipe for crafting RIS items specifically
+UCLASS(NotBlueprintable, NotPlaceable, Category = "RIS | Classes | Data")
+class RANCINVENTORY_API URISItemRecipeData : public URISObjectRecipeData
 {
     GENERATED_BODY()
 
 public:
-    explicit URISItemRecipe(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get())
+    explicit URISItemRecipeData(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get())
     {
         
     }
@@ -260,21 +294,21 @@ public:
     }
 public:
     // Replaces use of ResultingItem
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ranc Inventory", meta = (AssetBundles = "Data"))
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS", meta = (AssetBundles = "Data"))
     FGameplayTag ResultingItemId;
 };
 
-USTRUCT(BlueprintType, Category = "Ranc Inventory | Structs")
+USTRUCT(BlueprintType, Category = "RIS | Structs")
 struct FRancTaggedItemInstance
 {
     GENERATED_BODY()
 
     static const FRancTaggedItemInstance EmptyItemInstance;
     
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ranc Inventory")
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RIS")
     FGameplayTag Tag;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ranc Inventory")
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RIS")
     FRISItemInstance ItemInstance;
     
     bool IsValid() const

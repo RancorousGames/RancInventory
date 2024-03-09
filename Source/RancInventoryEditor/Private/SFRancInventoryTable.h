@@ -8,7 +8,7 @@
 
 struct FRancItemRowData
 {
-    explicit FRancItemRowData(const FPrimaryRancItemId& InPrimaryAssetId)
+    explicit FRancItemRowData(const FPrimaryRISItemId& InPrimaryAssetId)
     {
         const auto ItemData = URISInventoryFunctions::GetSingleItemDataById(InPrimaryAssetId, { TEXT("Data"), TEXT("SoftData"), }, false);
 
@@ -24,7 +24,7 @@ struct FRancItemRowData
         URISInventoryFunctions::UnloadRancItem(InPrimaryAssetId);
     }
 
-    explicit FRancItemRowData(const FPrimaryAssetId& InPrimaryAssetId) : FRancItemRowData(FPrimaryRancItemId(InPrimaryAssetId))
+    explicit FRancItemRowData(const FPrimaryAssetId& InPrimaryAssetId) : FRancItemRowData(FPrimaryRISItemId(InPrimaryAssetId))
     {
     }
 

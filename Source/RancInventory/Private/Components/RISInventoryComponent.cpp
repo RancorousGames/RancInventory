@@ -558,14 +558,14 @@ void URISInventoryComponent::OnRep_Slots()
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////// CRAFTING /////////////////////////////////////////////////////////////////
 
-bool URISInventoryComponent::CanCraftRecipeId(const FPrimaryAssetId& RecipeId) const
+bool URISInventoryComponent::CanCraftRecipeId(const FPrimaryRISRecipeId& RecipeId) const
 {
-	const URISRecipe* Recipe = Cast<URISRecipe>(
+	const URISObjectRecipeData* Recipe = Cast<URISObjectRecipeData>(
 		UAssetManager::GetIfInitialized()->GetPrimaryAssetObject(RecipeId));
 	return CanCraftRecipe(Recipe);
 }
 
-bool URISInventoryComponent::CanCraftRecipe(const URISRecipe* Recipe) const
+bool URISInventoryComponent::CanCraftRecipe(const URISObjectRecipeData* Recipe) const
 {
 	if (!Recipe) return false;
 
@@ -579,20 +579,20 @@ bool URISInventoryComponent::CanCraftRecipe(const URISRecipe* Recipe) const
 	return true;
 }
 
-bool URISInventoryComponent::CanCraftCraftingRecipe(const FPrimaryAssetId& RecipeId) const
+bool URISInventoryComponent::CanCraftCraftingRecipe(const FPrimaryRISRecipeId& RecipeId) const
 {
-	URISItemRecipe* CraftingRecipe = Cast<URISItemRecipe>(
+	URISItemRecipeData* CraftingRecipe = Cast<URISItemRecipeData>(
 		UAssetManager::GetIfInitialized()->GetPrimaryAssetObject(RecipeId));
 	return CanCraftRecipe(CraftingRecipe);
 }
 
-void URISInventoryComponent::CraftRecipeId_Server_Implementation(const FPrimaryAssetId& RecipeId)
+void URISInventoryComponent::CraftRecipeId_Server_Implementation(const FPrimaryRISRecipeId& RecipeId)
 {
-	const URISRecipe* Recipe = Cast<URISRecipe>(UAssetManager::GetIfInitialized()->GetPrimaryAssetObject(RecipeId));
+	const URISObjectRecipeData* Recipe = Cast<URISObjectRecipeData>(UAssetManager::GetIfInitialized()->GetPrimaryAssetObject(RecipeId));
 	CraftRecipe_IfServer(Recipe);
 }
 
-bool URISInventoryComponent::CraftRecipe_IfServer(const URISRecipe* Recipe)
+bool URISInventoryComponent::CraftRecipe_IfServer(const URISObjectRecipeData* Recipe)
 {
 	if (GetOwnerRole() < ROLE_Authority && GetOwnerRole() != ROLE_None)
 	{
@@ -615,7 +615,7 @@ bool URISInventoryComponent::CraftRecipe_IfServer(const URISRecipe* Recipe)
 		}
 		bSuccess = true;
 
-		if (const URISItemRecipe* ItemRecipe = Cast<URISItemRecipe>(Recipe))
+		if (const URISItemRecipeData* ItemRecipe = Cast<URISItemRecipeData>(Recipe))
 		{
 			// If it is an item recipe, add the resulting item to the inventory
 			auto CraftedItem = FRISItemInstance(ItemRecipe->ResultingItemId, ItemRecipe->QuantityCreated);
@@ -635,7 +635,7 @@ bool URISInventoryComponent::CraftRecipe_IfServer(const URISRecipe* Recipe)
 	return bSuccess;
 }
 
-void URISInventoryComponent::SetRecipeLock_Server_Implementation(const FPrimaryAssetId& RecipeId, bool LockState)
+void URISInventoryComponent::SetRecipeLock_Server_Implementation(const FPrimaryRISRecipeId& RecipeId, bool LockState)
 {
 	if (AllUnlockedRecipes.Contains(RecipeId) != LockState)
 	{
@@ -655,14 +655,14 @@ void URISInventoryComponent::SetRecipeLock_Server_Implementation(const FPrimaryA
 	}
 }
 
-URISRecipe* URISInventoryComponent::GetRecipeById(const FPrimaryAssetId& RecipeId)
+URISObjectRecipeData* URISInventoryComponent::GetRecipeById(const FPrimaryRISRecipeId& RecipeId)
 {
-	return Cast<URISRecipe>(UAssetManager::GetIfInitialized()->GetPrimaryAssetObject(RecipeId));
+	return Cast<URISObjectRecipeData>(UAssetManager::GetIfInitialized()->GetPrimaryAssetObject(RecipeId));
 }
 
-TArray<URISRecipe*> URISInventoryComponent::GetAvailableRecipes(FGameplayTag TagFilter)
+TArray<URISObjectRecipeData*> URISInventoryComponent::GetAvailableRecipes(FGameplayTag TagFilter)
 {
-	return CurrentAvailableRecipes.Contains(TagFilter) ? CurrentAvailableRecipes[TagFilter] : TArray<URISRecipe*>();
+	return CurrentAvailableRecipes.Contains(TagFilter) ? CurrentAvailableRecipes[TagFilter] : TArray<URISObjectRecipeData*>();
 }
 
 void URISInventoryComponent::CheckAndUpdateRecipeAvailability()
@@ -671,9 +671,9 @@ void URISInventoryComponent::CheckAndUpdateRecipeAvailability()
 	CurrentAvailableRecipes.Empty();
 
 	// Iterate through all available recipes and check if they can be crafted
-	for (const FPrimaryAssetId& RecipeId : AllUnlockedRecipes)
+	for (const FPrimaryRISRecipeId& RecipeId : AllUnlockedRecipes)
 	{
-		URISRecipe* Recipe = GetRecipeById(RecipeId);
+		URISObjectRecipeData* Recipe = GetRecipeById(RecipeId);
 		if (CanCraftRecipe(Recipe))
 		{
 			for (const FGameplayTag& Category : RecipeTagFilters)

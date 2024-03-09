@@ -13,7 +13,7 @@
 
 TMap<FGameplayTag, URISItemData*> URISInventoryFunctions::AllLoadedItemsByTag;
 TArray<FGameplayTag> URISInventoryFunctions::AllItemIds;
-TArray<URISRecipe*> URISInventoryFunctions::AllLoadedRecipes;
+TArray<URISObjectRecipeData*> URISInventoryFunctions::AllLoadedRecipes;
 
 void URISInventoryFunctions::UnloadAllRancItems()
 {
@@ -23,11 +23,11 @@ void URISInventoryFunctions::UnloadAllRancItems()
     if (UAssetManager* const AssetManager = UAssetManager::GetIfValid())
 #endif
 	{
-		AssetManager->UnloadPrimaryAssetsWithType(FPrimaryAssetType(RancItemDataType));
+		AssetManager->UnloadPrimaryAssetsWithType(FPrimaryAssetType(RancInventoryItemDataType));
 	}
 }
 
-void URISInventoryFunctions::UnloadRancItem(const FPrimaryRancItemId& InItemId)
+void URISInventoryFunctions::UnloadRancItem(const FPrimaryRISItemId& InItemId)
 {
 #if ENGINE_MAJOR_VERSION > 5 || (ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3)
 	if (UAssetManager* const AssetManager = UAssetManager::GetIfInitialized())
@@ -49,7 +49,7 @@ bool URISInventoryFunctions::CompareItemData(const URISItemData* Data1, const UR
 	return Data1->GetPrimaryAssetId() == Data2->GetPrimaryAssetId();
 }
 
-URISItemData* URISInventoryFunctions::GetSingleItemDataById(const FPrimaryRancItemId& InID,
+URISItemData* URISInventoryFunctions::GetSingleItemDataById(const FPrimaryRISItemId& InID,
                                                               const TArray<FName>& InBundles, const bool bAutoUnload)
 {
 	URISItemData* Output = nullptr;
@@ -89,7 +89,7 @@ URISItemData* URISInventoryFunctions::GetSingleItemDataById(const FPrimaryRancIt
 	return Output;
 }
 
-TArray<URISItemData*> URISInventoryFunctions::GetItemDataArrayById(const TArray<FPrimaryRancItemId>& InIDs,
+TArray<URISItemData*> URISInventoryFunctions::GetItemDataArrayById(const TArray<FPrimaryRISItemId>& InIDs,
                                                                      const TArray<FName>& InBundles,
                                                                      const bool bAutoUnload)
 {
@@ -162,10 +162,10 @@ TArray<URISItemData*> URISInventoryFunctions::SearchRancItemData(const ERISItemS
 }
 
 
-TMap<FGameplayTag, FPrimaryRancItemIdContainer> URISInventoryFunctions::GetItemRelations(
+TMap<FGameplayTag, FPrimaryRISItemIdContainer> URISInventoryFunctions::GetItemRelations(
 	const FRISItemInstance InItemInfo)
 {
-	TMap<FGameplayTag, FPrimaryRancItemIdContainer> Output;
+	TMap<FGameplayTag, FPrimaryRISItemIdContainer> Output;
 	if (const URISItemData* const Data = URISInventoryFunctions::GetItemDataById(InItemInfo.ItemId))
 	{
 		Output = Data->Relations;
@@ -232,7 +232,7 @@ TArray<URISItemData*> URISInventoryFunctions::LoadRancItemData_Internal(
 	else // Objects already loaded
 	{
 		if (TArray<UObject*> LoadedAssets;
-			InAssetManager->GetPrimaryAssetObjectList(FPrimaryAssetType(RancItemDataType), LoadedAssets))
+			InAssetManager->GetPrimaryAssetObjectList(FPrimaryAssetType(RancInventoryItemDataType), LoadedAssets))
 		{
 			PassItemArr_Lambda(LoadedAssets);
 		}
@@ -260,7 +260,7 @@ TArray<URISItemData*> URISInventoryFunctions::LoadRancItemData_Internal(
 }
 
 TArray<URISItemData*> URISInventoryFunctions::LoadRancItemData_Internal(
-	UAssetManager* InAssetManager, const TArray<FPrimaryRancItemId>& InIDs, const TArray<FName>& InBundles,
+	UAssetManager* InAssetManager, const TArray<FPrimaryRISItemId>& InIDs, const TArray<FName>& InBundles,
 	const bool bAutoUnload)
 {
 	const TArray<FPrimaryAssetId> PrimaryAssetIds(InIDs);
@@ -318,7 +318,7 @@ void URISInventoryFunctions::AllItemsLoadedCallback()
 	if (UAssetManager* const AssetManager = UAssetManager::GetIfInitialized())
 	{
 		TArray<UObject*> LoadedAssets;
-		if (AssetManager->GetPrimaryAssetObjectList(FPrimaryAssetType(RancItemDataType), LoadedAssets))
+		if (AssetManager->GetPrimaryAssetObjectList(FPrimaryAssetType(RancInventoryItemDataType), LoadedAssets))
 		{
 			for (UObject* const& Iterator : LoadedAssets)
 			{
@@ -354,7 +354,7 @@ TArray<FPrimaryAssetId> URISInventoryFunctions::GetAllRancItemPrimaryIds()
 	if (UAssetManager* const AssetManager = UAssetManager::GetIfValid())
 #endif
 	{
-		AssetManager->GetPrimaryAssetIdList(FPrimaryAssetType(RancItemDataType), Output);
+		AssetManager->GetPrimaryAssetIdList(FPrimaryAssetType(RancInventoryItemDataType), Output);
 	}
 
 	return Output;
@@ -517,7 +517,7 @@ TArray<FPrimaryAssetId> URISInventoryFunctions::GetAllRisItemRecipeIds()
 	TArray<FPrimaryAssetId> AllItemRecipeIds;
 	if (const UAssetManager* const AssetManager = UAssetManager::GetIfInitialized())
 	{
-		AssetManager->GetPrimaryAssetIdList(FPrimaryAssetType(RISItemRecipeType), AllItemRecipeIds);
+		AssetManager->GetPrimaryAssetIdList(FPrimaryAssetType(RancInventoryRecipeDataType), AllItemRecipeIds);
 	}
 
 	return AllItemRecipeIds;
@@ -528,11 +528,11 @@ void URISInventoryFunctions::AllRecipesLoadedCallback()
 	if (UAssetManager* const AssetManager = UAssetManager::GetIfInitialized())
 	{
 		TArray<UObject*> LoadedAssets;
-		if (AssetManager->GetPrimaryAssetObjectList(FPrimaryAssetType(RISItemRecipeType), LoadedAssets))
+		if (AssetManager->GetPrimaryAssetObjectList(FPrimaryAssetType(RancInventoryRecipeDataType), LoadedAssets))
 		{
 			for (UObject* const& Iterator : LoadedAssets)
 			{
-				URISRecipe* const CastedAsset = Cast<URISRecipe>(Iterator);
+				URISObjectRecipeData* const CastedAsset = Cast<URISObjectRecipeData>(Iterator);
 				AllLoadedRecipes.Add(CastedAsset);
 			}
 		}
@@ -551,7 +551,7 @@ void URISInventoryFunctions::HardcodeItem(FGameplayTag ItemId, URISItemData* Ite
 	AllItemIds.Add(ItemId);
 }
 
-void URISInventoryFunctions::HardcodeRecipe(FGameplayTag RecipeId, URISRecipe* RecipeData)
+void URISInventoryFunctions::HardcodeRecipe(FGameplayTag RecipeId, URISObjectRecipeData* RecipeData)
 {
 	if (AllLoadedRecipes.Contains(RecipeData))
 	{
@@ -575,7 +575,7 @@ void URISInventoryFunctions::PermanentlyLoadAllRecipesAsync()
 	}
 }
 
-TArray<URISRecipe*> URISInventoryFunctions::GetAllRISItemRecipes()
+TArray<URISObjectRecipeData*> URISInventoryFunctions::GetAllRISItemRecipes()
 {
 	return AllLoadedRecipes;
 }
