@@ -76,17 +76,14 @@ private:
     FRecordingSession CurrentSession;
     AWeaponActor* OwningWeapon;
 
-
-
+    void Initialize();
+    UFUNCTION()
     void OnAttackPerformed(FMontageData& MontageData);
     bool InitializeRecordingSession(FMontageData& MontageData);
     void RecordAttackData();
-
-   void InitializeSettings();
     void StopRecording();
-
     bool SaveAttackSequence(const FString& AssetName, UWeaponAttackData* AttackData);
-    TArray<FName> FindRelevantSockets(USkeletalMeshComponent* WeaponMesh) const;
+    TArray<FName> FindRelevantSockets(UMeshComponent* WeaponMesh) const;
     bool ValidateAssetSavePath() const;
     FString GenerateUniqueAssetName(const FString& BaseName) const;
     void UpdateMontageDataWithRecordedSequence(FMontageData& MontageData, UWeaponAttackData* AttackData);

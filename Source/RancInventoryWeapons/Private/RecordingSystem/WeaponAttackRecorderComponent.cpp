@@ -10,7 +10,7 @@
 
 UWeaponAttackRecorderComponent::UWeaponAttackRecorderComponent()
 {
-    PrimaryComponentTick.bCanEverTick = false; // We don't need to tick this component
+    PrimaryComponentTick.bCanEverTick = true;
 }
 
 void UWeaponAttackRecorderComponent::BeginPlay()
@@ -72,6 +72,39 @@ void UWeaponAttackRecorderComponent::Initialize()
             Settings = NewObject<UWeaponAttackRecorderSettings>(this, UWeaponAttackRecorderSettings::StaticClass());
             UE_LOG(LogTemp, Warning, TEXT("No WeaponAttackRecorderSettings found. Created a new instance with default values."));
         }
+    }
+
+    // Get the owning character's animation instance
+    ACharacter* OwningCharacter = Cast<ACharacter>(OwningWeapon->GetOwner());
+    if (OwningCharacter)
+    {
+        OwningCharacterAnimInstance = OwningCharacter->GetMesh()->GetAnimInstance();
+        if (OwningCharacterAnimInstance)
+        {
+            OwningCharacterAnimInstance->OnPlayMontageNotifyBegin.AddDynamic(this, &UWeaponAttackRecorderComponent::OnAnimNotifyBegin);
+            OwningCharacterAnimInstance->OnPlayMontageNotifyEnd.AddDynamic(this, &UWeaponAttackRecorderComponent::OnAnimNotifyEnd);
+        }
+    }
+    else
+    {
+        UE_LOG(LogTemp, Error, TEXT("WeaponAttackRecorderComponent could not find the owning character!"));
+    }
+}
+
+
+void UWeaponAttackRecorderComponent::OnAnimNotifyBegin(FName NotifyName, const FBranchingPointNotifyPayload& BranchingPointNotifyPayload)
+{
+    if (NotifyName == Settings->StartRecordingNotify)
+    {
+        StartRecording();
+    }
+}
+
+void UWeaponAttackRecorderComponent::OnAnimNotifyEnd(FName NotifyName, const FBranchingPointNotifyPayload& BranchingPointNotifyPayload)
+{
+    if (NotifyName == Settings->StopRecordingNotify)
+    {
+        StopRecording();
     }
 }
 

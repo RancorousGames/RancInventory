@@ -1,3 +1,53 @@
+
+#include "Components/ActorComponent.h"
+#include "WeaponDataStructures.h"
+#include "WeaponStaticData.h"
+#include "Components/InventoryComponent.h"
+#include "GearManagerComponent.generated.h"
+
+class UWeaponStaticData;
+class AWeaponActor;
+class ACharacter;
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FWeaponEvent);
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FWeaponState, AWeaponActor*, WeaponActor);
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FGearUpdated, FGameplayTag, Slot, FGameplayTag, ItemId);
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FWeaponEquipState, FName, WeaponType, bool , bEquipState);
+
+
+USTRUCT(BlueprintType)
+struct FGearSlotDefinition
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere,BlueprintReadWrite, Category = "Ranc Inventory")
+	FGameplayTag SlotTag;
+
+	// The name of the socket OR bone on the parent mesh where we want to attach the item
+	UPROPERTY(EditAnywhere,BlueprintReadWrite, Category = "Ranc Inventory")
+	FName AttachSocketName;
+
+	UPROPERTY(EditAnywhere,BlueprintReadWrite, Category = "Ranc Inventory")
+	EGearSlotType SlotType;
+};
+
+
+UENUM(BlueprintType)
+enum class EGearSlotType : uint8 {MainHand, OffHand, Armor};
+
+// enum
+UENUM(BlueprintType)
+enum class EPendingGearChangeType : uint8
+{
+	NoChange,
+	Equip,
+	Unequip,
+	WeaponSelect
+};
+
 /*
 A replicated component that manages the inventory of AWeaponActor's. 
 Meant to attached to ACharacter with a skeletal mesh.
@@ -57,6 +107,11 @@ public:
 	DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FWeaponAttackEvent, FMontageData, MontageData);
 	UPROPERTY(BlueprintAssignable, Category = "Ranc Inventory Weapons | Gear ")
 	FWeaponAttackEvent OnAttackPerformed;
+
+	DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnHitDetected, AActor*, HitActor, const FHitResult&, HitResult);
+	// Delegate to broadcast when a hit is detected during the attack replay
+	UPROPERTY(BlueprintAssignable, Category = "Ranc Inventory Weapons | Gear | Attack")
+	FOnHitDetected OnHitDetected;
 
 	/*
 	Called after SpawnWeaponsFromSavedData() is done
@@ -292,6 +347,7 @@ protected:
 
 	/* Asks the linked inventory to drop the item, converting it to a WorldItem */
 	void DropGearFromSlot_IfServer(FGameplayTag Slot) const;
+	
 	
 	// Block below is used for rotating towards the attack direction
 	float TargetYaw;
