@@ -5,7 +5,7 @@
 #include <CoreMinimal.h>
 #include <Kismet/BlueprintFunctionLibrary.h>
 #include <Runtime/Launch/Resources/Version.h>
-#include "RISInventoryFunctions.generated.h"
+#include "RISFunctions.generated.h"
 
 UENUM(BlueprintType, Category = "Ranc Inventory | Enumerations")
 enum class ERISItemSearchType : uint8
@@ -15,7 +15,7 @@ enum class ERISItemSearchType : uint8
     Type
 };
 
-class URISInventoryComponent;
+class UInventoryComponent;
 class UAssetManager;
 class URISItemData;
 struct FPrimaryRISItemId;
@@ -24,7 +24,7 @@ struct FPrimaryRISItemId;
  * Utility functions for the Ranc Inventory System
  */
 UCLASS(Category = "Ranc Inventory | Functions")
-class RANCINVENTORY_API URISInventoryFunctions final : public UBlueprintFunctionLibrary
+class RANCINVENTORY_API URISFunctions final : public UBlueprintFunctionLibrary
 {
     GENERATED_BODY()
 
@@ -39,7 +39,7 @@ public:
 
     /* Check if the ids are equal */
     UFUNCTION(BlueprintPure, Category = "Ranc Inventory")
-    static bool CompareItemInfo(const FRISItemInstance& Info1, const FRISItemInstance& Info2);
+    static bool CompareItemInfo(const FItemBundle& Info1, const FItemBundle& Info2);
 
     /* Check if the ids of the given item datas are equal */
     UFUNCTION(BlueprintPure, Category = "Ranc Inventory")
@@ -74,14 +74,14 @@ public:
     
     /* Uses static map from GameplayTag to URancItemData, works faster after having called PermanentlyLoadAllItems */
     UFUNCTION(BlueprintPure, Category = "Ranc Inventory")
-    static URISItemData* GetItemDataById(FGameplayTag TagId);
+    static UItemStaticData* GetItemDataById(FGameplayTag TagId);
     
     /* Trade items between two inventory components */
     UFUNCTION(BlueprintCallable, Category = "Ranc Inventory")
-    static void TradeRancItem(TArray<FRISItemInstance> ItemsToTrade, URISItemContainerComponent* FromInventory, URISItemContainerComponent* ToInventory);
+    static void TradeRancItem(TArray<FItemBundle> ItemsToTrade, UItemContainerComponent* FromInventory, UItemContainerComponent* ToInventory);
 
     // Utiltiy function to check if moving an item from one slot to another would cause a swap
-    static bool ShouldItemsBeSwapped(FRISItemInstance* Source, FRISItemInstance* Target);
+    static bool ShouldItemsBeSwapped(FItemBundle* Source, FItemBundle* Target);
 
     
     /* Moves from a source ItemInstance to a target one, either moving, stacking stackable items or swapping
@@ -89,12 +89,12 @@ public:
      * IgnoreMaxStacks will allow a target slot to go above the item datas maxstacksize (used for itemcontainer)
      * AllowPartial if enabled will allow a move to partially succeed, e.g. only move 2 of requested 3 quantity, if false moves full or nothing
      */
-    static int32 MoveBetweenSlots(FRISItemInstance* Source, FRISItemInstance* Target, bool IgnoreMaxStacks, int32 RequestedQuantity, bool AllowPartial);
+    static int32 MoveBetweenSlots(FItemBundle* Source, FItemBundle* Target, bool IgnoreMaxStacks, int32 RequestedQuantity, bool AllowPartial);
 
 
     /* Check if the given item info have a valid id */
     UFUNCTION(BlueprintPure, Category = "Ranc Inventory")
-    static bool IsItemValid(const FRISItemInstance InItemInfo);
+    static bool IsItemValid(const FItemBundle InItemInfo);
     
     /* Loads all item recipe data assets, allowing use of GetItemById */
     UFUNCTION(BlueprintCallable, Category = "Ranc Inventory")
@@ -104,7 +104,7 @@ public:
     static bool AreAllRISRecipesLoaded();
     
     UFUNCTION(BlueprintCallable, Category = "Ranc Inventory")
-    static TArray<URISObjectRecipeData*> GetAllRISItemRecipes();
+    static TArray<UObjectRecipeData*> GetAllRISItemRecipes();
 
     /* Includes both RancItemRecipe and RancItemCraftingRecipe (for item to item) */
     UFUNCTION(BlueprintPure, Category = "Ranc Inventory")
@@ -133,14 +133,14 @@ public:
     }
 
     UFUNCTION(BlueprintPure, Category = "Ranc Inventory")
-    static TMap<FGameplayTag, FPrimaryRISItemIdContainer> GetItemRelations(const FRISItemInstance InItemInfo);
+    static TMap<FGameplayTag, FPrimaryRISItemIdContainer> GetItemRelations(const FItemBundle InItemInfo);
 
     static void AllItemsLoadedCallback();
     static void AllRecipesLoadedCallback();
 
     // Below are used for e.g. unit tests
     static void HardcodeItem(FGameplayTag ItemId, URISItemData* ItemData);
-    static void HardcodeRecipe(FGameplayTag RecipeId, URISObjectRecipeData* RecipeData);
+    static void HardcodeRecipe(FGameplayTag RecipeId, UObjectRecipeData* RecipeData);
 
 private:
     static TArray<URISItemData*> LoadRancItemData_Internal(UAssetManager* InAssetManager, const TArray<FPrimaryAssetId>& InIDs, const TArray<FName>& InBundles, const bool bAutoUnload);
@@ -151,10 +151,10 @@ private:
    // static TMap<FGameplayTag, FName> AllLoadedItemAssetNamesByTag;
     static TArray<FGameplayTag> AllItemIds;
     
-    static TArray<URISObjectRecipeData*> AllLoadedRecipes;
+    static TArray<UObjectRecipeData*> AllLoadedRecipes;
 
 public:
     /* Filter the container and return only items that can be traded at the current context */
     UFUNCTION(BlueprintPure, Category = "Ranc Inventory")
-    static TArray<FRISItemInstance> FilterTradeableItems(URISInventoryComponent* FromInventory, URISInventoryComponent* ToInventory, const TArray<FRISItemInstance>& Items);
+    static TArray<FItemBundle> FilterTradeableItems(UInventoryComponent* FromInventory, UInventoryComponent* ToInventory, const TArray<FItemBundle>& Items);
 };

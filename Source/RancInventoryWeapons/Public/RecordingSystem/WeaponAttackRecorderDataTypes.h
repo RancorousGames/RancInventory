@@ -1,3 +1,11 @@
+#pragma once
+
+#include "GearManagerComponent.h"
+
+#include "WeaponAttackRecorderDataTypes.generated.h"
+
+
+
 USTRUCT(BlueprintType)
 struct FWeaponAttackTrace
 {

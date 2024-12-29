@@ -24,7 +24,7 @@ public:
      * bPreferEmptyUniversalSlots: Whether MoveItemToAnyTaggedSlot will prefer to use empty universal slots over occupied specialized slots
      */
     UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category=RIS)
-    void Initialize(URISInventoryComponent* InventoryComponent, int32 NumSlots = 9,  bool bPreferEmptyUniversalSlots = false);
+    void Initialize(UInventoryComponent* InventoryComponent, int32 NumSlots = 9,  bool bPreferEmptyUniversalSlots = false);
 
     // Checks if a given slot is empty
     UFUNCTION(BlueprintCallable, BlueprintPure, Category=RIS)
@@ -35,13 +35,13 @@ public:
 
     // Retrieves the item informatio<n for a given slot index
     UFUNCTION(BlueprintCallable, BlueprintPure, Category=RIS)
-    FRISItemInstance GetItem(int32 SlotIndex) const;
+    FItemBundle GetItem(int32 SlotIndex) const;
     
     UFUNCTION(BlueprintCallable, Category=RIS)
     int32 DropItem(FGameplayTag TaggedSlot, int32 SlotIndex, int32 Quantity);
     
     UFUNCTION(BlueprintCallable, Category=RIS)
-    const FRISItemInstance& GetItemForTaggedSlot(const FGameplayTag& SlotTag) const;
+    const FItemBundle& GetItemForTaggedSlot(const FGameplayTag& SlotTag) const;
     
     
     /**
@@ -74,10 +74,10 @@ public:
     bool MoveItemToAnyTaggedSlot(const FGameplayTag& SourceTaggedSlot, int32 SourceSlotIndex);
     
     UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category=RIS)
-    bool CanSlotReceiveItem(const FRISItemInstance& ItemInstance, int32 SlotIndex) const;
+    bool CanSlotReceiveItem(const FItemBundle& ItemInstance, int32 SlotIndex) const;
     
     UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category=RIS)
-    bool CanTaggedSlotReceiveItem(const FRISItemInstance& ItemInstance, const FGameplayTag& SlotTag, bool CheckContainerLimits = true) const;
+    bool CanTaggedSlotReceiveItem(const FItemBundle& ItemInstance, const FGameplayTag& SlotTag, bool CheckContainerLimits = true) const;
     
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category=RIS)
     int32 NumberOfSlots;
@@ -87,7 +87,7 @@ public:
     
     // Linked inventory component for direct interaction
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category=RIS)
-    URISInventoryComponent* LinkedInventoryComponent;
+    UInventoryComponent* LinkedInventoryComponent;
     
     DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnSlotUpdated, int32, SlotIndex);
     UPROPERTY(BlueprintAssignable, Category=RIS)
@@ -98,28 +98,28 @@ public:
     FOnTaggedSlotUpdated OnTaggedSlotUpdated;
     
 protected:
-    FGameplayTag FindTaggedSlotForItem(const FRISItemInstance& Item) const;
+    FGameplayTag FindTaggedSlotForItem(const FItemBundle& Item) const;
 
     UFUNCTION(BlueprintNativeEvent , Category = RIS)
-    int32 FindSlotIndexForItem(const FRISItemInstance& Item);
+    int32 FindSlotIndexForItem(const FItemBundle& Item);
     
     UFUNCTION(BlueprintNativeEvent , Category = RIS)
-    void HandleItemAdded(const FRISItemInstance& Item);
+    void HandleItemAdded(const FItemBundle& Item);
     UFUNCTION(BlueprintNativeEvent , Category = RIS)
-    void HandleItemRemoved(const FRISItemInstance& ItemInstance);
+    void HandleItemRemoved(const FItemBundle& ItemInstance);
     UFUNCTION(BlueprintNativeEvent , Category = RIS)
-    void HandleTaggedItemAdded(const FGameplayTag& SlotTag, const FRISItemInstance& ItemInstance);
+    void HandleTaggedItemAdded(const FGameplayTag& SlotTag, const FItemBundle& ItemInstance);
     UFUNCTION(BlueprintNativeEvent , Category = RIS)
-    void HandleTaggedItemRemoved(const FGameplayTag& SlotTag, const FRISItemInstance& ItemInstance);
+    void HandleTaggedItemRemoved(const FGameplayTag& SlotTag, const FItemBundle& ItemInstance);
     
     UFUNCTION(BlueprintNativeEvent , Category = RIS)
     void ForceFullUpdate();
 	
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category=RIS)
-    TArray<FRISItemInstance> ViewableGridSlots;
+    TArray<FItemBundle> ViewableGridSlots;
     
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category=RIS)
-    TMap<FGameplayTag, FRISItemInstance> ViewableTaggedSlots;
+    TMap<FGameplayTag, FItemBundle> ViewableTaggedSlots;
 
     UPROPERTY(VisibleAnywhere, Category=RIS)
     TArray<FRISExpectedOperation> OperationsToConfirm;

@@ -1,23 +1,23 @@
 ﻿// Copyright Rancorous Games, 2024
 
 #pragma once
+#include "Data/RISInventoryData.h"
 #include "Engine/StaticMeshActor.h"
-#include "..\Management\RISInventoryData.h"
-#include "RISWorldItem.generated.h"
+#include "WorldItem.generated.h"
 
 UCLASS()
-class RANCINVENTORY_API ARISWorldItem : public AStaticMeshActor
+class RANCINVENTORY_API AWorldItem : public AStaticMeshActor
 {
 GENERATED_BODY()
 public:
 	UPROPERTY(Replicated, BlueprintReadWrite, Meta = (DisplayName = "ItemInstance", ExposeOnSpawn = true), Category = "Item")
-	FRISItemInstance Item;
+	FItemBundle Item;
 	
 	UPROPERTY(BlueprintReadOnly, Meta = (DisplayName = "ItemData"), Category = "Item")
-	URISItemData* ItemData = nullptr;
+	UItemStaticData* ItemData = nullptr;
 
 	UFUNCTION(BlueprintCallable, Category = "Item")
-	void SetItem(const FRISItemInstance& NewItem);
+	void SetItem(const FItemBundle& NewItem);
 
 	virtual void OnConstruction(const FTransform& Transform) override;
 	

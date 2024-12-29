@@ -16,10 +16,10 @@ struct FVersionedItemInstanceArray
 	int32 Version = 0;
 
 	UPROPERTY()
-	TArray<FRISItemInstance> Items;
+	TArray<FItemBundle> Items;
 
 	FVersionedItemInstanceArray() = default;
-	FVersionedItemInstanceArray(int32 InVersion, const TArray<FRISItemInstance>& InItems)
+	FVersionedItemInstanceArray(int32 InVersion, const TArray<FItemBundle>& InItems)
 		: Version(InVersion), Items(InItems) { }
 };
 

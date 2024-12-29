@@ -3,7 +3,7 @@
 #include "RISGridViewModelTest.h" // header empty
 
 #include "NativeGameplayTags.h"
-#include "..\..\RancInventory\Public\Components\RISInventoryComponent.h"
+#include "..\..\RancInventory\Public\Components\InventoryComponent.h"
 #include "Misc/AutomationTest.h"
 #include "..\..\RancInventory\Public\ViewModels\RISGridViewModel.h"
 #include "RISInventoryTestSetup.cpp"
@@ -80,7 +80,7 @@ bool TestReactionToInventoryEvents(FRISGridViewModelTest* Test)
     Res &= Test->TestEqual(TEXT("ViewModel should reflect 5 rocks added to the first slot again"), ViewModel->GetItem(0).Quantity, 5);
     
     // Test exceeding max stack
-    InventoryComponent->AddItems_IfServer(FRISItemInstance(ItemIdRock, 10));
+    InventoryComponent->AddItems_IfServer(FItemBundle(ItemIdRock, 10));
     Res &= Test->TestTrue(TEXT("ViewModel should handle exceeding max stack correctly"), ViewModel->GetItem(0).Quantity == 5 && ViewModel->GetItem(1).Quantity == 5 && ViewModel->GetItem(2).Quantity == 5);
     
     // Test partial removal of items
@@ -138,7 +138,7 @@ bool TestAddItemsToViewModel(FRISGridViewModelTest* Test)
 	// Simulate adding a rock to the inventory
 	InventoryComponent->AddItems_IfServer(ThreeRocks);
 	
-	FRISItemInstance Item = ViewModel->GetItem(0);
+	FItemBundle Item = ViewModel->GetItem(0);
 	Res &= Test->TestTrue(TEXT("ViewModel should reflect 3 rocks added to the first slot"), Item.ItemId == ItemIdRock && Item.Quantity == 3);
 
 	InventoryComponent->AddItems_IfServer(ThreeRocks);
@@ -178,23 +178,23 @@ bool TestMoveAndSwap(FRISGridViewModelTest* Test)
 
 	// Move rock from slot 0 to slot 1, where sticks are, and expect them to swap
 	ViewModel->MoveItems(NoTag, 0, NoTag, 1);
-	FRISItemInstance ItemInSlot0AfterMove = ViewModel->GetItem(0);
-	FRISItemInstance ItemInSlot1AfterMove = ViewModel->GetItem(1);
+	FItemBundle ItemInSlot0AfterMove = ViewModel->GetItem(0);
+	FItemBundle ItemInSlot1AfterMove = ViewModel->GetItem(1);
 	Res &= Test->TestTrue(TEXT("Slot 0 should now contain sticks after swap"), ItemInSlot0AfterMove.ItemId == ItemIdSticks && ItemInSlot0AfterMove.Quantity == 3);
 	Res &= Test->TestTrue(TEXT("Slot 1 should now contain rocks after swap"), ItemInSlot1AfterMove.ItemId == ItemIdRock && ItemInSlot1AfterMove.Quantity == 5);
 
 	// Add helmet to inventory and attempt to swap with rocks in slot 1
 	InventoryComponent->AddItems_IfServer(OneHelmet);
 	ViewModel->MoveItems(NoTag, 2, NoTag, 1);
-	FRISItemInstance ItemInSlot1AfterHelmetSwap = ViewModel->GetItem(1);
-	FRISItemInstance ItemInSlot2AfterHelmetSwap = ViewModel->GetItem(2);
+	FItemBundle ItemInSlot1AfterHelmetSwap = ViewModel->GetItem(1);
+	FItemBundle ItemInSlot2AfterHelmetSwap = ViewModel->GetItem(2);
 	Res &= Test->TestTrue(TEXT("Slot 1 should now contain a helmet after swap"), ItemInSlot1AfterHelmetSwap.ItemId == ItemIdHelmet && ItemInSlot1AfterHelmetSwap.Quantity == 1);
 	Res &= Test->TestTrue(TEXT("Slot 2 should now contain rocks after swap"), ItemInSlot2AfterHelmetSwap.ItemId == ItemIdRock && ItemInSlot2AfterHelmetSwap.Quantity == 5);
 
 	// Test moving item 3 sticks from a generic slot to a universal tagged slot (LeftHandSlot) with 3 sticks
 	InventoryComponent->AddItemsToTaggedSlot_IfServer(LeftHandSlot, ThreeSticks, false);
 	ViewModel->MoveItems(NoTag, 0, LeftHandSlot, -1);
- 	FRISItemInstance ItemInLeftHandAfterMove = ViewModel->GetItemForTaggedSlot(LeftHandSlot);
+ 	FItemBundle ItemInLeftHandAfterMove = ViewModel->GetItemForTaggedSlot(LeftHandSlot);
 	Res &= Test->TestTrue(TEXT("LeftHandSlot should contain 5 sticks after move"), ItemInLeftHandAfterMove.ItemId == ItemIdSticks && ItemInLeftHandAfterMove.Quantity == 5);
 	// generic slots should contain the remaining 1 sticks
 	Res &= Test->TestTrue(TEXT("Slot 0 should contain 1 stick after move"), ViewModel->GetItem(0).ItemId == ItemIdSticks && ViewModel->GetItem(0).Quantity == 1);
@@ -208,8 +208,8 @@ bool TestMoveAndSwap(FRISGridViewModelTest* Test)
 	// Test moving helmet to LeftHandSlot which would swap except Helmet slot can't hold spear so it should fail
     InventoryComponent->AddItemsToTaggedSlot_IfServer(LeftHandSlot, OneSpear, true); // replacing the 5 sticks with spear
     ViewModel->MoveItems(HelmetSlot, -1, LeftHandSlot, -1);
-    FRISItemInstance ItemInLeftHandAfterHelmetMove = ViewModel->GetItemForTaggedSlot(LeftHandSlot);
-    FRISItemInstance HelmetInHelmetSlotAfterMove = ViewModel->GetItemForTaggedSlot(HelmetSlot);
+    FItemBundle ItemInLeftHandAfterHelmetMove = ViewModel->GetItemForTaggedSlot(LeftHandSlot);
+    FItemBundle HelmetInHelmetSlotAfterMove = ViewModel->GetItemForTaggedSlot(HelmetSlot);
 	Res &= Test->TestTrue(TEXT("LeftHandSlot should still  contain spear after failed move"), ItemInLeftHandAfterHelmetMove.ItemId == ItemIdSpear && ItemInLeftHandAfterHelmetMove.Quantity == 1);
 	Res &= Test->TestTrue(TEXT("HelmetSlot should still contain helmet after failed move"), HelmetInHelmetSlotAfterMove.ItemId == ItemIdHelmet && HelmetInHelmetSlotAfterMove.Quantity == 1);
 
@@ -223,24 +223,24 @@ bool TestMoveAndSwap(FRISGridViewModelTest* Test)
 	
     // Attempt to move a non-helmet item from generic slot HelmetSlot, which should fail and no swap occurs
     ViewModel->MoveItems(NoTag, 2, HelmetSlot, -1); // Assuming rocks are at slot 2 now
-    FRISItemInstance ItemInHelmetSlotAfterInvalidMove = ViewModel->GetItemForTaggedSlot(HelmetSlot);
-    FRISItemInstance ItemInSlot2AfterInvalidMove = ViewModel->GetItem(2);
+    FItemBundle ItemInHelmetSlotAfterInvalidMove = ViewModel->GetItemForTaggedSlot(HelmetSlot);
+    FItemBundle ItemInSlot2AfterInvalidMove = ViewModel->GetItem(2);
     Res &= Test->TestTrue(TEXT("HelmetSlot should not accept non-helmet item, should remain helmet"), ItemInHelmetSlotAfterInvalidMove.ItemId == ItemIdHelmet && ItemInHelmetSlotAfterInvalidMove.Quantity == 1);
     Res &= Test->TestTrue(TEXT("Slot 2 should remain unchanged after invalid move attempt"), ItemInSlot2AfterInvalidMove.ItemId == ItemIdRock && ItemInSlot2AfterInvalidMove.Quantity == 5);
 
     // Move item from a universal tagged slot to a specialized tagged slot that accepts it
     InventoryComponent->AddItemsToTaggedSlot_IfServer(LeftHandSlot, OneHelmet, true); // Override spear with another helmet
     ViewModel->MoveItems(LeftHandSlot, -1, HelmetSlot, -1);
-    FRISItemInstance ItemInHelmetSlotAfterSwapBack = ViewModel->GetItemForTaggedSlot(HelmetSlot);
-    FRISItemInstance ItemInLeftHandAfterSwapBack = ViewModel->GetItemForTaggedSlot(LeftHandSlot);
+    FItemBundle ItemInHelmetSlotAfterSwapBack = ViewModel->GetItemForTaggedSlot(HelmetSlot);
+    FItemBundle ItemInLeftHandAfterSwapBack = ViewModel->GetItemForTaggedSlot(LeftHandSlot);
     Res &= Test->TestTrue(TEXT("HelmetSlot should contain 1 helmet"), ItemInHelmetSlotAfterSwapBack.ItemId == ItemIdHelmet && ItemInHelmetSlotAfterSwapBack.Quantity == 1);
 	Res &= Test->TestTrue(TEXT("LeftHandSlot should contain 1 helmet"), ItemInLeftHandAfterSwapBack.ItemId == ItemIdHelmet && ItemInLeftHandAfterSwapBack.Quantity == 1);
 	
     // Test moving item to an already occupied generic slot to ensure they swap
     InventoryComponent->AddItems_IfServer(OneSpear); // Add spear to inventory
     ViewModel->MoveItems(NoTag, 1, NoTag, 2); // Assuming spear is at slot 1 now, and rocks at slot 2
-    FRISItemInstance ItemInSlot1AfterSwap = ViewModel->GetItem(1);
-    FRISItemInstance ItemInSlot2AfterSwap = ViewModel->GetItem(2);
+    FItemBundle ItemInSlot1AfterSwap = ViewModel->GetItem(1);
+    FItemBundle ItemInSlot2AfterSwap = ViewModel->GetItem(2);
     Res &= Test->TestTrue(TEXT("Slot 1 should now contain rocks after swap with spear"), ItemInSlot1AfterSwap.ItemId == ItemIdRock && ItemInSlot1AfterSwap.Quantity == 5);
     Res &= Test->TestTrue(TEXT("Slot 2 should now contain the spear after swap"), ItemInSlot2AfterSwap.ItemId == ItemIdSpear && ItemInSlot2AfterSwap.Quantity == 1);
 
@@ -270,7 +270,7 @@ bool TestSplitItems(FRISGridViewModelTest* Test)
     // Split between a generic slot and a tagged slot
     ViewModel->SplitItems(NoTag, 1, RightHandSlot, -1, 1); // Splitting 1 rock to RightHandSlot
     Res &= Test->TestEqual(TEXT("After splitting, second slot should have 1 rock"), ViewModel->GetItem(1).Quantity, 1);
-    FRISItemInstance RightHandItem = ViewModel->GetItemForTaggedSlot(RightHandSlot);
+    FItemBundle RightHandItem = ViewModel->GetItemForTaggedSlot(RightHandSlot);
     Res &= Test->TestTrue(TEXT("RightHandSlot should now contain 1 rock"), RightHandItem.ItemId == ItemIdRock && RightHandItem.Quantity == 1);
 
     // Invalid split to a different item type slot
@@ -279,20 +279,20 @@ bool TestSplitItems(FRISGridViewModelTest* Test)
     Res &= Test->TestTrue(TEXT("Attempting to split into a different item type slot should fail"), RightHandItem.Quantity == 1 && ViewModel->GetItemForTaggedSlot(HelmetSlot).Quantity == 1);
 
     // Exceeding max stack size
-    InventoryComponent->AddItems_IfServer(FRISItemInstance(ItemIdRock, 8)); // Add more rocks to force a stack size check
+    InventoryComponent->AddItems_IfServer(FItemBundle(ItemIdRock, 8)); // Add more rocks to force a stack size check
     ViewModel->SplitItems(NoTag, 2, NoTag, 1, 2); // Attempt to overflow slot 1 with rocks
     Res &= Test->TestEqual(TEXT("Splitting that exceeds max stack size should fail"), ViewModel->GetItem(1).Quantity, 5); 
     // Attempt split from tagged to generic slot with valid quantities
 	InventoryComponent->AddItemsToTaggedSlot_IfServer(LeftHandSlot, FiveRocks);
     ViewModel->SplitItems(LeftHandSlot, -1, NoTag, 2, 1); // Splitting 1 rock to a new generic slot
-    FRISItemInstance NewGenericSlotItem = ViewModel->GetItem(2);
+    FItemBundle NewGenericSlotItem = ViewModel->GetItem(2);
     Res &= Test->TestEqual(TEXT("After splitting from tagged to generic, new slot should contain 3 rocks total"), NewGenericSlotItem.Quantity, 3);
-	FRISItemInstance LeftHandItem = ViewModel->GetItemForTaggedSlot(LeftHandSlot);
+	FItemBundle LeftHandItem = ViewModel->GetItemForTaggedSlot(LeftHandSlot);
 	Res &= Test->TestEqual(TEXT("LeftHandSlot should now contain 4 rocks"), LeftHandItem.Quantity, 4);
 	
     // split from generic to tagged slot
     ViewModel->SplitItems(NoTag, 2, LeftHandSlot, -1, 1); // Attempt to add another helmet to HelmetSlot
-    FRISItemInstance ItemInLeftHandAfterSplit = ViewModel->GetItemForTaggedSlot(LeftHandSlot);
+    FItemBundle ItemInLeftHandAfterSplit = ViewModel->GetItemForTaggedSlot(LeftHandSlot);
 	Res &= Test->TestEqual(TEXT("LeftHandSlot should now contain 5 rocks"), ItemInLeftHandAfterSplit.Quantity, 5);
 	Res &= Test->TestEqual(TEXT("Slot 2 should now contain 2 rocks"), ViewModel->GetItem(2).Quantity, 2);
 	

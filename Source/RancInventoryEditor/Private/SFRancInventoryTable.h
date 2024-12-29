@@ -4,13 +4,13 @@
 
 #include <CoreMinimal.h>
 #include "..\..\RancInventory\Public\Management\RISInventoryData.h"
-#include "..\..\RancInventory\Public\Management\RISInventoryFunctions.h"
+#include "..\..\RancInventory\Public\Management\RISFunctions.h"
 
 struct FRancItemRowData
 {
     explicit FRancItemRowData(const FPrimaryRISItemId& InPrimaryAssetId)
     {
-        const auto ItemData = URISInventoryFunctions::GetSingleItemDataById(InPrimaryAssetId, { TEXT("Data"), TEXT("SoftData"), }, false);
+        const auto ItemData = URISFunctions::GetSingleItemDataById(InPrimaryAssetId, { TEXT("Data"), TEXT("SoftData"), }, false);
 
         PrimaryAssetId = InPrimaryAssetId;
         Id = ItemData->ItemId;
@@ -21,7 +21,7 @@ struct FRancItemRowData
         Value = ItemData->ItemValue;
         Weight = ItemData->ItemWeight;
 
-        URISInventoryFunctions::UnloadRancItem(InPrimaryAssetId);
+        URISFunctions::UnloadRancItem(InPrimaryAssetId);
     }
 
     explicit FRancItemRowData(const FPrimaryAssetId& InPrimaryAssetId) : FRancItemRowData(FPrimaryRISItemId(InPrimaryAssetId))

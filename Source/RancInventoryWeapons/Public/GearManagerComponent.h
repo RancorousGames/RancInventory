@@ -21,17 +21,20 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FWeaponEquipState, FName, WeaponTyp
 USTRUCT(BlueprintType)
 struct FGearSlotDefinition
 {
-	GENERATED_BODY()
+    GENERATED_BODY()
 
-	UPROPERTY(EditAnywhere,BlueprintReadWrite, Category = "Ranc Inventory")
-	FGameplayTag SlotTag;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ranc Inventory")
+    FGameplayTag SlotTag;
 
-	// The name of the socket OR bone on the parent mesh where we want to attach the item
-	UPROPERTY(EditAnywhere,BlueprintReadWrite, Category = "Ranc Inventory")
-	FName AttachSocketName;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ranc Inventory")
+    FName AttachSocketName;
 
-	UPROPERTY(EditAnywhere,BlueprintReadWrite, Category = "Ranc Inventory")
-	EGearSlotType SlotType;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ranc Inventory")
+    EGearSlotType SlotType;
+
+    //// Transient property to avoid serialization and replication of the component reference
+    //UPROPERTY(Transient)
+    //UStaticMeshComponent* MeshComponent = nullptr;
 };
 
 
@@ -46,6 +49,16 @@ enum class EPendingGearChangeType : uint8
 	Equip,
 	Unequip,
 	WeaponSelect
+};
+
+UENUM(BlueprintType)
+enum class EItemChangeReason : uint8
+{
+	Added UMETA(DisplayName = "Added"),      
+	Removed UMETA(DisplayName = "Removed"),  
+	Updated UMETA(DisplayName = "Updated"), 
+	Equipped UMETA(DisplayName = "Equipped"),
+	Unequipped UMETA(DisplayName = "Unequipped") 
 };
 
 /*

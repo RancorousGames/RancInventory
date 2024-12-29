@@ -1,17 +1,20 @@
 ﻿// Copyright Rancorous Games, 2024
 
-#include "..\..\Public\Actors\RISWorldItem.h"
+#include "Actors\WorldItem.h"
 
-#include "..\..\Public\Management\RISInventoryFunctions.h"
+#include "Components/StaticMeshComponent.h"
+#include "Core/RISFunctions.h"
+#include "Data/ItemStaticData.h"
+#include "Engine/StaticMesh.h"
 #include "Net/UnrealNetwork.h"
 
 
-void ARISWorldItem::OnConstruction(const FTransform& Transform)
+void AWorldItem::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
 }
 
-void ARISWorldItem::BeginPlay()
+void AWorldItem::BeginPlay()
 {
 	Super::BeginPlay();
 
@@ -21,20 +24,20 @@ void ARISWorldItem::BeginPlay()
 	}
 }
 
-void ARISWorldItem::SetItem(const FRISItemInstance& NewItem)
+void AWorldItem::SetItem(const FItemBundle& NewItem)
 {
 	Item = NewItem;
 	Initialize();
 }
 
-void ARISWorldItem::OnRep_Item()
+void AWorldItem::OnRep_Item()
 {
 	Initialize();
 }
 
-void ARISWorldItem::Initialize()
+void AWorldItem::Initialize()
 {
-	ItemData = URISInventoryFunctions::GetItemDataById(Item.ItemId);
+	ItemData = URISFunctions::GetItemDataById(Item.ItemId);
 
 	SetMobility(EComponentMobility::Movable);
 	auto* mesh = GetStaticMeshComponent();
@@ -53,14 +56,14 @@ void ARISWorldItem::Initialize()
 	}
 }
 
-void ARISWorldItem::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+void AWorldItem::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
-	DOREPLIFETIME_CONDITION(ARISWorldItem, Item, COND_InitialOnly);
+	DOREPLIFETIME_CONDITION(AWorldItem, Item, COND_InitialOnly);
 }
 
-void ARISWorldItem::PreReplication(IRepChangedPropertyTracker& ChangedPropertyTracker)
+void AWorldItem::PreReplication(IRepChangedPropertyTracker& ChangedPropertyTracker)
 {
 	Super::PreReplication(ChangedPropertyTracker);
 }

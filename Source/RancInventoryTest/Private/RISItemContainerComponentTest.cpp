@@ -33,7 +33,7 @@ bool TestAddItems(FRancItemContainerComponentTest* Test)
     Res &= Test->TestEqual(TEXT("Total weight should remain 5 after attempting to add Giant Boulder"), ItemContainerComponent->GetCurrentWeight(), 5.0f);
 
     // Test adding item partially when exceeding the max weight
-    FRISItemInstance StickInstance(ItemIdSticks, 6); // Assume each stick has a weight of 1
+    FItemBundle StickInstance(ItemIdSticks, 6); // Assume each stick has a weight of 1
     AddedQuantity = ItemContainerComponent->AddItems_IfServer(StickInstance, true);
     Res &= Test->TestEqual(TEXT("Should add only 5 sticks due to weight limit"), AddedQuantity, 5);
     Res &= Test->TestEqual(TEXT("Total weight should be 10 after partially adding sticks"), ItemContainerComponent->GetCurrentWeight(), 10.0f);
@@ -41,7 +41,7 @@ bool TestAddItems(FRancItemContainerComponentTest* Test)
     // Test adding an item when not enough slots are available but under weight limit
     ItemContainerComponent->ClearContainer_IfServer(); // Clear the inventory
     ItemContainerComponent->MaxContainerSlotCount = 2;
-    FRISItemInstance TenRocks(ItemIdRock, 10); 
+    FItemBundle TenRocks(ItemIdRock, 10); 
     ItemContainerComponent->AddItems_IfServer(TenRocks, false); // Fill two slots with 5 rocks each
     AddedQuantity = ItemContainerComponent->AddItems_IfServer(OneRock, false); // Try adding one more
     Res &= Test->TestEqual(TEXT("Should not add another rock due to slot limit"), AddedQuantity, 0);
@@ -110,7 +110,7 @@ bool TestRemoveItems(FRancItemContainerComponentTest* Test)
     Res &= Test->TestTrue(TEXT("Spear should be completely removed"), !ItemContainerComponent->DoesContainerContainItems(ItemIdSpear, 1));
 
     // Test attempting to remove more items than are available (Helmet)
-    RemovedQuantity = ItemContainerComponent->RemoveItems_IfServer(FRISItemInstance(ItemIdHelmet, 2), false); // Try removing 2 Helmets
+    RemovedQuantity = ItemContainerComponent->RemoveItems_IfServer(FItemBundle(ItemIdHelmet, 2), false); // Try removing 2 Helmets
     Res &= Test->TestEqual(TEXT("Should not remove any helmets as quantity exceeds available"), RemovedQuantity, 0);
     Res &= Test->TestTrue(TEXT("Helmet should remain after failed removal attempt"), ItemContainerComponent->DoesContainerContainItems(ItemIdHelmet, 1));
 
@@ -135,10 +135,10 @@ bool TestCanReceiveItems(FRancItemContainerComponentTest* Test)
 
     // Now, the container should report its reduced capacity accurately
     Res &= Test->TestTrue(TEXT("Container should still be able to receive more rocks"), ItemContainerComponent->CanContainerReceiveItems(TwoRocks));
-    Res &= Test->TestFalse(TEXT("Container should not be able to receive more rocks than its weight limit"), ItemContainerComponent->CanContainerReceiveItems(FRISItemInstance(ItemIdRock, 13)));
+    Res &= Test->TestFalse(TEXT("Container should not be able to receive more rocks than its weight limit"), ItemContainerComponent->CanContainerReceiveItems(FItemBundle(ItemIdRock, 13)));
 
     // Add unstackable item (Helmet)
-    ItemContainerComponent->AddItems_IfServer(FRISItemInstance(ItemIdHelmet, 5), false); // adding 5x2=10 units worth of weight, totalling 13
+    ItemContainerComponent->AddItems_IfServer(FItemBundle(ItemIdHelmet, 5), false); // adding 5x2=10 units worth of weight, totalling 13
 
     // Check if the container can receive another unstackable item without exceeding item count and weight limits
     Res &= Test->TestTrue(TEXT("Container should be able to receive a helmet"), ItemContainerComponent->CanContainerReceiveItems(OneHelmet));
@@ -148,7 +148,7 @@ bool TestCanReceiveItems(FRancItemContainerComponentTest* Test)
     ItemContainerComponent->AddItems_IfServer(TwoRocks, false); // Adding more rocks to reach the weight limit
 
     // Test the container's capacity with various items now that it's full
-    Res &= Test->TestFalse(TEXT("Container should not be able to receive any more items due to weight limit"), ItemContainerComponent->CanContainerReceiveItems(FRISItemInstance(ItemIdRock, 1)));
+    Res &= Test->TestFalse(TEXT("Container should not be able to receive any more items due to weight limit"), ItemContainerComponent->CanContainerReceiveItems(FItemBundle(ItemIdRock, 1)));
     Res &= Test->TestFalse(TEXT("Container should not be able to receive any more unstackable items due to item count limit"), ItemContainerComponent->CanContainerReceiveItems(OneHelmet));
 
     // 6 slots should taken lets increase the weight limit, then we should be able to fill 1 slot but not two
@@ -179,9 +179,9 @@ bool TestItemCountsAndPresence(FRancItemContainerComponentTest* Test)
     Res &= Test->TestFalse(TEXT("Inventory should not report more helmets than it contains"), ItemContainerComponent->DoesContainerContainItems(ItemIdHelmet, 2));
 
     // Test GetAllItems to ensure it returns all added items correctly
-    TArray<FRISItemInstance> AllItems = ItemContainerComponent->GetAllContainerItems();
-    Res &= Test->TestTrue(TEXT("GetAllItems should include rocks"), AllItems.ContainsByPredicate([](const FRISItemInstance& Item) { return Item.ItemId == ItemIdRock && Item.Quantity == 5; }));
-    Res &= Test->TestTrue(TEXT("GetAllItems should include the helmet"), AllItems.ContainsByPredicate([](const FRISItemInstance& Item) { return Item.ItemId == ItemIdHelmet && Item.Quantity == 1; }));
+    TArray<FItemBundle> AllItems = ItemContainerComponent->GetAllContainerItems();
+    Res &= Test->TestTrue(TEXT("GetAllItems should include rocks"), AllItems.ContainsByPredicate([](const FItemBundle& Item) { return Item.ItemId == ItemIdRock && Item.Quantity == 5; }));
+    Res &= Test->TestTrue(TEXT("GetAllItems should include the helmet"), AllItems.ContainsByPredicate([](const FItemBundle& Item) { return Item.ItemId == ItemIdHelmet && Item.Quantity == 1; }));
     
     // Remove some items and test counts again
     ItemContainerComponent->RemoveItems_IfServer(ThreeRocks, true); // Remove 3 Rocks
@@ -206,11 +206,11 @@ bool TestMiscFunctions(FRancItemContainerComponentTest* Test)
     InitializeTestItems();
 
     // Test FindItemById - Initially, the container should not contain a "Rock" item.
-    FRISItemInstance RockItemInstance = ItemContainerComponent->FindItemById(ItemIdRock);
+    FItemBundle RockItemInstance = ItemContainerComponent->FindItemById(ItemIdRock);
     Res &=  Test->TestTrue(TEXT("FindItemById should not find an item before it's added"), RockItemInstance.ItemId != ItemIdRock);
     
     // Add a "Rock" item to the container.
-    ItemContainerComponent->AddItems_IfServer(FRISItemInstance(ItemIdRock, 1));
+    ItemContainerComponent->AddItems_IfServer(FItemBundle(ItemIdRock, 1));
     
     // Test FindItemById - Now, the container should contain the "Rock" item.
     RockItemInstance = ItemContainerComponent->FindItemById(ItemIdRock);
@@ -224,8 +224,8 @@ bool TestMiscFunctions(FRancItemContainerComponentTest* Test)
  
     ItemContainerComponent->ClearContainer_IfServer();
 
-    ItemContainerComponent->AddItems_IfServer(FRISItemInstance(ItemIdRock, 1));
-    ItemContainerComponent->DropItems(FRISItemInstance(ItemIdRock, 1));
+    ItemContainerComponent->AddItems_IfServer(FItemBundle(ItemIdRock, 1));
+    ItemContainerComponent->DropItems(FItemBundle(ItemIdRock, 1));
     
     return Res;
 }
@@ -237,13 +237,13 @@ bool TestSetAddItemValidationCallback(FRancItemContainerComponentTest* Test)
 
     // We have to do this weird workaround because we can't bind a lambda to a delegate directly
     const auto DelegateHelper = NewObject<UTestDelegateForwardHelper>();
-    URISItemContainerComponent::FAddItemValidationDelegate MyDelegateInstance;
+    UItemContainerComponent::FAddItemValidationDelegate MyDelegateInstance;
     MyDelegateInstance.BindUFunction(DelegateHelper, FName("DispatchItemToBool"));
     ItemContainerComponent->SetAddItemValidationCallback_IfServer(MyDelegateInstance);
     // we can then set DelegateHelper->CallFuncItemToBool to whatever we want the callback to be
 
     // Define a lambda function as the validation callback which only allows adding rocks
-    DelegateHelper->CallFuncItemToBool = [](const FRISItemInstance& ItemInstance)
+    DelegateHelper->CallFuncItemToBool = [](const FItemBundle& ItemInstance)
     {
         return ItemInstance.ItemId.MatchesTag(ItemIdRock);
     };
@@ -257,7 +257,7 @@ bool TestSetAddItemValidationCallback(FRancItemContainerComponentTest* Test)
     Res &= Test->TestEqual(TEXT("Should not add the helmet since only rocks are allowed"), AddedQuantity, 0);
 
     // Change the validation callback to allow all items
-    DelegateHelper->CallFuncItemToBool = [&](const FRISItemInstance& ItemInstance){return true;};
+    DelegateHelper->CallFuncItemToBool = [&](const FItemBundle& ItemInstance){return true;};
 
     // Now, adding a helmet should be allowed
     AddedQuantity = ItemContainerComponent->AddItems_IfServer(OneHelmet, false);

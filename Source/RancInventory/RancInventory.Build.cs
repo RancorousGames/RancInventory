@@ -11,7 +11,8 @@ public class RancInventory : ModuleRules
 
         PublicDependencyModuleNames.AddRange(new[]
         {
-            "Core"
+            "Core",
+            "GameplayTagsEditor",
         });
 
         PrivateDependencyModuleNames.AddRange(new[]
@@ -20,7 +21,6 @@ public class RancInventory : ModuleRules
             "NetCore",
             "CoreUObject",
             "GameplayTags",
-            "GameplayTagsEditor",
             "DeveloperSettings"
         });
     }

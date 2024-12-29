@@ -29,7 +29,6 @@ public class RancInventoryEditor : ModuleRules
             "WorkspaceMenuStructure",
             "PropertyEditor",
             "GameplayTags", 
-            "GameplayTagsEditor", 
             "GameplayTagsEditor"
         });
     }

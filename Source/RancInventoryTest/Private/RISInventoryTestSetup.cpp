@@ -4,7 +4,7 @@
 
 #include "NativeGameplayTags.h"
 #include "CoreMinimal.h"
-#include "..\..\RancInventory\Public\Management\RISInventoryFunctions.h"
+#include "..\..\RancInventory\Public\Management\RISFunctions.h"
 #include "..\..\RancInventory\Public\Management\RISInventoryData.h"
 
 UE_DEFINE_GAMEPLAY_TAG(LeftHandSlot, "Hands.LeftHand");
@@ -25,17 +25,17 @@ UE_DEFINE_GAMEPLAY_TAG(ItemIdChestArmor, "Items.IDs.ChestArmor");
 UE_DEFINE_GAMEPLAY_TAG(ItemIdGiantBoulder, "Items.IDs.GiantBoulder");
 
 
-FRISItemInstance OneSpear(ItemIdSpear, 1);
-FRISItemInstance OneRock(ItemIdRock, 1);
-FRISItemInstance TwoRocks(ItemIdRock, 2);
-FRISItemInstance ThreeRocks(ItemIdRock, 3);
-FRISItemInstance FourRocks(ItemIdRock, 4);
-FRISItemInstance FiveRocks(ItemIdRock, 5);
-FRISItemInstance ThreeSticks(ItemIdSticks, 3);
-FRISItemInstance OneHelmet(ItemIdHelmet, 1);
-FRISItemInstance OneSpecialHelmet(ItemIdSpecialHelmet, 1);
-FRISItemInstance OneChestArmor(ItemIdChestArmor, 1);
-FRISItemInstance GiantBoulder(ItemIdGiantBoulder, 1);
+FItemBundle OneSpear(ItemIdSpear, 1);
+FItemBundle OneRock(ItemIdRock, 1);
+FItemBundle TwoRocks(ItemIdRock, 2);
+FItemBundle ThreeRocks(ItemIdRock, 3);
+FItemBundle FourRocks(ItemIdRock, 4);
+FItemBundle FiveRocks(ItemIdRock, 5);
+FItemBundle ThreeSticks(ItemIdSticks, 3);
+FItemBundle OneHelmet(ItemIdHelmet, 1);
+FItemBundle OneSpecialHelmet(ItemIdSpecialHelmet, 1);
+FItemBundle OneChestArmor(ItemIdChestArmor, 1);
+FItemBundle GiantBoulder(ItemIdGiantBoulder, 1);
 FGameplayTag NoTag = FGameplayTag::EmptyTag;
 
 void InitializeTestItems()
@@ -49,7 +49,7 @@ void InitializeTestItems()
 	RockItemData->MaxStackSize = 5;
 	RockItemData->ItemWeight = 1;
 	RockItemData->ItemCategories.AddTag(ItemTypeResource);
-	URISInventoryFunctions::HardcodeItem(ItemIdRock, RockItemData);
+	URISFunctions::HardcodeItem(ItemIdRock, RockItemData);
 
 	URISItemData* SticksItemData = NewObject<URISItemData>();
 	SticksItemData->ItemId = ItemIdRock;
@@ -60,7 +60,7 @@ void InitializeTestItems()
 	SticksItemData->MaxStackSize = 5;
 	SticksItemData->ItemWeight = 1;
 	SticksItemData->ItemCategories.AddTag(ItemTypeResource);
-	URISInventoryFunctions::HardcodeItem(ItemIdSticks, SticksItemData);
+	URISFunctions::HardcodeItem(ItemIdSticks, SticksItemData);
 
 	URISItemData* HelmetItemData = NewObject<URISItemData>();
 	HelmetItemData->ItemId = ItemIdHelmet;
@@ -71,7 +71,7 @@ void InitializeTestItems()
 	HelmetItemData->MaxStackSize = 1;
 	HelmetItemData->ItemWeight = 2;
 	HelmetItemData->ItemCategories.AddTag(HelmetSlot);
-	URISInventoryFunctions::HardcodeItem(ItemIdHelmet, HelmetItemData);
+	URISFunctions::HardcodeItem(ItemIdHelmet, HelmetItemData);
 	
 	URISItemData* SpecialHelmetItemData = NewObject<URISItemData>();
 	SpecialHelmetItemData->ItemId = ItemIdSpecialHelmet;
@@ -82,7 +82,7 @@ void InitializeTestItems()
 	SpecialHelmetItemData->MaxStackSize = 1;
 	SpecialHelmetItemData->ItemWeight = 2;
 	SpecialHelmetItemData->ItemCategories.AddTag(HelmetSlot);
-	URISInventoryFunctions::HardcodeItem(ItemIdSpecialHelmet, SpecialHelmetItemData);
+	URISFunctions::HardcodeItem(ItemIdSpecialHelmet, SpecialHelmetItemData);
 
 	URISItemData* ChestItemData = NewObject<URISItemData>();
 	ChestItemData->ItemId = ItemIdChestArmor;
@@ -93,7 +93,7 @@ void InitializeTestItems()
 	ChestItemData->MaxStackSize = 1;
 	ChestItemData->ItemWeight = 5; // Adjusted weight for chest armor
 	ChestItemData->ItemCategories.AddTag(ChestSlot); // Adjust for chest slot
-	URISInventoryFunctions::HardcodeItem(ItemIdChestArmor, ChestItemData);
+	URISFunctions::HardcodeItem(ItemIdChestArmor, ChestItemData);
 
 	URISItemData* SpearItemData = NewObject<URISItemData>();
 	SpearItemData->ItemId = ItemIdSpear;
@@ -104,7 +104,7 @@ void InitializeTestItems()
 	SpearItemData->MaxStackSize = 5; // should not matter
 	SpearItemData->ItemWeight = 3;
 	SpearItemData->ItemCategories.AddTag(ItemTypeWeapon);
-	URISInventoryFunctions::HardcodeItem(ItemIdSpear, SpearItemData);
+	URISFunctions::HardcodeItem(ItemIdSpear, SpearItemData);
 
 
 	URISItemData* GiantBoulderItemData = NewObject<URISItemData>();
@@ -116,5 +116,5 @@ void InitializeTestItems()
 	GiantBoulderItemData->MaxStackSize = 1;
 	GiantBoulderItemData->ItemWeight = 10;
 	GiantBoulderItemData->ItemCategories.AddTag(ItemTypeResource);
-	URISInventoryFunctions::HardcodeItem(ItemIdGiantBoulder, GiantBoulderItemData);
+	URISFunctions::HardcodeItem(ItemIdGiantBoulder, GiantBoulderItemData);
 }

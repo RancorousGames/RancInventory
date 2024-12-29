@@ -2,7 +2,7 @@
 
 #include "SRancItemCreator.h"
 #include <..\..\RancInventory\Public\Management\RISInventoryData.h>
-#include <..\..\RancInventory\Public\Management\RISInventoryFunctions.h>
+#include <..\..\RancInventory\Public\Management\RISFunctions.h>
 #include <PropertyCustomizationHelpers.h>
 #include <AssetThumbnail.h>
 #include <AssetToolsModule.h>
