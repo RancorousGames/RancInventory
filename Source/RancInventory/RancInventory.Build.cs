@@ -7,8 +7,8 @@ public class RancInventory : ModuleRules
     public RancInventory(ReadOnlyTargetRules Target) : base(Target)
     {
         PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
-        CppStandard = CppStandardVersion.Cpp17;
-
+        CppStandard = CppStandardVersion.Cpp20;
+        
         PublicDependencyModuleNames.AddRange(new[]
         {
             "Core",

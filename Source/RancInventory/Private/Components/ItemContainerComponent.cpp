@@ -6,6 +6,7 @@
 #include "LogRancInventorySystem.h"
 #include "Data/ItemInstanceData.h"
 #include "Core/RISFunctions.h"
+#include "Core/RISSubsystem.h"
 #include "Net/UnrealNetwork.h"
 #include "Net/Core/PushModel/PushModel.h"
 
@@ -72,7 +73,7 @@ void UItemContainerComponent::OnRep_Items()
 	DetectAndPublishChanges();
 }
 
-int32 UItemContainerComponent::AddItems_IfServer(TScriptInterface<IRISItemSource> ItemSource, const FGameplayTag& ItemId, int32 RequestedQuantity, bool AllowPartial,
+int32 UItemContainerComponent::AddItems_IfServer(TScriptInterface<IItemSource> ItemSource, const FGameplayTag& ItemId, int32 RequestedQuantity, bool AllowPartial,
                                                  bool SuppressUpdate)
 {
 	if (GetOwnerRole() != ROLE_Authority && GetOwnerRole() != ROLE_None)
@@ -123,7 +124,7 @@ int32 UItemContainerComponent::AddItems_IfServer(TScriptInterface<IRISItemSource
 	if (!SuppressUpdate)
 	{
 		UpdateWeightAndSlots();
-		OnItemAddedToContainer.Broadcast(ItemData, AmountToAdd);
+		OnItemAddedToContainer.Broadcast(ItemData, AmountToAdd, EItemChangeReason::Added);
 	}
 
 	if (GetOwnerRole() == ROLE_Authority || GetOwnerRole() == ROLE_None)
@@ -236,7 +237,7 @@ void UItemContainerComponent::DropItemsFromContainer_ServerImpl(const FGameplayT
 
 	if (auto* World = GetWorld())
 	{
-		URISFunctions::SpawnWorldItem(World, DropItemClass, ItemId, Quantity, GetOwner()->GetActorLocation() + RelativeDropLocation, DroppedItemStateArray);
+		URISSubsystem::Get(this)->SpawnWorldItem(World, DropItemClass, ItemId, Quantity, GetOwner()->GetActorLocation() + RelativeDropLocation, DroppedItemStateArray);
 	}
 		
 	UpdateWeightAndSlots();
@@ -322,7 +323,7 @@ int32 UItemContainerComponent::ExtractItemFromContainer_IfServer(const FGameplay
 	ItemInstance->ItemBundle.Quantity += QuantityExtracted;
 	
 	UpdateWeightAndSlots();
-	OnItemAddedToContainer.Broadcast(URISFunctions::GetItemDataById(ItemId), QuantityExtracted);
+	OnItemAddedToContainer.Broadcast(URISFunctions::GetItemDataById(ItemId), QuantityExtracted, EItemChangeReason::Transferred);
 	MARK_PROPERTY_DIRTY_FROM_NAME(UItemContainerComponent, ItemsVer, this);
 
 	return Quantity;
@@ -412,7 +413,7 @@ const FItemBundle& UItemContainerComponent::FindItemById(const FGameplayTag& Ite
 	return FItemBundle::EmptyItemInstance;
 }
 
-bool UItemContainerComponent::CanReceiveItem(const FGameplayTag& ItemId, int32 Quantity) const
+bool UItemContainerComponent::CanContainerReceiveItems(const FGameplayTag& ItemId, int32 Quantity) const
 {
 	return (OnValidateAddItemToContainer.IsBound() ? OnValidateAddItemToContainer.Execute(ItemId, Quantity) : true) &&
 		GetReceivableQuantity(ItemId) >= Quantity;
@@ -642,7 +643,7 @@ void UItemContainerComponent::DetectAndPublishChanges()
 				const auto* ItemData = URISFunctions::GetItemDataById(NewItem.ItemBundle.ItemId);
 				if (OldItem->ItemBundle.Quantity < NewItem.ItemBundle.Quantity)
 				{
-					OnItemAddedToContainer.Broadcast(ItemData, NewItem.ItemBundle.Quantity - OldItem->ItemBundle.Quantity);
+					OnItemAddedToContainer.Broadcast(ItemData, NewItem.ItemBundle.Quantity - OldItem->ItemBundle.Quantity, EItemChangeReason::Synced);
 				}
 				else if (OldItem->ItemBundle.Quantity > NewItem.ItemBundle.Quantity)
 				{
@@ -656,7 +657,7 @@ void UItemContainerComponent::DetectAndPublishChanges()
 		{
 			// New item
 			const auto* ItemData = URISFunctions::GetItemDataById(NewItem.ItemBundle.ItemId);
-			OnItemAddedToContainer.Broadcast(ItemData, NewItem.ItemBundle.Quantity);
+			OnItemAddedToContainer.Broadcast(ItemData, NewItem.ItemBundle.Quantity, EItemChangeReason::Synced);
 			NewItem.ItemBundle.Quantity = -NewItem.ItemBundle.Quantity; // Mark as processed
 			CachedItemsVer.Items.Add(NewItem);
 		}

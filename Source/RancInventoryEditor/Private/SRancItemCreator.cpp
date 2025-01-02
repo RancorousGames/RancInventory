@@ -1,8 +1,6 @@
 // Copyright Rancorous Games, 2024
 
 #include "SRancItemCreator.h"
-#include <..\..\RancInventory\Public\Management\RISInventoryData.h>
-#include <..\..\RancInventory\Public\Management\RISFunctions.h>
 #include <PropertyCustomizationHelpers.h>
 #include <AssetThumbnail.h>
 #include <AssetToolsModule.h>
@@ -16,6 +14,17 @@
 #include <Widgets/Layout/SScrollBox.h>
 #include <Widgets/Layout/SGridPanel.h>
 
+#include "Editor.h"
+#include "EditorStyleSet.h"
+#include "Core/RISFunctions.h"
+#include "Data/ItemStaticData.h"
+#include "Data/RISDataTypes.h"
+#include "Engine/StaticMesh.h"
+#include "Engine/Texture2D.h"
+#include "Misc/MessageDialog.h"
+#include "Widgets/SToolTip.h"
+#include "Widgets/Input/SButton.h"
+#include "Widgets/Input/SEditableTextBox.h"
 #include "Widgets/Input/SVectorInputBox.h"
 
 #if ENGINE_MAJOR_VERSION >= 5
@@ -56,7 +65,7 @@ TSharedRef<SWidget> SRISItemCreator::ConstructContent()
                 .OnObjectChanged(this, &SRISItemCreator::OnObjChanged, ObjId);
         };
 
-    return SNew(SScrollBox)
+    return SNew(SScrollBox);/*
         + SScrollBox::Slot()
         [
             SNew(SGridPanel)
@@ -113,15 +122,15 @@ TSharedRef<SWidget> SRISItemCreator::ConstructContent()
                     .OnZCommitted(this, &SRISItemCreator::OnSetArriveTangent, EAxis::Z)
                     .Font(FAppStyle::Get().GetFontStyle("PropertyWindow.NormalFont"))
                 ]
-                /*  
-                .Padding(SlotPadding)
-                [
-                    SNew(SClassPropertyEntryBox)
-                        .AllowAbstract(true)
-                        .SelectedClass(this, &SRancItemCreator::GetSelectedEntryClass)
-                        .OnSetClass(this, &SRancItemCreator::HandleNewEntryClassSelected)
-                ]
-                */
+                 
+                //.Padding(SlotPadding)
+                //[
+                //    SNew(SClassPropertyEntryBox)
+                //        .AllowAbstract(true)
+                //        .SelectedClass(this, &SRancItemCreator::GetSelectedEntryClass)
+                //        .OnSetClass(this, &SRancItemCreator::HandleNewEntryClassSelected)
+                //]
+                
                 + SGridPanel::Slot(0, 3)
                 .Padding(SlotPadding)
                 [
@@ -348,7 +357,7 @@ TSharedRef<SWidget> SRISItemCreator::ConstructContent()
                             )
                         )
                 ]
-        ];
+        ];*/
 }
 
 void SRISItemCreator::OnIdTagContainerChanged(const FGameplayTagContainer& NewTagContainer)
@@ -432,7 +441,7 @@ void SRISItemCreator::UpdateFolders()
         }
     }
 
-    if (const UAssetManager* const AssetManager = UAssetManager::GetIfValid(); IsValid(AssetManager) && AssetManager->HasInitialScanCompleted() && URISInventoryFunctions::HasEmptyParam(AssetFoldersArr))
+    if (const UAssetManager* const AssetManager = UAssetManager::GetIfValid(); IsValid(AssetManager) && AssetManager->HasInitialScanCompleted() && URISFunctions::HasEmptyParam(AssetFoldersArr))
     {
         FMessageDialog::Open(EAppMsgType::Ok, FText::FromString(TEXT("Asset Manager could not find any folder. Please check your Asset Manager settings.")));
     }
@@ -453,9 +462,9 @@ FReply SRISItemCreator::HandleCreateItemButtonClicked() const
 
     UDataAssetFactory* const Factory = NewObject<UDataAssetFactory>();
 
-    if (UObject* const NewData = AssetToolsModule.Get().CreateAsset(AssetName.ToString(), FPackageName::GetLongPackagePath(PackageName), URISItemData::StaticClass(), Factory))
+    if (UObject* const NewData = AssetToolsModule.Get().CreateAsset(AssetName.ToString(), FPackageName::GetLongPackagePath(PackageName), UItemStaticData::StaticClass(), Factory))
     {
-        URISItemData* const ItemData = Cast<URISItemData>(NewData);
+        UItemStaticData* const ItemData = Cast<UItemStaticData>(NewData);
         ItemData->ItemId = ItemId;
         ItemData->ItemWorldMesh = Cast<UStaticMesh>(ObjectMap.FindRef(0)); ;
         ItemData->ItemWorldScale = ItemWorldScale;

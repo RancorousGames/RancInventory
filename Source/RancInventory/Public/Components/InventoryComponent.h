@@ -81,11 +81,11 @@ public:
 	bool IsTaggedSlotCompatible(const FGameplayTag& ItemId, const FGameplayTag& SlotTag) const;
 
 	UFUNCTION(BlueprintPure, Category = "RIS | Equipment")
-	const FItemBundleWithTag& GetItemForTaggedSlot(const FGameplayTag& SlotTag) const;
+	const FTaggedItemBundle& GetItemForTaggedSlot(const FGameplayTag& SlotTag) const;
 
 
 	// New events for slot equipment changes, this also gets called if an already held stackable item has its stack quantity increased
-	DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnItemAddedToTaggedSlot, const FGameplayTag&, SlotTag, const UItemStaticData*, ItemData, int32, Quantity);
+	DECLARE_DYNAMIC_MULTICAST_DELEGATE_FourParams(FOnItemAddedToTaggedSlot, const FGameplayTag&, SlotTag, const UItemStaticData*, ItemData, int32, Quantity, EItemChangeReason, Reason);
 	UPROPERTY(BlueprintAssignable, Category = "RIS | Equipment")
 	FOnItemAddedToTaggedSlot OnItemAddedToTaggedSlot;
 	
@@ -110,36 +110,36 @@ public:
 	TArray<FGameplayTag> SpecializedTaggedSlots; // E.g., head, feet
 
 	UFUNCTION()
-	void OnInventoryItemAddedHandler(const UItemStaticData* ItemData, int32 Quantity);
+	void OnInventoryItemAddedHandler(const UItemStaticData* ItemData, int32 Quantity, EItemChangeReason Reason);
 	UFUNCTION()
 	void OnInventoryItemRemovedHandler(const UItemStaticData* ItemData, int32 Quantity, EItemChangeReason Reason);
 
 	////////////////// CRAFTING ///////////////////
 
 	UFUNCTION(BlueprintCallable, Category = "RIS | Crafting")
-	bool CanCraftRecipeId(const FRISRecipePrimaryAssetId& RecipeId) const;
+	bool CanCraftRecipeId(const FPrimaryRISRecipeId& RecipeId) const;
 
 	UFUNCTION(BlueprintCallable, Category = "RIS | Crafting")
 	bool CanCraftRecipe(const UObjectRecipeData* Recipe) const;
 
 	UFUNCTION(BlueprintCallable, Category = "RIS | Crafting")
-	bool CanCraftCraftingRecipe(const FRISRecipePrimaryAssetId& RecipeId) const;
+	bool CanCraftCraftingRecipe(const FPrimaryRISRecipeId& RecipeId) const;
 	
 	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "RIS | Crafting")
-	void CraftRecipeId_Server(const FRISRecipePrimaryAssetId& RecipeId);
+	void CraftRecipeId_Server(const FPrimaryRISRecipeId& RecipeId);
 
 	UFUNCTION(BlueprintCallable, Category = "RIS | Crafting")
 	bool CraftRecipe_IfServer(const UObjectRecipeData* Recipe);
 
 
 	UFUNCTION(BlueprintPure, Category = "RIS")
-	TArray<FItemBundleWithTag> GetAllTaggedItems() const;
+	TArray<FTaggedItemBundle> GetAllTaggedItems() const;
 
 	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "RIS | Recipes")
-	void SetRecipeLock_Server(const FRISRecipePrimaryAssetId& RecipeId, bool LockState);
+	void SetRecipeLock_Server(const FPrimaryRISRecipeId& RecipeId, bool LockState);
 
 	UFUNCTION(BlueprintCallable, Category = "RIS | Recipes")
-	UObjectRecipeData* GetRecipeById(const FRISRecipePrimaryAssetId& RecipeId);
+	UObjectRecipeData* GetRecipeById(const FPrimaryRISRecipeId& RecipeId);
 
 	// Available recipes are ones that are unlocked and for which we have the necessary materials
 	UFUNCTION(BlueprintCallable, Category = "RIS | Recipes")
@@ -163,7 +163,7 @@ public:
 
 	// All possible recipes, not just ones we can craft
 	UPROPERTY(ReplicatedUsing=OnRep_Recipes, EditAnywhere, BlueprintReadOnly, Category = "RIS | Recipes")
-	TArray<FRISRecipePrimaryAssetId> AllUnlockedRecipes;
+	TArray<FPrimaryRISRecipeId> AllUnlockedRecipes;
 	
 	
 	UFUNCTION(BlueprintCallable, Category = "RIS | Equipment")
@@ -242,7 +242,7 @@ protected:
 
 
 	UPROPERTY(ReplicatedUsing=OnRep_Slots, BlueprintReadOnly, Category = "RIS")
-	TArray<FItemBundleWithTag> TaggedSlotItemInstances;
+	TArray<FTaggedItemBundle> TaggedSlotItemInstances;
 
 	TMap<FGameplayTag, TArray<UObjectRecipeData*>> CurrentAvailableRecipes;
 

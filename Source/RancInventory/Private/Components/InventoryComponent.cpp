@@ -41,9 +41,9 @@ void UInventoryComponent::UpdateWeightAndSlots()
 	Super::UpdateWeightAndSlots();
 
 	// then subtract the slots of the tagged items
-	for (const FItemBundleWithTag& TaggedInstance : TaggedSlotItemInstances)
+	for (const FTaggedItemBundle& TaggedInstance : TaggedSlotItemInstances)
 	{
-		if (const UItemStaticData* const ItemData = URISFunctions::GetItemDataById(
+		if (const UItemStaticData* const ItemData = URISSubsystem::Get(this)->GetItemDataById(
 			TaggedInstance.ItemBundle.ItemId))
 		{
 			int32 SlotsTakenPerStack = 1;
@@ -104,7 +104,7 @@ int32 UInventoryComponent::ExtractItemFromTaggedSlot_IfServer(const FGameplayTag
 
 
 ////////////////////////////////////////////////////// TAGGED SLOTS ///////////////////////////////////////////////////////
-int32 UInventoryComponent::AddItemsToTaggedSlot_IfServer(TScriptInterface<IRISItemSource> ItemSource, const FGameplayTag& SlotTag, const FGameplayTag& ItemId,
+int32 UInventoryComponent::AddItemsToTaggedSlot_IfServer(TScriptInterface<IItemSource> ItemSource, const FGameplayTag& SlotTag, const FGameplayTag& ItemId,
                                                             int32 RequestedQuantity)
 {
 	// Reminder: Items in tagged slots are duplicated in container
@@ -126,7 +126,7 @@ int32 UInventoryComponent::AddItemsToTaggedSlot_IfServer(TScriptInterface<IRISIt
 	const int32 Index = GetIndexForTaggedSlot(SlotTag); // -1 if not found
 
 	UItemStaticData* ItemData = URISFunctions::GetItemDataById(ItemId);
-	FItemBundleWithTag* ExistingItem = nullptr;
+	FTaggedItemBundle* ExistingItem = nullptr;
 	
 	if (TaggedSlotItemInstances.IsValidIndex(Index))
 	{
@@ -152,7 +152,7 @@ int32 UInventoryComponent::AddItemsToTaggedSlot_IfServer(TScriptInterface<IRISIt
 		{
 			RemoveQuantityFromTaggedSlot_IfServer(SlotTag, MAX_int32, EItemChangeReason::ForceDestroyed, true); // Remove existing item
                                     		}
-                                    		auto NewTaggedInstance = FItemBundleWithTag(SlotTag, ItemId, 0);
+                                    		auto NewTaggedInstance = FTaggedItemBundle(SlotTag, ItemId, 0);
                                     		TaggedSlotItemInstances.Add(NewTaggedInstance);
 		ExistingItem = &TaggedSlotItemInstances[TaggedSlotItemInstances.Num() - 1];
 	}
@@ -164,13 +164,13 @@ int32 UInventoryComponent::AddItemsToTaggedSlot_IfServer(TScriptInterface<IRISIt
 
 	UpdateWeightAndSlots();
 	
-	OnItemAddedToTaggedSlot.Broadcast(SlotTag, ItemData, QuantityToAdd);
+	OnItemAddedToTaggedSlot.Broadcast(SlotTag, ItemData, QuantityToAdd, EItemChangeReason::Added);
 	MARK_PROPERTY_DIRTY_FROM_NAME(UInventoryComponent, TaggedSlotItemInstances, this);
 
 	return QuantityToAdd;
 }
 
-int32 UInventoryComponent::AddItemsToAnySlot(TScriptInterface<IRISItemSource> ItemSource, const FGameplayTag& ItemId, int32 RequestedQuantity, bool PreferTaggedSlots)
+int32 UInventoryComponent::AddItemsToAnySlot(TScriptInterface<IItemSource> ItemSource, const FGameplayTag& ItemId, int32 RequestedQuantity, bool PreferTaggedSlots)
 {
 	const auto* ItemData = URISFunctions::GetItemDataById(ItemId);
 	if (!ItemData)
@@ -204,7 +204,7 @@ int32 UInventoryComponent::AddItemsToAnySlot(TScriptInterface<IRISItemSource> It
 		{
 			// We do a move because the item has already been added to the container
 			const int32 ActualAddedQuantity = MoveItems_ServerImpl(ItemId, QuantityToAddSlot, FGameplayTag::EmptyTag, SlotTag, false, FGameplayTag(), 0, true);
-			OnItemAddedToTaggedSlot.Broadcast(SlotTag, ItemData, ActualAddedQuantity);
+			OnItemAddedToTaggedSlot.Broadcast(SlotTag, ItemData, ActualAddedQuantity, EItemChangeReason::Added);
 
 			ensureMsgf(ActualAddedQuantity == QuantityToAddSlot, TEXT("Failed to add all items to tagged slot despite plan calculated"));
 		}
@@ -216,7 +216,7 @@ int32 UInventoryComponent::AddItemsToAnySlot(TScriptInterface<IRISItemSource> It
 
 	if (AddedAnyToGenericSlots)
 	{
-		OnItemAddedToContainer.Broadcast(ItemData, QuantityToAdd);
+		OnItemAddedToContainer.Broadcast(ItemData, QuantityToAdd, EItemChangeReason::Added);
 	}
 
 	UpdateWeightAndSlots();
@@ -260,7 +260,7 @@ int32 UInventoryComponent::RemoveQuantityFromTaggedSlot_IfServer(const FGameplay
 		return 0;
 	}
 	
-	FItemBundleWithTag* InstanceToRemoveFrom = &TaggedSlotItemInstances[IndexToRemoveAt];
+	FTaggedItemBundle* InstanceToRemoveFrom = &TaggedSlotItemInstances[IndexToRemoveAt];
 	
 	if (!AllowPartial && InstanceToRemoveFrom->ItemBundle.Quantity <
 		QuantityToRemove)
@@ -394,7 +394,7 @@ int32 UInventoryComponent::MoveItems_ServerImpl(const FGameplayTag& ItemId, int3
 				return 0;
 			}
 
-			TaggedSlotItemInstances.Add(FItemBundleWithTag(TargetTaggedSlot, FItemBundle::EmptyItemInstance));
+			TaggedSlotItemInstances.Add(FTaggedItemBundle(TargetTaggedSlot, FItemBundle::EmptyItemInstance));
 			TargetItem = &TaggedSlotItemInstances.Last().ItemBundle;
 		}
 		else
@@ -473,9 +473,9 @@ int32 UInventoryComponent::MoveItems_ServerImpl(const FGameplayTag& ItemId, int3
 			if (MoveResult.WereItemsSwapped)
 			{
 				OnItemRemovedFromTaggedSlot.Broadcast(TargetTaggedSlot, TargetItemData, SourceItem->Quantity, EItemChangeReason::Moved);
-				OnItemAddedToTaggedSlot.Broadcast(SourceTaggedSlot, TargetItemData, SourceItem->Quantity);
+				OnItemAddedToTaggedSlot.Broadcast(SourceTaggedSlot, TargetItemData, SourceItem->Quantity, EItemChangeReason::Moved);
 			}
-			OnItemAddedToTaggedSlot.Broadcast(TargetTaggedSlot, SourceItemData, MovedQuantity);
+			OnItemAddedToTaggedSlot.Broadcast(TargetTaggedSlot, SourceItemData, MovedQuantity, EItemChangeReason::Moved);
 		}
 	}
 	else if (SourceIsTaggedSlot)
@@ -499,10 +499,10 @@ int32 UInventoryComponent::MoveItems_ServerImpl(const FGameplayTag& ItemId, int3
 		if (!SuppressUpdate)
 		{
 			OnItemRemovedFromTaggedSlot.Broadcast(SourceTaggedSlot, SourceItemData, MovedQuantity, EItemChangeReason::Moved);
-			OnItemAddedToContainer.Broadcast(SourceItemData, MovedQuantity);
+			OnItemAddedToContainer.Broadcast(SourceItemData, MovedQuantity, EItemChangeReason::Moved);
 		
 			if (SwapBackRequested)
-				OnItemAddedToTaggedSlot.Broadcast(SourceTaggedSlot, TargetItemData, SwapQuantity);
+				OnItemAddedToTaggedSlot.Broadcast(SourceTaggedSlot, TargetItemData, SwapQuantity, EItemChangeReason::Moved);
 		}
 	}
 	else // TargetIsTaggedSlot
@@ -514,7 +514,7 @@ int32 UInventoryComponent::MoveItems_ServerImpl(const FGameplayTag& ItemId, int3
 			ensureMsgf(SwapQuantity == TargetItem->Quantity, TEXT("Requested swap did not swap all of target item"));
 			// Notify of the first part of the swap (we dont actually need to do any moving as its going to get overwritten anyway)
 			OnItemRemovedFromTaggedSlot.Broadcast(TargetTaggedSlot, TargetItemData, SwapQuantity, EItemChangeReason::Moved);
-			OnItemAddedToContainer.Broadcast(TargetItemData, SwapQuantity);
+			OnItemAddedToContainer.Broadcast(TargetItemData, SwapQuantity, EItemChangeReason::Moved);
 		}	
 	
 		if (TargetItem->ItemId != ItemId) // If we are swapping or filling a newly added tagged slot
@@ -526,7 +526,7 @@ int32 UInventoryComponent::MoveItems_ServerImpl(const FGameplayTag& ItemId, int3
 		if (!SuppressUpdate)
 		{
 			OnItemRemovedFromContainer.Broadcast(SourceItemData, MovedQuantity, EItemChangeReason::Moved);
-			OnItemAddedToTaggedSlot.Broadcast(TargetTaggedSlot, SourceItemData, MovedQuantity);
+			OnItemAddedToTaggedSlot.Broadcast(TargetTaggedSlot, SourceItemData, MovedQuantity, EItemChangeReason::Moved);
 		}
 	}
 
@@ -545,7 +545,7 @@ void UInventoryComponent::PickupItem(AWorldItem* WorldItem, bool PreferTaggedSlo
 {
 	if (!WorldItem)
 	{
-		UE_LOG(LogRancInventorySystem, Warning, TEXT("PickupItem called with null world item"));
+		UE_LOG(LogRISInventory, Warning, TEXT("PickupItem called with null world item"));
 		return;
 	}
 
@@ -590,7 +590,7 @@ int32 UInventoryComponent::MoveItems(const FGameplayTag& ItemId, int32 Quantity,
 int32 UInventoryComponent::ActivateItemFromTaggedSlot(const FGameplayTag& SlotTag)
 {
 	// On client the below is just a guess
-	const FItemBundleWithTag Item = GetItemForTaggedSlot(SlotTag);
+	const FTaggedItemBundle Item = GetItemForTaggedSlot(SlotTag);
 	if (!Item.IsValid()) return 0;
 	const int32 QuantityToRemove = 1; // Todo: Make this configurable
 
@@ -623,7 +623,7 @@ int32 UInventoryComponent::GetQuantityOfItemTaggedSlotCanReceive(const FGameplay
 
 	if (IsTaggedSlotCompatible(ItemId, SlotTag))
 	{
-		const FItemBundleWithTag& ItemInSlot = GetItemForTaggedSlot(SlotTag);
+		const FTaggedItemBundle& ItemInSlot = GetItemForTaggedSlot(SlotTag);
 		if (ItemInSlot.IsValid() && ItemInSlot.ItemBundle.ItemId == ItemId)
 		{
 			QuantityThatCanBeAddedToTaggedSlots += ItemData->MaxStackSize > 1
@@ -643,7 +643,7 @@ int32 UInventoryComponent::GetQuantityOfItemTaggedSlotCanReceive(const FGameplay
 int32 UInventoryComponent::DropFromTaggedSlot(const FGameplayTag& SlotTag, int32 Quantity, FVector RelativeDropLocation)
 {
 	// On client the below is just a guess
-	const FItemBundleWithTag Item = GetItemForTaggedSlot(SlotTag);
+	const FTaggedItemBundle Item = GetItemForTaggedSlot(SlotTag);
 	if (!Item.IsValid()) return 0;
 	int32 QuantityToDrop = FMath::Min(Quantity, Item.ItemBundle.Quantity);
 
@@ -659,7 +659,7 @@ void UInventoryComponent::DropFromTaggedSlot_Server_Implementation(const FGamepl
                                                                       FVector RelativeDropLocation)
 {
 	const int32 Index = GetIndexForTaggedSlot(SlotTag);
-	const FItemBundleWithTag& Item = TaggedSlotItemInstances[Index];
+	const FTaggedItemBundle& Item = TaggedSlotItemInstances[Index];
 	if (!Item.Tag.IsValid())
 	{
 		UE_LOG(LogTemp, Warning, TEXT("DropFromTaggedSlot called with invalid slot tag"));
@@ -668,7 +668,7 @@ void UInventoryComponent::DropFromTaggedSlot_Server_Implementation(const FGamepl
 
 	FGameplayTag ItemId = Item.ItemBundle.ItemId;
 
-	const FItemBundleWithTag ItemContained = GetItemForTaggedSlot(SlotTag);
+	const FTaggedItemBundle ItemContained = GetItemForTaggedSlot(SlotTag);
 	int32 QuantityToDrop = 0;
 	if (ItemContained.IsValid() && ItemContained.ItemBundle.ItemId == ItemId)
 	{
@@ -685,7 +685,7 @@ void UInventoryComponent::DropFromTaggedSlot_Server_Implementation(const FGamepl
 
 void UInventoryComponent::ActivateItemFromTaggedSlot_Server_Implementation(const FGameplayTag& SlotTag)
 {
-	const FItemBundleWithTag Item = GetItemForTaggedSlot(SlotTag);
+	const FTaggedItemBundle Item = GetItemForTaggedSlot(SlotTag);
 	if (Item.Tag.IsValid())
 	{
 		constexpr int32 QuantityToConsume = 1; // todo: Make this configurable
@@ -699,13 +699,13 @@ void UInventoryComponent::ActivateItemFromTaggedSlot_Server_Implementation(const
 	}
 }
 
-const FItemBundleWithTag& UInventoryComponent::GetItemForTaggedSlot(const FGameplayTag& SlotTag) const
+const FTaggedItemBundle& UInventoryComponent::GetItemForTaggedSlot(const FGameplayTag& SlotTag) const
 {
 	int32 Index = GetIndexForTaggedSlot(SlotTag);
 
 	if (Index < 0 || Index >= TaggedSlotItemInstances.Num())
 	{
-		return FItemBundleWithTag::EmptyItemInstance;
+		return FTaggedItemBundle::EmptyItemInstance;
 	}
 
 	return TaggedSlotItemInstances[Index];
@@ -723,7 +723,7 @@ int32 UInventoryComponent::GetIndexForTaggedSlot(const FGameplayTag& SlotTag) co
 	return -1;
 }
 
-TArray<FItemBundleWithTag> UInventoryComponent::GetAllTaggedItems() const
+TArray<FTaggedItemBundle> UInventoryComponent::GetAllTaggedItems() const
 {
 	return TaggedSlotItemInstances;
 }
@@ -731,7 +731,7 @@ TArray<FItemBundleWithTag> UInventoryComponent::GetAllTaggedItems() const
 void UInventoryComponent::DetectAndPublishContainerChanges()
 {
 	// First pass: Update existing items or add new ones, mark them by setting quantity to negative.
-	/*for (FItemBundleWithTag& NewItem : TaggedSlotItemInstances)
+	/*for (FTaggedItemBundle& NewItem : TaggedSlotItemInstances)
 	{
 		FItemBundle* OldItem = TaggedItemsCache.Find(NewItem.Tag);
 
@@ -898,7 +898,7 @@ void UInventoryComponent::OnRep_Slots()
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////// CRAFTING /////////////////////////////////////////////////////////////////
 
-bool UInventoryComponent::CanCraftRecipeId(const FRISRecipePrimaryAssetId& RecipeId) const
+bool UInventoryComponent::CanCraftRecipeId(const FPrimaryRISRecipeId& RecipeId) const
 {
 	const UObjectRecipeData* Recipe = Cast<UObjectRecipeData>(
 		UAssetManager::GetIfInitialized()->GetPrimaryAssetObject(RecipeId));
@@ -919,14 +919,14 @@ bool UInventoryComponent::CanCraftRecipe(const UObjectRecipeData* Recipe) const
 	return true;
 }
 
-bool UInventoryComponent::CanCraftCraftingRecipe(const FRISRecipePrimaryAssetId& RecipeId) const
+bool UInventoryComponent::CanCraftCraftingRecipe(const FPrimaryRISRecipeId& RecipeId) const
 {
 	UItemRecipeData* CraftingRecipe = Cast<UItemRecipeData>(
 		UAssetManager::GetIfInitialized()->GetPrimaryAssetObject(RecipeId));
 	return CanCraftRecipe(CraftingRecipe);
 }
 
-void UInventoryComponent::CraftRecipeId_Server_Implementation(const FRISRecipePrimaryAssetId& RecipeId)
+void UInventoryComponent::CraftRecipeId_Server_Implementation(const FPrimaryRISRecipeId& RecipeId)
 {
 	const UObjectRecipeData* Recipe = Cast<UObjectRecipeData>(
 		UAssetManager::GetIfInitialized()->GetPrimaryAssetObject(RecipeId));
@@ -957,13 +957,13 @@ bool UInventoryComponent::CraftRecipe_IfServer(const UObjectRecipeData* Recipe)
 		if (const UItemRecipeData* ItemRecipe = Cast<UItemRecipeData>(Recipe))
 		{
 			const FItemBundle CraftedItem = FItemBundle(ItemRecipe->ResultingItemId, ItemRecipe->QuantityCreated);
-			const int32 QuantityAdded = AddItemsToAnySlot(URISFunctions::GetRISSubsystem(this), CraftedItem.ItemId, CraftedItem.Quantity, false);
+			const int32 QuantityAdded = AddItemsToAnySlot(URISSubsystem::Get(this), CraftedItem.ItemId, CraftedItem.Quantity, false);
 			if (QuantityAdded < ItemRecipe->QuantityCreated)
 			{
 				UE_LOG(LogTemp, Display, TEXT("Failed to add crafted item to inventory, dropping item instead"));
 
 				TArray<UItemInstanceData*> DroppingItemState;
-				Execute_ExtractItem_IfServer(URISFunctions::GetRISSubsystem(this), CraftedItem.ItemId, CraftedItem.Quantity - QuantityAdded,
+				Execute_ExtractItem_IfServer(URISSubsystem::Get(this), CraftedItem.ItemId, CraftedItem.Quantity - QuantityAdded,
 				                              EItemChangeReason::Transformed, DroppingItemState);
 				
 				DropItemsFromContainer_Server(CraftedItem.ItemId, CraftedItem.Quantity - QuantityAdded);
@@ -977,7 +977,7 @@ bool UInventoryComponent::CraftRecipe_IfServer(const UObjectRecipeData* Recipe)
 	return bSuccess;
 }
 
-void UInventoryComponent::SetRecipeLock_Server_Implementation(const FRISRecipePrimaryAssetId& RecipeId, bool LockState)
+void UInventoryComponent::SetRecipeLock_Server_Implementation(const FPrimaryRISRecipeId& RecipeId, bool LockState)
 {
 	if (AllUnlockedRecipes.Contains(RecipeId) != LockState)
 	{
@@ -997,7 +997,7 @@ void UInventoryComponent::SetRecipeLock_Server_Implementation(const FRISRecipePr
 	}
 }
 
-UObjectRecipeData* UInventoryComponent::GetRecipeById(const FRISRecipePrimaryAssetId& RecipeId)
+UObjectRecipeData* UInventoryComponent::GetRecipeById(const FPrimaryRISRecipeId& RecipeId)
 {
 	return Cast<UObjectRecipeData>(UAssetManager::GetIfInitialized()->GetPrimaryAssetObject(RecipeId));
 }
@@ -1015,7 +1015,7 @@ void UInventoryComponent::CheckAndUpdateRecipeAvailability()
 	CurrentAvailableRecipes.Empty();
 
 	// Iterate through all available recipes and check if they can be crafted
-	for (const FRISRecipePrimaryAssetId& RecipeId : AllUnlockedRecipes)
+	for (const FPrimaryRISRecipeId& RecipeId : AllUnlockedRecipes)
 	{
 		UObjectRecipeData* Recipe = GetRecipeById(RecipeId);
 		if (CanCraftRecipe(Recipe))
@@ -1023,7 +1023,7 @@ void UInventoryComponent::CheckAndUpdateRecipeAvailability()
 			for (const FGameplayTag& Category : RecipeTagFilters)
 			{
 				// If recipe matches a category, add it to the corresponding list
-				if (Recipe->RecipeCategories.HasTag(Category))
+				if (Recipe->Tags.HasTag(Category))
 				{
 					if (!CurrentAvailableRecipes.Contains(Category))
 					{
@@ -1083,7 +1083,7 @@ int32 UInventoryComponent::DestroyItemImpl(const FGameplayTag& ItemId, int32 Qua
 int32 UInventoryComponent::GetContainerItemQuantityImpl(const FGameplayTag& ItemId) const
 {
 	int32 Quantity = GetItemQuantityTotal(ItemId);
-	for (const FItemBundleWithTag& TaggedItem : TaggedSlotItemInstances)
+	for (const FTaggedItemBundle& TaggedItem : TaggedSlotItemInstances)
 	{
 		if (TaggedItem.ItemBundle.ItemId == ItemId)
 		{
@@ -1157,7 +1157,7 @@ int32 UInventoryComponent::GetReceivableQuantityImpl(const FGameplayTag& ItemId)
 	return FinalAcceptableQuantity;	
 }
 
-void UInventoryComponent::OnInventoryItemAddedHandler(const UItemStaticData* ItemData, int32 Quantity)
+void UInventoryComponent::OnInventoryItemAddedHandler(const UItemStaticData* ItemData, int32 Quantity, EItemChangeReason Reason)
 {
 	CheckAndUpdateRecipeAvailability();
 }

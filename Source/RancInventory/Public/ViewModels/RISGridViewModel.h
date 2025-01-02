@@ -7,6 +7,7 @@
 #include "RISNetworkingData.h"
 #include "RISGridViewModel.generated.h"
 
+class UInventoryComponent;
 class RancInventoryComponent;
 
 
@@ -74,10 +75,10 @@ public:
     bool MoveItemToAnyTaggedSlot(const FGameplayTag& SourceTaggedSlot, int32 SourceSlotIndex);
     
     UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category=RIS)
-    bool CanSlotReceiveItem(const FItemBundle& ItemInstance, int32 SlotIndex) const;
+    bool CanSlotReceiveItem(const FGameplayTag& ItemId, int32 Quantity, int32 SlotIndex) const;
     
     UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category=RIS)
-    bool CanTaggedSlotReceiveItem(const FItemBundle& ItemInstance, const FGameplayTag& SlotTag, bool CheckContainerLimits = true) const;
+    bool CanTaggedSlotReceiveItem(const FGameplayTag& ItemId, int32 Quantity, const FGameplayTag& SlotTag, bool CheckContainerLimits = true) const;
     
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category=RIS)
     int32 NumberOfSlots;
@@ -101,16 +102,16 @@ protected:
     FGameplayTag FindTaggedSlotForItem(const FItemBundle& Item) const;
 
     UFUNCTION(BlueprintNativeEvent , Category = RIS)
-    int32 FindSlotIndexForItem(const FItemBundle& Item);
+    int32 FindSlotIndexForItem(const FGameplayTag& ItemId, int32 Quantity);
     
     UFUNCTION(BlueprintNativeEvent , Category = RIS)
-    void HandleItemAdded(const FItemBundle& Item);
+    void HandleItemAdded(const UItemStaticData* ItemData, int32 Quantity, EItemChangeReason Reason);
     UFUNCTION(BlueprintNativeEvent , Category = RIS)
-    void HandleItemRemoved(const FItemBundle& ItemInstance);
+    void HandleItemRemoved(const UItemStaticData* ItemData, int32 Quantity, EItemChangeReason Reason);
     UFUNCTION(BlueprintNativeEvent , Category = RIS)
-    void HandleTaggedItemAdded(const FGameplayTag& SlotTag, const FItemBundle& ItemInstance);
+    void HandleTaggedItemAdded(const FGameplayTag& SlotTag, const UItemStaticData* ItemData, int32 Quantity, EItemChangeReason Reason);
     UFUNCTION(BlueprintNativeEvent , Category = RIS)
-    void HandleTaggedItemRemoved(const FGameplayTag& SlotTag, const FItemBundle& ItemInstance);
+    void HandleTaggedItemRemoved(const FGameplayTag& SlotTag, const UItemStaticData* ItemData, int32 Quantity, EItemChangeReason Reason);
     
     UFUNCTION(BlueprintNativeEvent , Category = RIS)
     void ForceFullUpdate();

@@ -1,8 +1,11 @@
 // Copyright Rancorous Games, 2024
 
 #include "SFRancInventoryDetailsPanel.h"
-#include <..\..\RancInventory\Public\Management\RISInventoryData.h>
 #include <Engine/AssetManager.h>
+
+#include "Data/ItemStaticData.h"
+#include "Data/RecipeData.h"
+#include "Misc/MessageDialog.h"
 
 void SFRancInventoryItemDetailsPanel::CustomizeHeader(const TSharedRef<IPropertyHandle> PropertyHandle, FDetailWidgetRow& HeaderRow, IPropertyTypeCustomizationUtils& CustomizationUtils)
 {
@@ -16,7 +19,7 @@ void SFRancInventoryItemDetailsPanel::CustomizeHeader(const TSharedRef<IProperty
         .ValueContent()
         [
             SNew(SObjectPropertyEntryBox)
-                .AllowedClass(URISItemData::StaticClass())
+                .AllowedClass(UItemStaticData::StaticClass())
                 .PropertyHandle(PropertyHandle)
                 .DisplayThumbnail(true)
                 .ThumbnailPool(CustomizationUtils.GetThumbnailPool())
@@ -82,7 +85,7 @@ void SFRancInventoryRecipeDetailsPanel::CustomizeHeader(const TSharedRef<IProper
         .ValueContent()
         [
             SNew(SObjectPropertyEntryBox)
-                .AllowedClass(URISObjectRecipeData::StaticClass())
+                .AllowedClass(UObjectRecipeData::StaticClass())
                 .PropertyHandle(PropertyHandle)
                 .DisplayThumbnail(true)
                 .ThumbnailPool(CustomizationUtils.GetThumbnailPool())

@@ -18,15 +18,15 @@ void AWorldItem::BeginPlay()
 {
 	Super::BeginPlay();
 
-	if (Item.ItemId.IsValid())
+	if (RepresentedItem.ItemBundle.ItemId.IsValid())
 	{
 		Initialize();
 	}
 }
 
-void AWorldItem::SetItem(const FItemBundle& NewItem)
+void AWorldItem::SetItem(const FItemBundleWithInstanceData& NewItem)
 {
-	Item = NewItem;
+	RepresentedItem = NewItem;
 	Initialize();
 }
 
@@ -37,7 +37,7 @@ void AWorldItem::OnRep_Item()
 
 void AWorldItem::Initialize()
 {
-	ItemData = URISFunctions::GetItemDataById(Item.ItemId);
+	ItemData = URISFunctions::GetItemDataById(RepresentedItem.ItemBundle.ItemId);
 
 	SetMobility(EComponentMobility::Movable);
 	auto* mesh = GetStaticMeshComponent();
@@ -60,7 +60,7 @@ void AWorldItem::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifeti
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
-	DOREPLIFETIME_CONDITION(AWorldItem, Item, COND_InitialOnly);
+	DOREPLIFETIME_CONDITION(AWorldItem, RepresentedItem, COND_InitialOnly);
 }
 
 void AWorldItem::PreReplication(IRepChangedPropertyTracker& ChangedPropertyTracker)

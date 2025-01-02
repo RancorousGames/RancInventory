@@ -3,7 +3,7 @@
 #pragma once
 #include "GameplayTagContainer.h"
 #include <CoreMinimal.h>
-#include "Management/RISInventoryData.h"
+#include "Data/RISDataTypes.h"
 #include "RISNetworkingData.generated.h"
 
 
@@ -16,10 +16,10 @@ struct FVersionedItemInstanceArray
 	int32 Version = 0;
 
 	UPROPERTY()
-	TArray<FItemBundle> Items;
+	TArray<FItemBundleWithInstanceData> Items;
 
 	FVersionedItemInstanceArray() = default;
-	FVersionedItemInstanceArray(int32 InVersion, const TArray<FItemBundle>& InItems)
+	FVersionedItemInstanceArray(int32 InVersion, const TArray<FItemBundleWithInstanceData>& InItems)
 		: Version(InVersion), Items(InItems) { }
 };
 

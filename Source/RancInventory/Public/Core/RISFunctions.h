@@ -17,7 +17,7 @@ enum class ERISItemSearchType : uint8
 
 class UInventoryComponent;
 class UAssetManager;
-class URISItemData;
+class UItemStaticData;
 struct FPrimaryRISItemId;
 
 /**
@@ -36,50 +36,23 @@ public:
     /* Unload a item that was loaded by Asset Manager */
     UFUNCTION(BlueprintCallable, Category = "Ranc Inventory")
     static void UnloadRancItem(const FPrimaryRISItemId& InItemId);
-
-    /* Check if the ids are equal */
-    UFUNCTION(BlueprintPure, Category = "Ranc Inventory")
-    static bool CompareItemInfo(const FItemBundle& Info1, const FItemBundle& Info2);
-
+    
     /* Check if the ids of the given item datas are equal */
     UFUNCTION(BlueprintPure, Category = "Ranc Inventory")
-    static bool CompareItemData(const URISItemData* Data1, const URISItemData* Data2);
+    static bool CompareItemData(const UItemStaticData* Data1, const UItemStaticData* Data2);
 
     /* Return the item data related to the given id */
     UFUNCTION(BlueprintCallable, Category = "Ranc Inventory")
-    static URISItemData* GetSingleItemDataById(const FPrimaryRISItemId& InID, const TArray<FName>& InBundles, const bool bAutoUnload = true);
+    static UItemStaticData* GetSingleItemDataById(const FPrimaryRISItemId& InID, const TArray<FName>& InBundles, const bool bAutoUnload = true);
 
     /* Return a array of data depending of the given ids */
     UFUNCTION(BlueprintCallable, Category = "Ranc Inventory")
-    static TArray<URISItemData*> GetItemDataArrayById(const TArray<FPrimaryRISItemId>& InIDs, const TArray<FName>& InBundles, const bool bAutoUnload = true);
-
-    /* Search all registered items and return a array of item data that match with the given parameters */
-    UFUNCTION(BlueprintCallable, Category = "Ranc Inventory")
-    static TArray<URISItemData*> SearchRancItemData(const ERISItemSearchType SearchType, const FString& SearchString, const TArray<FName>& InBundles, const bool bAutoUnload = true);
-    
-    /* Get the primary asset ids of all registered items */
-    UFUNCTION(BlueprintPure, Category = "Ranc Inventory")
-    static TArray<FPrimaryAssetId> GetAllRancItemPrimaryIds();
-    
-    UFUNCTION(BlueprintPure, Category = "Ranc Inventory")
-    static TArray<FGameplayTag> GetAllRancItemIds();
-
-    
-    /* Loads all item data assets, removing the need for GetSingleItemDataById and instead allowing use of GetItemById */
-    UFUNCTION(BlueprintCallable, Category = "Ranc Inventory")
-    static void PermanentlyLoadAllItemsAsync();
-    
-    UFUNCTION(BlueprintPure, Category = "Ranc Inventory")
-    static bool AreAllItemsLoaded();
+    static TArray<UItemStaticData*> GetItemDataArrayById(const TArray<FPrimaryRISItemId> InIDs, const TArray<FName>& InBundles, const bool bAutoUnload = true);
     
     /* Uses static map from GameplayTag to URancItemData, works faster after having called PermanentlyLoadAllItems */
     UFUNCTION(BlueprintPure, Category = "Ranc Inventory")
     static UItemStaticData* GetItemDataById(FGameplayTag TagId);
     
-    /* Trade items between two inventory components */
-    UFUNCTION(BlueprintCallable, Category = "Ranc Inventory")
-    static void TradeRancItem(TArray<FItemBundle> ItemsToTrade, UItemContainerComponent* FromInventory, UItemContainerComponent* ToInventory);
-
     // Utiltiy function to check if moving an item from one slot to another would cause a swap
     static bool ShouldItemsBeSwapped(FItemBundle* Source, FItemBundle* Target);
 
@@ -89,26 +62,7 @@ public:
      * IgnoreMaxStacks will allow a target slot to go above the item datas maxstacksize (used for itemcontainer)
      * AllowPartial if enabled will allow a move to partially succeed, e.g. only move 2 of requested 3 quantity, if false moves full or nothing
      */
-    static int32 MoveBetweenSlots(FItemBundle* Source, FItemBundle* Target, bool IgnoreMaxStacks, int32 RequestedQuantity, bool AllowPartial);
-
-
-    /* Check if the given item info have a valid id */
-    UFUNCTION(BlueprintPure, Category = "Ranc Inventory")
-    static bool IsItemValid(const FItemBundle InItemInfo);
-    
-    /* Loads all item recipe data assets, allowing use of GetItemById */
-    UFUNCTION(BlueprintCallable, Category = "Ranc Inventory")
-    static void PermanentlyLoadAllRecipesAsync();
-    
-    UFUNCTION(BlueprintCallable, Category = "Ranc Inventory")
-    static bool AreAllRISRecipesLoaded();
-    
-    UFUNCTION(BlueprintCallable, Category = "Ranc Inventory")
-    static TArray<UObjectRecipeData*> GetAllRISItemRecipes();
-
-    /* Includes both RancItemRecipe and RancItemCraftingRecipe (for item to item) */
-    UFUNCTION(BlueprintPure, Category = "Ranc Inventory")
-    static TArray<FPrimaryAssetId> GetAllRisItemRecipeIds();
+    static FRISMoveResult MoveBetweenSlots(FItemBundle* Source, FItemBundle* Target, bool IgnoreMaxStacks, int32 RequestedQuantity, bool AllowPartial);
     
     
     template<typename Ty>
@@ -132,29 +86,6 @@ public:
         }
     }
 
-    UFUNCTION(BlueprintPure, Category = "Ranc Inventory")
-    static TMap<FGameplayTag, FPrimaryRISItemIdContainer> GetItemRelations(const FItemBundle InItemInfo);
-
-    static void AllItemsLoadedCallback();
-    static void AllRecipesLoadedCallback();
-
-    // Below are used for e.g. unit tests
-    static void HardcodeItem(FGameplayTag ItemId, URISItemData* ItemData);
-    static void HardcodeRecipe(FGameplayTag RecipeId, UObjectRecipeData* RecipeData);
-
 private:
-    static TArray<URISItemData*> LoadRancItemData_Internal(UAssetManager* InAssetManager, const TArray<FPrimaryAssetId>& InIDs, const TArray<FName>& InBundles, const bool bAutoUnload);
-    static TArray<URISItemData*> LoadRancItemData_Internal(UAssetManager* InAssetManager, const TArray<FPrimaryRISItemId>& InIDs, const TArray<FName>& InBundles, const bool bAutoUnload);
-
-    
-    static TMap<FGameplayTag, URISItemData*> AllLoadedItemsByTag;
-   // static TMap<FGameplayTag, FName> AllLoadedItemAssetNamesByTag;
-    static TArray<FGameplayTag> AllItemIds;
-    
-    static TArray<UObjectRecipeData*> AllLoadedRecipes;
-
-public:
-    /* Filter the container and return only items that can be traded at the current context */
-    UFUNCTION(BlueprintPure, Category = "Ranc Inventory")
-    static TArray<FItemBundle> FilterTradeableItems(UInventoryComponent* FromInventory, UInventoryComponent* ToInventory, const TArray<FItemBundle>& Items);
+    static TArray<UItemStaticData*> LoadRancItemData_Internal(UAssetManager* InAssetManager, const TArray<FPrimaryAssetId>& InIDs, const TArray<FName>& InBundles, const bool bAutoUnload);
 };

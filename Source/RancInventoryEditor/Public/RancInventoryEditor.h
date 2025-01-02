@@ -4,6 +4,10 @@
 
 #include <CoreMinimal.h>
 
+#include "PropertyEditorModule.h"
+#include "Modules/ModuleInterface.h"
+#include "Widgets/Docking/SDockTab.h"
+
 class FRancInventoryEditorModule : public IModuleInterface
 {
 protected:

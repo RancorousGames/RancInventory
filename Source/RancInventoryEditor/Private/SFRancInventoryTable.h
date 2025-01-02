@@ -3,14 +3,22 @@
 #pragma once
 
 #include <CoreMinimal.h>
-#include "..\..\RancInventory\Public\Management\RISInventoryData.h"
-#include "..\..\RancInventory\Public\Management\RISFunctions.h"
+
+#include "Core/RISFunctions.h"
+#include "Data/ItemStaticData.h"
+#include "Data/RISDataTypes.h"
+#include "Engine/StaticMesh.h"
+#include "Widgets/SCompoundWidget.h"
+#include "Widgets/Views/ITableRow.h"
+#include "Widgets/Views/SHeaderRow.h"
+#include "Widgets/Views/SListView.h"
 
 struct FRancItemRowData
 {
     explicit FRancItemRowData(const FPrimaryRISItemId& InPrimaryAssetId)
     {
-        const auto ItemData = URISFunctions::GetSingleItemDataById(InPrimaryAssetId, { TEXT("Data"), TEXT("SoftData"), }, false);
+        UItemStaticData* const ItemData = URISFunctions::GetSingleItemDataById(
+            InPrimaryAssetId, {TEXT("Data"), TEXT("SoftData"),}, false);
 
         PrimaryAssetId = InPrimaryAssetId;
         Id = ItemData->ItemId;

@@ -5,6 +5,8 @@
 #include <CoreMinimal.h>
 
 #include "GameplayTagContainer.h"
+#include "Framework/SlateDelegates.h"
+#include "Widgets/SCompoundWidget.h"
 
 enum class ERancItemType : uint8;
 

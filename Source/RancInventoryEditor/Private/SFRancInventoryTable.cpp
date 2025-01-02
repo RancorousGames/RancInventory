@@ -1,10 +1,12 @@
 // Copyright Rancorous Games, 2024
 
 #include "SFRancInventoryTable.h"
-#include <..\..\RancInventory\Public\Management\RISFunctions.h>
-#include <..\..\RancInventory\Public\Management\RISInventoryData.h>
 #include <Subsystems/AssetEditorSubsystem.h>
 #include <Engine/AssetManager.h>
+
+#include "Editor.h"
+#include "Core/RISSubsystem.h"
+#include "Misc/MessageDialog.h"
 
 static const FName ColumnId_PrimaryIdLabel("PrimaryAssetId");
 static const FName ColumnId_ItemIdLabel("Id");
@@ -203,7 +205,7 @@ void SFRancInventoryTable::UpdateItemList()
 {
     ItemArr.Empty();
 
-    for (const FPrimaryAssetId& Iterator : URISFunctions::GetAllRancItemPrimaryIds())
+    for (const FPrimaryAssetId& Iterator : URISSubsystem::GetAllRISItemPrimaryIds())
     {
         ItemArr.Add(MakeShared<FRancItemRowData>(Iterator));
     }

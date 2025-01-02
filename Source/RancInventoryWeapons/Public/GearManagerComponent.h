@@ -1,6 +1,8 @@
+// Copyright Rancorous Games, 2024
+
+#pragma once
 
 #include "Components/ActorComponent.h"
-#include "WeaponDataStructures.h"
 #include "WeaponStaticData.h"
 #include "Components/InventoryComponent.h"
 #include "GearManagerComponent.generated.h"
@@ -18,6 +20,9 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FGearUpdated, FGameplayTag, Slot, F
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FWeaponEquipState, FName, WeaponType, bool , bEquipState);
 
 
+UENUM(BlueprintType)
+enum class EGearSlotType : uint8 {MainHand, OffHand, Armor};
+
 USTRUCT(BlueprintType)
 struct FGearSlotDefinition
 {
@@ -32,14 +37,14 @@ struct FGearSlotDefinition
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ranc Inventory")
     EGearSlotType SlotType;
 
-    //// Transient property to avoid serialization and replication of the component reference
-    //UPROPERTY(Transient)
-    //UStaticMeshComponent* MeshComponent = nullptr;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ranc Inventory")
+	bool bVisibleOnCharacter;
+	
+    // Transient property to avoid serialization and replication of the component reference
+    UPROPERTY(Transient)
+    UStaticMeshComponent* MeshComponent = nullptr;
 };
 
-
-UENUM(BlueprintType)
-enum class EGearSlotType : uint8 {MainHand, OffHand, Armor};
 
 // enum
 UENUM(BlueprintType)
@@ -49,16 +54,6 @@ enum class EPendingGearChangeType : uint8
 	Equip,
 	Unequip,
 	WeaponSelect
-};
-
-UENUM(BlueprintType)
-enum class EItemChangeReason : uint8
-{
-	Added UMETA(DisplayName = "Added"),      
-	Removed UMETA(DisplayName = "Removed"),  
-	Updated UMETA(DisplayName = "Updated"), 
-	Equipped UMETA(DisplayName = "Equipped"),
-	Unequipped UMETA(DisplayName = "Unequipped") 
 };
 
 /*
@@ -118,6 +113,14 @@ public:
 	UPROPERTY(BlueprintAssignable)
 	FWeaponEvent OnFinishSpawningWeapons;
 
+	DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnHitDetected, AActor*, HitActor, FHitResult, HitResult);
+	UPROPERTY(BlueprintAssignable, Category = "Ranc Inventory Weapons |Gear")
+	FOnHitDetected OnHitDetected;
+	
+	DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnAttackPerformed, FMontageData, MontageData);
+	UPROPERTY(BlueprintAssignable, Category = "Ranc Inventory Weapons |Gear")
+	FOnAttackPerformed OnAttackPerformed;
+	
 	// Called every frame
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
@@ -253,10 +256,10 @@ public:
 
 	
 	UFUNCTION()
-	void HandleItemAddedToSlot(const FGameplayTag& SlotTag, const UItemStaticData* Data, int32 Quantity);
+	void HandleItemAddedToSlot(const FGameplayTag& SlotTag, const UItemStaticData* Data, int32 Quantity, EItemChangeReason Reason);
 
 	UFUNCTION()
-	void HandleItemRemovedFromSlot(const FGameplayTag& SlotTag, const UItemStaticData* Data, int32 Quantity);
+	void HandleItemRemovedFromSlot(const FGameplayTag& SlotTag, const UItemStaticData* Data, int32 Quantity, EItemChangeReason Reason);
 
 	/* Try to perform an attack montage
 	 * This will succeed if cooldown is ready The weapon is notified of the attack
@@ -377,7 +380,7 @@ protected:
 	
 	void RotateToAimLocation(FVector AimLocation);
 	void UpdateRotation();
-	
+
 	const FGearSlotDefinition* GetHandSlotToUse(const UWeaponStaticData* WeaponData) const;
 	const AWeaponActor* GetWeaponForSlot(const FGearSlotDefinition* Slot) const;
 	
@@ -388,13 +391,24 @@ protected:
 	
 	virtual void GetLifetimeReplicatedProps(TArray < class FLifetimeProperty > & OutLifetimeProps) const override;
 
+	void PlayRecordedAttackSequence(const UWeaponAttackData* AttackData);
+	void StartAttackReplay();
+	void StopAttackReplay();
+
 	UInventoryComponent* LinkedInventoryComponent = nullptr;
 
 	// Last attack time
 	float LastAttackTime = 0.0f;
 	
 	bool UseOffhandNext = false;
-	
+
+	// Trace replays
+	int ReplayCurrentIndex;
+	bool bReplayInitialOwnerPositionSaved;
+	const UWeaponAttackData* ReplayedAttackData;
+	FTimerHandle ReplayTimerHandle;
+	FTransform ReplayInitialOwnerPosition;
+	ECollisionChannel TraceChannel;
 };
 
 

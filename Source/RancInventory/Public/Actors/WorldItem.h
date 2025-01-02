@@ -1,9 +1,11 @@
 ﻿// Copyright Rancorous Games, 2024
 
 #pragma once
-#include "Data/RISInventoryData.h"
+#include "Data/RISDataTypes.h"
 #include "Engine/StaticMeshActor.h"
 #include "WorldItem.generated.h"
+
+class UItemStaticData;
 
 UCLASS()
 class RANCINVENTORY_API AWorldItem : public AStaticMeshActor
@@ -11,13 +13,13 @@ class RANCINVENTORY_API AWorldItem : public AStaticMeshActor
 GENERATED_BODY()
 public:
 	UPROPERTY(Replicated, BlueprintReadWrite, Meta = (DisplayName = "ItemInstance", ExposeOnSpawn = true), Category = "Item")
-	FItemBundle Item;
+	FItemBundleWithInstanceData RepresentedItem;
 	
 	UPROPERTY(BlueprintReadOnly, Meta = (DisplayName = "ItemData"), Category = "Item")
 	UItemStaticData* ItemData = nullptr;
 
 	UFUNCTION(BlueprintCallable, Category = "Item")
-	void SetItem(const FItemBundle& NewItem);
+	void SetItem(const FItemBundleWithInstanceData& NewItem);
 
 	virtual void OnConstruction(const FTransform& Transform) override;
 	

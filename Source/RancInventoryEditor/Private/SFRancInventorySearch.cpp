@@ -1,9 +1,15 @@
 // Copyright Rancorous Games, 2024
 
 #include "SFRancInventorySearch.h"
-#include <..\..\RancInventory\Public\Management\RISInventoryData.h>
 #include <Widgets/Input/SSearchBox.h>
 
+#include "Core/RISFunctions.h"
+#include "Data/ItemStaticData.h"
+#include "Engine/StaticMesh.h"
+#include "Widgets/Views/ITableRow.h"
+#include "Widgets/Views/SHeaderRow.h"
+#include "Widgets/Views/SListView.h"
+#include "EditorStyleSet.h"
 #include "SGameplayTagContainerCombo.h"
 
 void SFRancInventorySearch::Construct(const FArguments& InArgs)
@@ -29,8 +35,9 @@ TSharedRef<SWidget> SFRancInventorySearch::ConstructContent()
 #endif
 
     constexpr float SlotPadding = 4.f;
-
-    return SNew(SVerticalBox)
+    return SNew(SVerticalBox);
+/*
+    return SNew(SVerticalBox);
         + SVerticalBox::Slot()
         .AutoHeight()
         [
@@ -53,7 +60,7 @@ TSharedRef<SWidget> SFRancInventorySearch::ConstructContent()
            .Filter(FString("Item, Items, RancInventory, Inventory, ItemTypes, Types"))
            .TagContainer(this, &SFRancInventorySearch::GetSearchTypesTagContainer)
            .OnTagContainerChanged(this, &SFRancInventorySearch::TriggerOnCategoriesChanged)
-       ];
+       ];*/
 }
 
 void SFRancInventorySearch::TriggerOnCategoriesChanged(const FGameplayTagContainer& Categories)

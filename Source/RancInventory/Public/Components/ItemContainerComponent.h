@@ -4,12 +4,13 @@
 #include "Actors/WorldItem.h"
 #include "Data/ItemBundle.h"
 #include "Core/IItemSource.h"
+#include "Data/RISDataTypes.h"
 #include "Data/ItemStaticData.h"
 #include "ViewModels/RISNetworkingData.h"
 #include "ItemContainerComponent.generated.h"
 
 UCLASS(Blueprintable, ClassGroup = (Custom), Category = "RIS | Classes", EditInlineNew, meta = (BlueprintSpawnableComponent))
-class RANCINVENTORY_API UItemContainerComponent : public UActorComponent, public IRISItemSource
+class RANCINVENTORY_API UItemContainerComponent : public UActorComponent, public IItemSource
 {
     GENERATED_BODY()
 public:
@@ -32,7 +33,7 @@ public:
      * This will extract the item count from the source, if you don't want to take the items from anywhere specific, use the GetInfiniteItemSource
      * Returns the amount added */
 	UFUNCTION(BlueprintCallable, Category=RIS)
-	int32 AddItems_IfServer(TScriptInterface<IRISItemSource> ItemSource,  const FGameplayTag& ItemId, int32 RequestedQuantity, bool AllowPartial = false, bool SuppressUpdate = false);
+	int32 AddItems_IfServer(TScriptInterface<IItemSource> ItemSource,  const FGameplayTag& ItemId, int32 RequestedQuantity, bool AllowPartial = false, bool SuppressUpdate = false);
 
     /* For most games we could probably trust the client to specify ItemInstance but for e.g. a hot potato we can't
      * Instead have the client send an input like UseItem or DropItem
@@ -59,7 +60,7 @@ public:
     
 	/* Checks weight and container slot count */
     UFUNCTION(BlueprintPure, Category=RIS)
-    bool CanReceiveItem(const FGameplayTag& ItemId, int32 Quantity) const;
+    bool CanContainerReceiveItems(const FGameplayTag& ItemId, int32 Quantity) const;
 
 	/* Checks weight and container slot count */
     UFUNCTION(BlueprintPure, Category=RIS)
@@ -99,7 +100,7 @@ public:
 	UFUNCTION(BlueprintCallable, Category=RIS)
 	void SetAddItemValidationCallback_IfServer(const FAddItemValidationDelegate& ValidationDelegate);
 	
-    DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnInventoryItemAdded, const UItemStaticData*, ItemData, int32, Quantity);
+    DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnInventoryItemAdded, const UItemStaticData*, ItemData, int32, Quantity, EItemChangeReason, Reason);
     UPROPERTY(BlueprintAssignable, Category=RIS)
     FOnInventoryItemAdded OnItemAddedToContainer;
 

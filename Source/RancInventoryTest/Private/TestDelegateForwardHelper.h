@@ -1,7 +1,7 @@
 ﻿// Copyright Rancorous Games, 2024
 
 #pragma once
-#include "Management/RISInventoryData.h"
+#include "Data/ItemBundle.h"
 #include "TestDelegateForwardHelper.Generated.h"
 
 UCLASS()

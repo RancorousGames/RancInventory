@@ -4,6 +4,8 @@
 
 #include <CoreMinimal.h>
 
+#include "Widgets/SCompoundWidget.h"
+
 class SFRancInventoryTable;
 
 class SFRancInventoryUtils final : public SCompoundWidget

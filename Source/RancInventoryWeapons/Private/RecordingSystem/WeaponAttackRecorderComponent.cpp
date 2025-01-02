@@ -1,12 +1,11 @@
 // Copyright Rancorous Games, 2024
 
-#include "WeaponAttackRecorderComponent.h"
-#include "AWeaponActor.h" // Make sure to include the correct header for your weapon actor
+#include "RecordingSystem/WeaponAttackRecorderComponent.h"
+#include "WeaponActor.h"
 #include "Engine/SkeletalMeshSocket.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "Kismet/GameplayStatics.h"
-
-// Oct 9
+#include "UObject/SavePackage.h"
 
 UWeaponAttackRecorderComponent::UWeaponAttackRecorderComponent()
 {
@@ -75,7 +74,6 @@ void UWeaponAttackRecorderComponent::Initialize()
     }
 
     // Get the owning character's animation instance
-    ACharacter* OwningCharacter = Cast<ACharacter>(OwningWeapon->GetOwner());
     if (OwningCharacter)
     {
         OwningCharacterAnimInstance = OwningCharacter->GetMesh()->GetAnimInstance();

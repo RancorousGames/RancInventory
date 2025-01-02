@@ -5,6 +5,7 @@
 #include <CoreMinimal.h>
 
 #include "GameplayTagContainer.h"
+#include "Widgets/SCompoundWidget.h"
 
 class SRISItemCreator final : public SCompoundWidget
 {
@@ -46,8 +47,7 @@ private:
     void OnSetArriveTangent(float value, ETextCommit::Type CommitType, EAxis::Type Axis);
     TMap<int32, TWeakObjectPtr<class UObject>> ObjectMap;
     TSharedPtr<class FAssetThumbnailPool> ImageIcon_ThumbnailPool;
-    TArray<FTextDisplayStringPtr> AssetFoldersArr;
-
+    TArray<TSharedPtr<FString>> AssetFoldersArr;
     FName AssetName;
     FName AssetFolder;
     FGameplayTag ItemId;

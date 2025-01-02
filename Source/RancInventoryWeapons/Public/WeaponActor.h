@@ -7,6 +7,7 @@
 #include "WeaponStaticData.h"
 #include "Actors/WorldItem.h"
 #include "Engine/StreamableManager.h"
+#include "Templates/SharedPointer.h"
 #include "WeaponActor.generated.h"
 
 class UWeaponFiringComponent;
@@ -71,10 +72,11 @@ public:
 	UFUNCTION(BlueprintNativeEvent, Category = "Ranc Inventory | Weapon")
 	FTransform GetAttachTransform(FName SocketName);
 	virtual FTransform GetAttachTransform_Impl(FName SocketName);
+
+	virtual FMontageData GetAttackMontage(int32 MontageIdOverride = -1);
 	
-	
-	UFUNCTION(BlueprintPure, Category = "Ranc Inventory | Weapon")
-	FMontageData GetAttackMontage(int32 MontageIdOverride = -1);
+	UFUNCTION(BlueprintImplementableEvent, Category = "Ranc Inventory | Weapon", meta=(DisplayName = "GetAttackMontage"))
+	FMontageData ReceiveGetAttackMontage(int32 MontageIdOverride = -1);
 
 	void Equip();
 
@@ -116,7 +118,6 @@ public:
 	}
 
 private:
-	UPROPERTY()
 	TArray<TSharedPtr<FStreamableHandle>> AnimationHandles;
 	
 };

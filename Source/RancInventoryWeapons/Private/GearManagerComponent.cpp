@@ -2,14 +2,15 @@
 
 
 #include "GearManagerComponent.h"
+
+#include "LogRancInventorySystem.h"
 #include "WeaponActor.h"
 #include "Engine/EngineTypes.h"
-#include "LogRancInventorySystem.h"
 #include "Async/IAsyncTask.h"
 #include "Core/RISFunctions.h"
 #include "GameFramework/Character.h"
 #include "Net/UnrealNetwork.h"
-//#include "../FunctionLibrary/UtilityFunctions.h"
+#include "RecordingSystem/WeaponAttackRecorderDataTypes.h"
 
 // Sets default values for this component's properties
 UGearManagerComponent::UGearManagerComponent()
@@ -27,7 +28,7 @@ UGearManagerComponent::UGearManagerComponent()
 
 		if (!LinkedInventoryComponent)
 		{
-			UE_LOG(LogRancInventorySystem, Warning, TEXT("LinkedInventoryComponent is nullptr."))
+			UE_LOG(LogRISInventory, Warning, TEXT("LinkedInventoryComponent is nullptr."))
 			return;
 		}
 	}
@@ -65,7 +66,7 @@ void UGearManagerComponent::Initialize()
 	Owner = Cast<ACharacter>(GetOwner());
 	if (!Owner)
 	{
-		UE_LOG(LogRancInventorySystem, Warning, TEXT("Owner is nullptr."))
+		UE_LOG(LogRISInventory, Warning, TEXT("Owner is nullptr."))
 		return;
 	}
 
@@ -82,11 +83,11 @@ void UGearManagerComponent::Initialize()
 	for (FGearSlotDefinition& GearSlot : GearSlots)
 	{
 		// if mainhand or offhand then save reference MainHandSlot OffhandSlot
-		if (GearSlot.SlotType == EGearSlotType::Mainhand)
+		if (GearSlot.SlotType == EGearSlotType::MainHand)
 		{
 			MainHandSlot = &GearSlot;
 		}
-		else if (GearSlot.SlotType == EGearSlotType::Offhand)
+		else if (GearSlot.SlotType == EGearSlotType::OffHand)
 		{
 			OffhandSlot = &GearSlot;
 		}
@@ -133,7 +134,7 @@ const UWeaponStaticData* UGearManagerComponent::GetOffhandWeaponData()
 	return OffhandWeapon->WeaponData;
 }
 
-void UGearManagerComponent::HandleItemAddedToSlot(const FGameplayTag& SlotTag, const UItemStaticData* Data, int32 Quantity)
+void UGearManagerComponent::HandleItemAddedToSlot(const FGameplayTag& SlotTag, const UItemStaticData* Data, int32 Quantity, EItemChangeReason Reason)
 {
 	if (const UWeaponStaticData* WeaponData = Cast<UWeaponStaticData>(Data))
 	{
@@ -146,7 +147,7 @@ void UGearManagerComponent::HandleItemAddedToSlot(const FGameplayTag& SlotTag, c
 	}
 }
 
-void UGearManagerComponent::HandleItemRemovedFromSlot(const FGameplayTag& SlotTag, const UItemStaticData* Data, int32 Quantity)
+void UGearManagerComponent::HandleItemRemovedFromSlot(const FGameplayTag& SlotTag, const UItemStaticData* Data, int32 Quantity, EItemChangeReason Reason)
 {
 	UnequipGear(SlotTag, Data, true);
 }
@@ -202,7 +203,7 @@ void UGearManagerComponent::AddAndSelectWeapon(const UWeaponStaticData* WeaponDa
 	{
 		if (SelectableWeaponsData.Num() == MaxSelectableWeaponCount)
 		{
-			UE_LOG(LogRancInventorySystem, Warning, TEXT("NumberOfWeaponsAcquired >= WeaponSlots, replaced earliest weapon"))
+			UE_LOG(LogRISInventory, Warning, TEXT("NumberOfWeaponsAcquired >= WeaponSlots, replaced earliest weapon"))
 
 			SelectableWeaponsData.RemoveAt(0);
 		}
@@ -216,15 +217,15 @@ const FGearSlotDefinition* UGearManagerComponent::GetHandSlotToUse(const UWeapon
 {
 	switch (WeaponData->HandCompatability)
 	{
-	case EHandCompatability::OnlyMainhand:
-	case EHandCompatability::TwoHanded:
+	case EHandCompatibility::OnlyMainHand:
+	case EHandCompatibility::TwoHanded:
 		return MainHandSlot;
-	case EHandCompatability::OnlyOffhand:
+	case EHandCompatibility::OnlyOffhand:
 		// Return offhand unless mainhand is two handed
-		return MainhandWeapon && MainhandWeapon->WeaponData->HandCompatability == EHandCompatability::TwoHanded ? nullptr : OffhandSlot;
-	case EHandCompatability::AnyHand:
+		return MainhandWeapon && MainhandWeapon->WeaponData->HandCompatability == EHandCompatibility::TwoHanded ? nullptr : OffhandSlot;
+	case EHandCompatibility::AnyHand:
 		{
-			if (MainhandWeapon && MainhandWeapon->WeaponData->HandCompatability != EHandCompatability::TwoHanded && !OffhandWeapon)
+			if (MainhandWeapon && MainhandWeapon->WeaponData->HandCompatability != EHandCompatibility::TwoHanded && !OffhandWeapon)
 				return OffhandSlot;
 			return MainHandSlot;
 		}
@@ -261,7 +262,7 @@ void UGearManagerComponent::AttachWeaponToOwner(AWeaponActor* InputWeaponActor, 
 
 	if (!CharMesh)
 	{
-		UE_LOG(LogRancInventorySystem, Warning, TEXT("AttachWeaponToOwner() failed, CharMesh is nullptr"))
+		UE_LOG(LogRISInventory, Warning, TEXT("AttachWeaponToOwner() failed, CharMesh is nullptr"))
 		return;
 	}
 
@@ -284,7 +285,7 @@ bool UGearManagerComponent::Check(AWeaponActor* InputWeaponActor) const
 {
 	if (!Owner)
 	{
-		UE_LOG(LogRancInventorySystem, Warning, TEXT("Owner a nullptr. Initialize this component propertly!"));
+		UE_LOG(LogRISInventory, Warning, TEXT("Owner a nullptr. Initialize this component propertly!"));
 
 		return false;
 	}
@@ -292,7 +293,7 @@ bool UGearManagerComponent::Check(AWeaponActor* InputWeaponActor) const
 
 	if (!InputWeaponActor)
 	{
-		UE_LOG(LogRancInventorySystem, Warning, TEXT("InputWeaponActor is nullptr!"))
+		UE_LOG(LogRISInventory, Warning, TEXT("InputWeaponActor is nullptr!"))
 		return false;
 	}
 	return true;
@@ -350,7 +351,7 @@ void UGearManagerComponent::SelectWeapon_Server_Implementation(int32 WeaponIndex
 
 	if (SelectableWeaponsData.Num() == 0 || WeaponIndex < 0 || WeaponIndex > SelectableWeaponsData.Num())
 	{
-		UE_LOG(LogRancInventorySystem, Warning, TEXT("Slot is < 0 || Slot > WeaponSlot. EquipWeapon() Failed"))
+		UE_LOG(LogRISInventory, Warning, TEXT("Slot is < 0 || Slot > WeaponSlot. EquipWeapon() Failed"))
 		return;
 	}
 	
@@ -365,7 +366,7 @@ void UGearManagerComponent::SelectWeapon_Server_Implementation(int32 WeaponIndex
 
 	if (!WeaponData)
 	{
-		UE_LOG(LogRancInventorySystem, Warning, TEXT("WeaponData is nullptr."))
+		UE_LOG(LogRISInventory, Warning, TEXT("WeaponData is nullptr."))
 		return;
 	}
 
@@ -579,7 +580,7 @@ void UGearManagerComponent::UnequipGear(FGameplayTag Slot, const UItemStaticData
 
 		if (!WeaponData) return;
 		
-		if (Slot == MainHandSlot->SlotTag && WeaponData->HandCompatability == EHandCompatability::OnlyOffhand && OffhandWeapon)
+		if (Slot == MainHandSlot->SlotTag && WeaponData->HandCompatability == EHandCompatibility::OnlyOffhand && OffhandWeapon)
 		{
 			WeaponToUnequip = OffhandWeapon;
 			OffhandWeapon = nullptr;
@@ -644,7 +645,7 @@ void UGearManagerComponent::SelectNextActiveWeaponServer_Implementation(bool bPl
 {
 	if (SelectableWeaponsData.Num() == 0)
 	{
-		UE_LOG(LogRancInventorySystem, Warning, TEXT("No weapons to select!"))
+		UE_LOG(LogRISInventory, Warning, TEXT("No weapons to select!"))
 		return;
 	}
 
@@ -677,7 +678,7 @@ bool UGearManagerComponent::PlayEquipMontage(AWeaponActor* WeaponActor)
 {
 	if (!Check(WeaponActor) || !WeaponActor->WeaponData)
 	{
-		UE_LOG(LogRancInventorySystem, Warning, TEXT("WeaponActor or WeaponData is nullptr."))
+		UE_LOG(LogRISInventory, Warning, TEXT("WeaponActor or WeaponData is nullptr."))
 		return false;
 	}
 
@@ -735,7 +736,7 @@ AWeaponActor* UGearManagerComponent::SpawnWeapon_IfServer(const UWeaponStaticDat
 			return NewWeaponActor;
 		}
 
-	UE_LOG(LogRancInventorySystem, Warning, TEXT("Failed to spawn weapon actor!"))
+	UE_LOG(LogRISInventory, Warning, TEXT("Failed to spawn weapon actor!"))
 	return nullptr;
 }
 
@@ -745,7 +746,7 @@ float UGearManagerComponent::PlayMontage(ACharacter* OwnerChar, UAnimMontage* Mo
 	{
 		if (bShowDebugWarnings)
 		{
-			UE_LOG(LogRancInventorySystem, Warning, TEXT("OwnerChar is a nullptr, PlayMontage() returning 0.0f "))
+			UE_LOG(LogRISInventory, Warning, TEXT("OwnerChar is a nullptr, PlayMontage() returning 0.0f "))
 		}
 
 		return 0.0f;
@@ -755,7 +756,7 @@ float UGearManagerComponent::PlayMontage(ACharacter* OwnerChar, UAnimMontage* Mo
 	{
 		if (bShowDebugWarnings)
 		{
-			UE_LOG(LogRancInventorySystem, Warning, TEXT("Montage is a nullptr, PlayMontage() returning 0.0f "))
+			UE_LOG(LogRISInventory, Warning, TEXT("Montage is a nullptr, PlayMontage() returning 0.0f "))
 		}
 
 
@@ -766,7 +767,7 @@ float UGearManagerComponent::PlayMontage(ACharacter* OwnerChar, UAnimMontage* Mo
 	{
 		if (bShowDebugWarnings)
 		{
-			UE_LOG(LogRancInventorySystem, Warning, TEXT("Playrate was < 0, setting Playrate = 1!"))
+			UE_LOG(LogRISInventory, Warning, TEXT("Playrate was < 0, setting Playrate = 1!"))
 		}
 		PlayRate = 1.0f;
 	}

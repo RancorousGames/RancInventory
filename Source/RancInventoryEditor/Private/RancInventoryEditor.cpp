@@ -67,11 +67,7 @@ void FRancInventoryEditorModule::RegisterMenus()
 {
     FToolMenuOwnerScoped OwnerScoped(this);
 
-#if ENGINE_MAJOR_VERSION < 5
-    const FName AppStyleName = FEditorStyle::GetStyleSetName();
-#else
     const FName AppStyleName = FAppStyle::GetAppStyleSetName();
-#endif
 
     const TSharedPtr<FWorkspaceItem> Menu = WorkspaceMenu::GetMenuStructure().GetToolsCategory()->AddGroup(LOCTEXT("RancInventoryCategory", "RancInventory"), LOCTEXT("RancInventoryCategoryTooltip", "Ranc Inventory Plugins Tabs"), FSlateIcon(AppStyleName, "InputBindingEditor.LevelViewport"));
 

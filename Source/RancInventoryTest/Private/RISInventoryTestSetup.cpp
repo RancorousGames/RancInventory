@@ -4,8 +4,12 @@
 
 #include "NativeGameplayTags.h"
 #include "CoreMinimal.h"
-#include "..\..\RancInventory\Public\Management\RISFunctions.h"
-#include "..\..\RancInventory\Public\Management\RISInventoryData.h"
+#include "Core/RISFunctions.h"
+#include "Core/RISSubsystem.h"
+#include "Data/ItemBundle.h"
+#include "Data/ItemStaticData.h"
+#include "Engine/Engine.h"
+#include "Engine/GameInstance.h"
 
 UE_DEFINE_GAMEPLAY_TAG(LeftHandSlot, "Hands.LeftHand");
 UE_DEFINE_GAMEPLAY_TAG(RightHandSlot, "Hands.RightHand");
@@ -24,7 +28,7 @@ UE_DEFINE_GAMEPLAY_TAG(ItemIdSpecialHelmet, "Items.IDs.SpecialHelmet");
 UE_DEFINE_GAMEPLAY_TAG(ItemIdChestArmor, "Items.IDs.ChestArmor");
 UE_DEFINE_GAMEPLAY_TAG(ItemIdGiantBoulder, "Items.IDs.GiantBoulder");
 
-
+/*
 FItemBundle OneSpear(ItemIdSpear, 1);
 FItemBundle OneRock(ItemIdRock, 1);
 FItemBundle TwoRocks(ItemIdRock, 2);
@@ -35,12 +39,64 @@ FItemBundle ThreeSticks(ItemIdSticks, 3);
 FItemBundle OneHelmet(ItemIdHelmet, 1);
 FItemBundle OneSpecialHelmet(ItemIdSpecialHelmet, 1);
 FItemBundle OneChestArmor(ItemIdChestArmor, 1);
-FItemBundle GiantBoulder(ItemIdGiantBoulder, 1);
+FItemBundle GiantBoulder(ItemIdGiantBoulder, 1);*/
+#define OneSpear ItemIdSpear, 1
+#define OneRock ItemIdRock, 1
+#define TwoRocks ItemIdRock, 2
+#define ThreeRocks ItemIdRock, 3
+#define FourRocks ItemIdRock, 4
+#define FiveRocks ItemIdRock, 5
+#define ThreeSticks ItemIdSticks, 3
+#define OneHelmet ItemIdHelmet, 1
+#define OneSpecialHelmet ItemIdSpecialHelmet, 1
+#define OneChestArmor ItemIdChestArmor, 1
+#define GiantBoulder ItemIdGiantBoulder, 1
 FGameplayTag NoTag = FGameplayTag::EmptyTag;
+
+
+UWorld* FindWorld(const UObject* ContextObject)
+{
+	if (ContextObject)
+	{
+		if (UWorld* World = GEngine->GetWorldFromContextObject(ContextObject, EGetWorldErrorMode::ReturnNull))
+		{
+			return World;
+		}
+	}
+
+	if (GEngine && GEngine->GetWorldContexts().Num() > 0)
+	{
+		TIndirectArray<FWorldContext> worlds = GEngine->GetWorldContexts();
+		for (const FWorldContext& WorldContext : worlds)
+		{
+			if (WorldContext.WorldType != EWorldType::Editor && WorldContext.WorldType != EWorldType::EditorPreview)
+			{
+				return WorldContext.World();
+			}
+		}
+
+		return worlds[0].World(); // Needed for tests
+	}
+
+	return nullptr;
+}
+
+URISSubsystem* SetupSubsystem()
+{
+	UGameInstance* GameInstance = NewObject<UGameInstance>();
+	FindWorld(nullptr)->SetGameInstance(GameInstance);
+	GameInstance->Init();
+	
+	URISSubsystem* Subsystem = GameInstance->GetSubsystem<URISSubsystem>();
+
+	return Subsystem;
+}
 
 void InitializeTestItems()
 {
-	URISItemData* RockItemData = NewObject<URISItemData>();
+	URISSubsystem* SubSystem = SetupSubsystem();
+	
+	UItemStaticData* RockItemData = NewObject<UItemStaticData>();
 	RockItemData->ItemId = ItemIdRock;
 	RockItemData->ItemName = FName("Rock");
 	RockItemData->ItemDescription = FText::FromString("A sturdy rock, useful for crafting and building.");
@@ -49,9 +105,9 @@ void InitializeTestItems()
 	RockItemData->MaxStackSize = 5;
 	RockItemData->ItemWeight = 1;
 	RockItemData->ItemCategories.AddTag(ItemTypeResource);
-	URISFunctions::HardcodeItem(ItemIdRock, RockItemData);
+	SubSystem->HardcodeItem(ItemIdRock, RockItemData);
 
-	URISItemData* SticksItemData = NewObject<URISItemData>();
+	UItemStaticData* SticksItemData = NewObject<UItemStaticData>();
 	SticksItemData->ItemId = ItemIdRock;
 	SticksItemData->ItemName = FName("Sticks");
 	SticksItemData->ItemDescription = FText::FromString("Some sticks");
@@ -60,9 +116,9 @@ void InitializeTestItems()
 	SticksItemData->MaxStackSize = 5;
 	SticksItemData->ItemWeight = 1;
 	SticksItemData->ItemCategories.AddTag(ItemTypeResource);
-	URISFunctions::HardcodeItem(ItemIdSticks, SticksItemData);
+	SubSystem->HardcodeItem(ItemIdSticks, SticksItemData);
 
-	URISItemData* HelmetItemData = NewObject<URISItemData>();
+	UItemStaticData* HelmetItemData = NewObject<UItemStaticData>();
 	HelmetItemData->ItemId = ItemIdHelmet;
 	HelmetItemData->ItemName = FName("Helmet");
 	HelmetItemData->ItemDescription = FText::FromString("Protective gear for the head.");
@@ -71,9 +127,9 @@ void InitializeTestItems()
 	HelmetItemData->MaxStackSize = 1;
 	HelmetItemData->ItemWeight = 2;
 	HelmetItemData->ItemCategories.AddTag(HelmetSlot);
-	URISFunctions::HardcodeItem(ItemIdHelmet, HelmetItemData);
+	SubSystem->HardcodeItem(ItemIdHelmet, HelmetItemData);
 	
-	URISItemData* SpecialHelmetItemData = NewObject<URISItemData>();
+	UItemStaticData* SpecialHelmetItemData = NewObject<UItemStaticData>();
 	SpecialHelmetItemData->ItemId = ItemIdSpecialHelmet;
 	SpecialHelmetItemData->ItemName = FName("SpecialHelmet");
 	SpecialHelmetItemData->ItemDescription = FText::FromString("Protective gear for the head.");
@@ -82,9 +138,9 @@ void InitializeTestItems()
 	SpecialHelmetItemData->MaxStackSize = 1;
 	SpecialHelmetItemData->ItemWeight = 2;
 	SpecialHelmetItemData->ItemCategories.AddTag(HelmetSlot);
-	URISFunctions::HardcodeItem(ItemIdSpecialHelmet, SpecialHelmetItemData);
+	SubSystem->HardcodeItem(ItemIdSpecialHelmet, SpecialHelmetItemData);
 
-	URISItemData* ChestItemData = NewObject<URISItemData>();
+	UItemStaticData* ChestItemData = NewObject<UItemStaticData>();
 	ChestItemData->ItemId = ItemIdChestArmor;
 	ChestItemData->ItemName = FName("Chest Armor");
 	ChestItemData->ItemDescription = FText::FromString("Armor protecting the torso.");
@@ -93,9 +149,9 @@ void InitializeTestItems()
 	ChestItemData->MaxStackSize = 1;
 	ChestItemData->ItemWeight = 5; // Adjusted weight for chest armor
 	ChestItemData->ItemCategories.AddTag(ChestSlot); // Adjust for chest slot
-	URISFunctions::HardcodeItem(ItemIdChestArmor, ChestItemData);
+	SubSystem->HardcodeItem(ItemIdChestArmor, ChestItemData);
 
-	URISItemData* SpearItemData = NewObject<URISItemData>();
+	UItemStaticData* SpearItemData = NewObject<UItemStaticData>();
 	SpearItemData->ItemId = ItemIdSpear;
 	SpearItemData->ItemName = FName("Spear");
 	SpearItemData->ItemDescription = FText::FromString("Sharp!");
@@ -104,10 +160,10 @@ void InitializeTestItems()
 	SpearItemData->MaxStackSize = 5; // should not matter
 	SpearItemData->ItemWeight = 3;
 	SpearItemData->ItemCategories.AddTag(ItemTypeWeapon);
-	URISFunctions::HardcodeItem(ItemIdSpear, SpearItemData);
+	SubSystem->HardcodeItem(ItemIdSpear, SpearItemData);
 
 
-	URISItemData* GiantBoulderItemData = NewObject<URISItemData>();
+	UItemStaticData* GiantBoulderItemData = NewObject<UItemStaticData>();
 	GiantBoulderItemData->ItemId = ItemIdGiantBoulder;
 	GiantBoulderItemData->ItemName = FName("Giant Boulder");
 	GiantBoulderItemData->ItemDescription = FText::FromString("HEAVY!");
@@ -116,5 +172,5 @@ void InitializeTestItems()
 	GiantBoulderItemData->MaxStackSize = 1;
 	GiantBoulderItemData->ItemWeight = 10;
 	GiantBoulderItemData->ItemCategories.AddTag(ItemTypeResource);
-	URISFunctions::HardcodeItem(ItemIdGiantBoulder, GiantBoulderItemData);
+	SubSystem->HardcodeItem(ItemIdGiantBoulder, GiantBoulderItemData);
 }

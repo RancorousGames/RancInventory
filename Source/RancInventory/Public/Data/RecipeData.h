@@ -14,7 +14,7 @@ class RANCINVENTORY_API UObjectRecipeData : public UPrimaryDataAsset
     GENERATED_BODY()
 
 public:
-    explicit UObjectRecipeData(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
+    explicit UObjectRecipeData(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get()){}
     
     FORCEINLINE virtual FPrimaryAssetId GetPrimaryAssetId() const override
     {

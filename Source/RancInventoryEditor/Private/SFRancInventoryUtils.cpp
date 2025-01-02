@@ -7,6 +7,11 @@
 #include <Widgets/Layout/SUniformGridPanel.h>
 #include <ObjectTools.h>
 
+#include "Framework/Docking/TabManager.h"
+#include "Misc/MessageDialog.h"
+#include "Widgets/SToolTip.h"
+#include "Widgets/Input/SButton.h"
+
 void SFRancInventoryUtils::Construct(const FArguments& InArgs)
 {
     TableSource = InArgs._TableSource;

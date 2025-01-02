@@ -7,7 +7,7 @@
 #include "RangedWeaponActor.generated.h"
 
 UCLASS()
-class YOURGAME_API ARangedWeaponActor : public AWeaponActor
+class RANCINVENTORYWEAPONS_API ARangedWeaponActor : public AWeaponActor
 {
     GENERATED_BODY()
 
@@ -25,14 +25,17 @@ protected:
     void EquipMulticastImpl();
     void ReloadWeapon();
     void OnReloadComplete_IfServer();
-    UFUNCTION(Client, Reliable)
-    void OnReloadComplete_Client(int32 AmmoToReload);
+    
+   // UFUNCTION(Client, Reliable)
+   // void OnReloadComplete_Client(int32 AmmoToReload);
 
-    void ApplyInstantHit_Implementation(FHitResult HitResult);
+    UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category= "Ranged Weapon")
+    void ApplyInstantHit(FHitResult HitResult);
+    
     void ApplyInstantHit_Impl(FHitResult HitResult);
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Ranged Weapon")
-    URangedWeaponStaticData* RangedWeaponData;
+    const URangedWeaponStaticData* RangedWeaponData;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Ranged Weapon")
     UItemContainerComponent* InternalMagazineAmmoContainer;
@@ -47,6 +50,12 @@ protected:
     int32 CurrentAmmo;
 
     bool bIsReloading;
+    
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Ranged Weapon")
+    ACharacter* WeaponHolder;
+    
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Ranged Weapon")
+    AController* InstigatingController;
 
     UFUNCTION(BlueprintCallable, Category = "Ranged Weapon")
     float PlayMontage(ACharacter* OwnerChar, UAnimMontage* Montage, float PlayRate, FName StartSectionName, bool bShowDebugWarnings = true);
