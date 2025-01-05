@@ -73,7 +73,7 @@ void UItemContainerComponent::OnRep_Items()
 	DetectAndPublishChanges();
 }
 
-int32 UItemContainerComponent::AddItems_IfServer(TScriptInterface<IItemSource> ItemSource, const FGameplayTag& ItemId, int32 RequestedQuantity, bool AllowPartial,
+int32 UItemContainerComponent::AddItem_IfServer(TScriptInterface<IItemSource> ItemSource, const FGameplayTag& ItemId, int32 RequestedQuantity, bool AllowPartial,
                                                  bool SuppressUpdate)
 {
 	if (GetOwnerRole() != ROLE_Authority && GetOwnerRole() != ROLE_None)

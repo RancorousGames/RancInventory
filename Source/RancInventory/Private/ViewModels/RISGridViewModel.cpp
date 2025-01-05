@@ -2,6 +2,7 @@
 
 #include "ViewModels/RISGridViewModel.h"
 
+#include "LogRancInventorySystem.h"
 #include "Components/InventoryComponent.h"
 #include "Core/RISFunctions.h"
 
@@ -113,7 +114,7 @@ FItemBundle URISGridViewModel::GetItem(int32 SlotIndex) const
 	return FItemBundle();
 }
 
-bool URISGridViewModel::SplitItems_Implementation(FGameplayTag SourceTaggedSlot, int32 SourceSlotIndex, FGameplayTag TargetTaggedSlot, int32 TargetSlotIndex, int32 Quantity)
+bool URISGridViewModel::SplitItem_Implementation(FGameplayTag SourceTaggedSlot, int32 SourceSlotIndex, FGameplayTag TargetTaggedSlot, int32 TargetSlotIndex, int32 Quantity)
 {
 	if (!LinkedInventoryComponent) return false;
 
@@ -218,9 +219,9 @@ bool URISGridViewModel::SplitItems_Implementation(FGameplayTag SourceTaggedSlot,
 	{
 		OperationsToConfirm.Emplace(FRISExpectedOperation(AddTagged, TargetTaggedSlot, SourceItem.ItemId, Quantity));
 		if (SourceTaggedSlot.IsValid())
-			LinkedInventoryComponent->MoveItems(SourceItem.ItemId, Quantity, SourceTaggedSlot, TargetTaggedSlot);
+			LinkedInventoryComponent->MoveItem(SourceItem.ItemId, Quantity, SourceTaggedSlot, TargetTaggedSlot);
 		else
-			LinkedInventoryComponent->MoveItems(SourceItem.ItemId, Quantity, FGameplayTag::EmptyTag, TargetTaggedSlot);
+			LinkedInventoryComponent->MoveItem(SourceItem.ItemId, Quantity, FGameplayTag::EmptyTag, TargetTaggedSlot);
 		OnTaggedSlotUpdated.Broadcast(TargetTaggedSlot);
 	}
 	else
@@ -228,7 +229,7 @@ bool URISGridViewModel::SplitItems_Implementation(FGameplayTag SourceTaggedSlot,
 		if (!IsPureSplit)
 		{
 			OperationsToConfirm.Emplace(FRISExpectedOperation(Add, SourceItem.ItemId, Quantity));
-			LinkedInventoryComponent->MoveItems(SourceItem.ItemId, Quantity, SourceTaggedSlot, FGameplayTag::EmptyTag);
+			LinkedInventoryComponent->MoveItem(SourceItem.ItemId, Quantity, SourceTaggedSlot, FGameplayTag::EmptyTag);
 		}
 		OnSlotUpdated.Broadcast(TargetSlotIndex);
 	}
@@ -276,8 +277,14 @@ int32 URISGridViewModel::DropItem(FGameplayTag TaggedSlot, int32 SlotIndex, int3
 	return DroppedCount;
 }
 
-bool URISGridViewModel::MoveItems_Implementation(FGameplayTag SourceTaggedSlot, int32 SourceSlotIndex,
-                                         FGameplayTag TargetTaggedSlot, int32 TargetSlotIndex)
+int32 URISGridViewModel::UseItem(FGameplayTag TaggedSlot, int32 SlotIndex)
+{
+	// TODO RECOVERY:
+	return 0;
+}
+
+bool URISGridViewModel::MoveItem_Implementation(FGameplayTag SourceTaggedSlot, int32 SourceSlotIndex,
+                                                 FGameplayTag TargetTaggedSlot, int32 TargetSlotIndex)
 {
 	if (!LinkedInventoryComponent || (!SourceTaggedSlot.IsValid() && !ViewableGridSlots.IsValidIndex(SourceSlotIndex)) ||
 		(!TargetTaggedSlot.IsValid() && !ViewableGridSlots.IsValidIndex(TargetSlotIndex)) ||
@@ -384,7 +391,7 @@ bool URISGridViewModel::MoveItems_Implementation(FGameplayTag SourceTaggedSlot, 
 	if (TargetIsTaggedSlot || SourceIsTaggedSlot) // If its not a purely visual move
 	{
 		// now request the move on the server
-		LinkedInventoryComponent->MoveItems(MoveItem.ItemId, MoveItem.Quantity, SourceTaggedSlot, TargetTaggedSlot);
+		LinkedInventoryComponent->MoveItem(MoveItem.ItemId, MoveItem.Quantity, SourceTaggedSlot, TargetTaggedSlot);
 	}
 
 	return true;
@@ -610,6 +617,18 @@ const FItemBundle& URISGridViewModel::GetItemForTaggedSlot(const FGameplayTag& S
 	return ViewableTaggedSlots.FindChecked(SlotTag);
 }
 
+void URISGridViewModel::PickupItem(AWorldItem* WorldItem, bool PreferTaggedSlots,
+	bool DestroyAfterPickup)
+{
+	if (WorldItem == nullptr || !WorldItem->IsValidLowLevel())
+	{
+		UE_LOG(LogRISInventory, Warning, TEXT("WorldItem is not valid"));
+		return;
+	}
+
+	LinkedInventoryComponent->PickupItem(WorldItem, PreferTaggedSlots, DestroyAfterPickup);
+}
+
 
 int32 URISGridViewModel::FindSlotIndexForItem_Implementation(const FGameplayTag& ItemId, int32 Quantity)
 {
@@ -713,5 +732,5 @@ bool URISGridViewModel::MoveItemToAnyTaggedSlot_Implementation(const FGameplayTa
 
 	const auto TargetSlot = FindTaggedSlotForItem(*SourceItem);
 
-	return MoveItems(SourceTaggedSlot, SourceSlotIndex, TargetSlot, -1);
+	return MoveItem(SourceTaggedSlot, SourceSlotIndex, TargetSlot, -1);
 }

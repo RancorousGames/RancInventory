@@ -11,6 +11,14 @@
 class UTexture2D;
 class UStaticMesh;
 
+UENUM(BlueprintType)
+enum class EFoundState : uint8
+{
+	Found UMETA(DisplayName = "Found"),
+	NotFound UMETA(DisplayName = "Not Found")
+};
+
+
 UCLASS(NotBlueprintable, NotPlaceable, Category = "RIS | Classes | Data")
 class RANCINVENTORY_API UItemStaticData : public UPrimaryDataAsset
 {
@@ -67,14 +75,19 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS", meta = (AssetBundles = "Data"))
 	UStaticMesh* ItemWorldMesh = nullptr;
-
+	
+	/* Allows extending item data without inheritance. Similar to components */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS",
+		meta = (DisplayName = "Item definitions"))
+	TMap<TSubclassOf<UObject>, UObject*> ItemDefinitions;
+	
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS",
 		meta = (UIMin = 0, ClampMin = 0, AssetBundles = "Data"))
 	FVector ItemWorldScale = FVector(1.0f, 1.0f, 1.0f);
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS", meta = (AssetBundles = "Data"))
+	UPROPERTY(EditDefaultsOnly, Category = "RIS", meta = (AssetBundles = "Data"))
 	TSubclassOf<AWorldItem> WorldItemClassOverride;
-
+	
 	/* Allows to implement custom properties in this item data */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS",
 		meta = (DisplayName = "Custom Metadatas", AssetBundles = "Custom"))
@@ -85,4 +98,17 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS",
 		meta = (DisplayName = "Item Relations", AssetBundles = "Custom"))
 	TMap<FGameplayTag, FPrimaryRISItemIdContainer> Relations;
+	
+	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "Definition", ExpandEnumAsExecs = "Found"))
+	UObject* GetItemDefinition(class TSubclassOf<UObject> Definition, EFoundState& Found)
+	{
+		if (ItemDefinitions.Contains(Definition))
+		{
+			Found = EFoundState::Found;
+			return ItemDefinitions[Definition];
+		}
+		
+		Found = EFoundState::NotFound;
+		return nullptr;
+	}
 };

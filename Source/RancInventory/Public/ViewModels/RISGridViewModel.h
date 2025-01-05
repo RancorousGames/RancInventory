@@ -37,10 +37,17 @@ public:
     // Retrieves the item informatio<n for a given slot index
     UFUNCTION(BlueprintCallable, BlueprintPure, Category=RIS)
     FItemBundle GetItem(int32 SlotIndex) const;
-    
+
+	
+	UFUNCTION(BlueprintCallable, BlueprintCallable, Category=RIS)
+	void PickupItem(AWorldItem* WorldItem, bool PreferTaggedSlots, bool DestroyAfterPickup);
+	
     UFUNCTION(BlueprintCallable, Category=RIS)
     int32 DropItem(FGameplayTag TaggedSlot, int32 SlotIndex, int32 Quantity);
-    
+	
+	UFUNCTION(BlueprintCallable, Category=RIS)
+	int32 UseItem(FGameplayTag TaggedSlot, int32 SlotIndex);
+	
     UFUNCTION(BlueprintCallable, Category=RIS)
     const FItemBundle& GetItemForTaggedSlot(const FGameplayTag& SlotTag) const;
     
@@ -65,15 +72,15 @@ public:
      * @param Quantity The number of items to be split from the source slot to the target slot.
      */
     UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category=RIS)
-    bool SplitItems(FGameplayTag SourceTaggedSlot, int32 SourceSlotIndex, FGameplayTag TargetTaggedSlot, int32 TargetSlotIndex, int32 Quantity);
+    bool SplitItem(FGameplayTag SourceTaggedSlot, int32 SourceSlotIndex, FGameplayTag TargetTaggedSlot, int32 TargetSlotIndex, int32 Quantity);
     
     UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category=RIS)
-    bool MoveItems(FGameplayTag SourceTaggedSlot, int32 SourceSlotIndex = -1,
+    bool MoveItem(FGameplayTag SourceTaggedSlot, int32 SourceSlotIndex = -1,
                   FGameplayTag TargetTaggedSlot = FGameplayTag(), int32 TargetSlotIndex = -1);
 
     UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category=RIS)
     bool MoveItemToAnyTaggedSlot(const FGameplayTag& SourceTaggedSlot, int32 SourceSlotIndex);
-    
+	
     UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category=RIS)
     bool CanSlotReceiveItem(const FGameplayTag& ItemId, int32 Quantity, int32 SlotIndex) const;
     

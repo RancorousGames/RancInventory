@@ -52,7 +52,7 @@ public:
 	 * If PreferTaggedSlots is true, an item with category e.g. HelmetSlot will go into HelmetSlot first
 	 * Returns amount added, and always allows partial adding */
 	UFUNCTION(BlueprintCallable, Category = "RIS | Equipment")
-	int32 AddItemsToAnySlot(TScriptInterface<IItemSource> ItemSource, const FGameplayTag& ItemId, int32 RequestedQuantity, bool PreferTaggedSlots = true);
+	int32 AddItemToAnySlot(TScriptInterface<IItemSource> ItemSource, const FGameplayTag& ItemId, int32 RequestedQuantity, bool PreferTaggedSlots = true);
 	
 	// Remove up to Quantity item from a tagged slot, will return the count that was removed
 	UFUNCTION(BlueprintCallable, Category = "RIS | Equipment")
@@ -80,6 +80,10 @@ public:
 	UFUNCTION(BlueprintPure, Category = "RIS | Equipment")
 	bool IsTaggedSlotCompatible(const FGameplayTag& ItemId, const FGameplayTag& SlotTag) const;
 
+	//  Returns if the item can be added to teh slot, does NOT check if the slot is occupied
+	UFUNCTION(BlueprintPure, Category = "RIS | Equipment")
+	bool IsItemInTaggedSlotValid(const FGameplayTag SlotTag) const;
+	
 	UFUNCTION(BlueprintPure, Category = "RIS | Equipment")
 	const FTaggedItemBundle& GetItemForTaggedSlot(const FGameplayTag& SlotTag) const;
 
@@ -167,10 +171,10 @@ public:
 	
 	
 	UFUNCTION(BlueprintCallable, Category = "RIS | Equipment")
-	void PickupItem(AWorldItem* WorldItem, bool PreferTaggedSlots = false);
+	void PickupItem(AWorldItem* WorldItem, bool PreferTaggedSlots = false, bool DestroyAfterPickup = true);
 	
 	UFUNCTION(BlueprintCallable, Category = "RIS")
-	int32 MoveItems(const FGameplayTag& ItemId, int32 Quantity,
+	int32 MoveItem(const FGameplayTag& ItemId, int32 Quantity,
 					const FGameplayTag& SourceTaggedSlot = FGameplayTag(),
 					const FGameplayTag& TargetTaggedSlot = FGameplayTag(),
 					const FGameplayTag& SwapItemId = FGameplayTag(), int32 SwapQuantity = 0);
@@ -188,7 +192,7 @@ protected:
 	/* Attempts to pickup a world item, if successfull and fully picked up the object is destroyed
 	 * If AllowPartial is true, will only pick up as much as possible. */
 	UFUNCTION(Server, Reliable, Category = "RIS | Equipment")
-	void PickupItem_Server(AWorldItem* WorldItem, bool PreferTaggedSlots = false);
+	void PickupItem_Server(AWorldItem* WorldItem, bool PreferTaggedSlots = false, bool DestroyAfterPickup = true);
 
 	/* Do NOT call this directly
 	 * Moves items from one tagged slot to another, always allows partial moves but source must contain right amount

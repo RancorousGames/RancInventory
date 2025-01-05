@@ -12,7 +12,7 @@ class RANCINVENTORYWEAPONS_API URangedWeaponStaticData : public UWeaponStaticDat
 public:
 	explicit URangedWeaponStaticData(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get()):
 		MagazineSize(0), bInfiniteAmmo(false), bInfiniteReserve(false), bSpawnProjectiles(false),
-		RandomSpreadDegrees(0), ReloadTime(0), bAutomaticReload(false), FalloffFactor(0), Damage(0), TraceChannel()	{}
+		RandomSpreadDegrees(0), ReloadTime(0), bAutomaticReload(false), FalloffFactor(0), TraceChannel()	{}
 
 	/** The size of the magazine */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS | Ranged Weapon",
@@ -61,12 +61,7 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS | Ranged Weapon",
 		meta = (UIMin = 0, ClampMin = 0, AssetBundles = "Data"))
 	float FalloffFactor;
-
-	/** Damage value for ranged instant-hit (if applicable) */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS | Ranged Weapon",
-		meta = (UIMin = 0, ClampMin = 0, AssetBundles = "Data"))
-	float Damage;
-
+	
 	/** Trace channel for hitscan weapons */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS | Ranged Weapon", meta = (AssetBundles = "Data"))
 	TEnumAsByte<ECollisionChannel> TraceChannel;

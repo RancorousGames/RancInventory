@@ -318,7 +318,7 @@ void ARangedWeaponActor::OnReloadComplete_IfServer()
             return;
         }
         
-        CurrentAmmo = InternalMagazineAmmoContainer->AddItems_IfServer(ReserveAmmoContainer, RangedWeaponData->AmmoItemId, RangedWeaponData->MagazineSize, true);
+        CurrentAmmo = InternalMagazineAmmoContainer->AddItem_IfServer(ReserveAmmoContainer, RangedWeaponData->AmmoItemId, RangedWeaponData->MagazineSize, true);
     }
 
  //   OnReloadComplete_Client(CurrentAmmo);

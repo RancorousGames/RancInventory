@@ -33,7 +33,7 @@ public:
      * This will extract the item count from the source, if you don't want to take the items from anywhere specific, use the GetInfiniteItemSource
      * Returns the amount added */
 	UFUNCTION(BlueprintCallable, Category=RIS)
-	int32 AddItems_IfServer(TScriptInterface<IItemSource> ItemSource,  const FGameplayTag& ItemId, int32 RequestedQuantity, bool AllowPartial = false, bool SuppressUpdate = false);
+	int32 AddItem_IfServer(TScriptInterface<IItemSource> ItemSource,  const FGameplayTag& ItemId, int32 RequestedQuantity, bool AllowPartial = false, bool SuppressUpdate = false);
 
     /* For most games we could probably trust the client to specify ItemInstance but for e.g. a hot potato we can't
      * Instead have the client send an input like UseItem or DropItem

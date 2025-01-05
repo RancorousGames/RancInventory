@@ -15,7 +15,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE(FWeaponEvent);
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FWeaponState, AWeaponActor*, WeaponActor);
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FGearUpdated, FGameplayTag, Slot, FGameplayTag, ItemId);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FGearUpdated, FGameplayTag, Slot, FGameplayTag, ItemId, AActor*, GearActor);
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FWeaponEquipState, FName, WeaponType, bool , bEquipState);
 
@@ -120,6 +120,13 @@ public:
 	DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnAttackPerformed, FMontageData, MontageData);
 	UPROPERTY(BlueprintAssignable, Category = "Ranc Inventory Weapons |Gear")
 	FOnAttackPerformed OnAttackPerformed;
+
+
+	// Called when a trace replay has ended i think
+	DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnAttackAnimNotifyEndEvent);
+	UPROPERTY(BlueprintAssignable, Category = "Ranc Inventory Weapons |Gear")
+	FOnAttackAnimNotifyEndEvent OnAttackAnimNotifyEndEvent;
+	
 	
 	// Called every frame
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
@@ -198,10 +205,10 @@ public:
 	int32 ActiveWeaponIndex = 0;;
 	
 	UPROPERTY(VisibleAnywhere,BlueprintReadOnly, Category = "Ranc Inventory Weapons | Gear | State")
-	AWeaponActor* MainhandWeapon = nullptr;
+	AWeaponActor* MainhandSlotWeapon = nullptr;
 
 	UPROPERTY(VisibleAnywhere,BlueprintReadOnly, Category = "Ranc Inventory Weapons | Gear | State")
-	AWeaponActor* OffhandWeapon = nullptr;
+	AWeaponActor* OffhandSlotWeapon = nullptr;
 	
 	UPROPERTY(VisibleAnywhere,BlueprintReadOnly, Category = "Ranc Inventory Weapons | Gear | Internal")
 	ACharacter* Owner = nullptr;
@@ -247,7 +254,7 @@ public:
 	/* Convenience function to get the mainhand weapons data.
 	 * Equivalent to WeaponPerSlot[MainHandSlot]*/
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Ranc Inventory Weapons | Gear")
-	const UWeaponStaticData* GetMainhandWeaponData();
+	const UWeaponStaticData* GetMainhandWeaponSlotData();
 
 	/* Convenience function to get the Offhand weapons data.
 	 * Equivalent to WeaponPerSlot[OffhandSlot] */
@@ -293,13 +300,16 @@ public:
 
 	UFUNCTION(Server,Reliable)
 	void SelectPreviousActiveWeaponServer(bool bPlayMontage = true);
+	
+	UFUNCTION(BlueprintCallable, Category = "Ranc Inventory Weapons | Gear")
+	void SelectActiveWeapon(int32 WeaponIndex, AWeaponActor* AlreadySpawnedWeapon = nullptr);
 
 	/*
 	If bPlayEquipMontage is false then the swap will happen immediately
 	Otherwise the swap time will depend on configuration of GearChangeCommitAnimNotifyName
 	*/
 	UFUNCTION(Reliable, Server, BlueprintCallable, Category = "Ranc Inventory Weapons | Gear")
-	void SelectWeapon_Server(int32 WeaponIndex, bool bPlayEquipMontage = false);
+	void SelectActiveWeapon_Server(int32 WeaponIndex, AWeaponActor* AlreadySpawnedWeapon = nullptr);
 
 	UFUNCTION(Reliable, Server, BlueprintCallable, Category = "Ranc Inventory Weapons | Gear")
 	void SelectUnarmed_Server();

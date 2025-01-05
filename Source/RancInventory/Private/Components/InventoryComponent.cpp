@@ -158,7 +158,7 @@ int32 UInventoryComponent::AddItemsToTaggedSlot_IfServer(TScriptInterface<IItemS
 	}
 
 	// We also need to add to container as items are duplicated between the containers instances and the tagged slots, but we suppres
-	const int32 QuantityToAdd = AddItems_IfServer(ItemSource, ItemId, RequestedQuantity, true, true);
+	const int32 QuantityToAdd = AddItem_IfServer(ItemSource, ItemId, RequestedQuantity, true, true);
 
 	ExistingItem->ItemBundle.Quantity += QuantityToAdd;
 
@@ -170,7 +170,7 @@ int32 UInventoryComponent::AddItemsToTaggedSlot_IfServer(TScriptInterface<IItemS
 	return QuantityToAdd;
 }
 
-int32 UInventoryComponent::AddItemsToAnySlot(TScriptInterface<IItemSource> ItemSource, const FGameplayTag& ItemId, int32 RequestedQuantity, bool PreferTaggedSlots)
+int32 UInventoryComponent::AddItemToAnySlot(TScriptInterface<IItemSource> ItemSource, const FGameplayTag& ItemId, int32 RequestedQuantity, bool PreferTaggedSlots)
 {
 	const auto* ItemData = URISFunctions::GetItemDataById(ItemId);
 	if (!ItemData)
@@ -189,7 +189,7 @@ int32 UInventoryComponent::AddItemsToAnySlot(TScriptInterface<IItemSource> ItemS
 	// Distribution plan should not try to add to left hand as left hand already has sticks!
 	TArray<std::tuple<FGameplayTag, int32>> DistributionPlan =  GetItemDistributionPlan(ItemId, QuantityToAdd, PreferTaggedSlots);
 	
-	const int32 ActualAdded = AddItems_IfServer(ItemSource, ItemId, QuantityToAdd, true, true);
+	const int32 ActualAdded = AddItem_IfServer(ItemSource, ItemId, QuantityToAdd, true, true);
 
 	if (GetOwnerRole() >= ROLE_Authority || GetOwnerRole() == ROLE_None)
 		ensureMsgf(ActualAdded == QuantityToAdd, TEXT("Failed to add all items to container despite quantity calculated"));
@@ -225,22 +225,28 @@ int32 UInventoryComponent::AddItemsToAnySlot(TScriptInterface<IItemSource> ItemS
 }
 
 
-void UInventoryComponent::PickupItem_Server_Implementation(AWorldItem* WorldItem, bool PreferTaggedSlots)
+void UInventoryComponent::PickupItem_Server_Implementation(AWorldItem* WorldItem, bool PreferTaggedSlots, bool DestroyAfterPickup)
 {
 	FGameplayTag ItemId = WorldItem->RepresentedItem.ItemBundle.ItemId;
-	const int32 QuantityAdded = AddItemsToAnySlot(WorldItem, ItemId, WorldItem->RepresentedItem.ItemBundle.Quantity, PreferTaggedSlots);
+	const int32 QuantityAdded = AddItemToAnySlot(WorldItem, ItemId, WorldItem->RepresentedItem.ItemBundle.Quantity, PreferTaggedSlots);
 
 	if (QuantityAdded == 0) return;
 
 	if (!WorldItem->RepresentedItem.IsValid())
 	{
 		// destroy the actor
-		WorldItem->Destroy();
+		if (DestroyAfterPickup)
+			WorldItem->Destroy();
 	}
 	else
 	{
 		// update the item quantity
 		WorldItem->RepresentedItem.ItemBundle.Quantity -= QuantityAdded;
+		if (WorldItem->RepresentedItem.ItemBundle.Quantity <= 0 && DestroyAfterPickup)
+		{
+			// destroy the actor
+			WorldItem->Destroy();
+		}
 	}
 }
 
@@ -541,7 +547,7 @@ int32 UInventoryComponent::MoveItems_ServerImpl(const FGameplayTag& ItemId, int3
 	return MovedQuantity;
 }
 
-void UInventoryComponent::PickupItem(AWorldItem* WorldItem, bool PreferTaggedSlots)
+void UInventoryComponent::PickupItem(AWorldItem* WorldItem, bool PreferTaggedSlots, bool DestroyAfterPickup)
 {
 	if (!WorldItem)
 	{
@@ -568,10 +574,10 @@ void UInventoryComponent::PickupItem(AWorldItem* WorldItem, bool PreferTaggedSlo
 		}
 	}
 
-	PickupItem_Server(WorldItem, PreferTaggedSlots);
+	PickupItem_Server(WorldItem, PreferTaggedSlots, DestroyAfterPickup);
 }
 
-int32 UInventoryComponent::MoveItems(const FGameplayTag& ItemId, int32 Quantity, const FGameplayTag& SourceTaggedSlot, const FGameplayTag& TargetTaggedSlot,
+int32 UInventoryComponent::MoveItem(const FGameplayTag& ItemId, int32 Quantity, const FGameplayTag& SourceTaggedSlot, const FGameplayTag& TargetTaggedSlot,
 	const FGameplayTag& SwapItemId, int32 SwapQuantity)
 {
 	if (GetOwnerRole() < ROLE_Authority && GetOwnerRole() != ROLE_None)
@@ -829,6 +835,12 @@ bool UInventoryComponent::IsTaggedSlotCompatible(const FGameplayTag& ItemId, con
 	return false;
 }
 
+bool UInventoryComponent::IsItemInTaggedSlotValid(const FGameplayTag SlotTag) const
+{
+	const FTaggedItemBundle* Item = TaggedSlotItemInstances.FindByPredicate([&SlotTag](const FTaggedItemBundle& Item) { return Item.Tag == SlotTag; });
+	return Item && Item->IsValid();
+}
+
 TArray<std::tuple<FGameplayTag, int32>> UInventoryComponent::GetItemDistributionPlan(const FGameplayTag& ItemId, int32 QuantityToAdd, bool PreferTaggedSlots)
 {
 	TArray<std::tuple<FGameplayTag, int32>> DistributionPlan;
@@ -957,7 +969,7 @@ bool UInventoryComponent::CraftRecipe_IfServer(const UObjectRecipeData* Recipe)
 		if (const UItemRecipeData* ItemRecipe = Cast<UItemRecipeData>(Recipe))
 		{
 			const FItemBundle CraftedItem = FItemBundle(ItemRecipe->ResultingItemId, ItemRecipe->QuantityCreated);
-			const int32 QuantityAdded = AddItemsToAnySlot(URISSubsystem::Get(this), CraftedItem.ItemId, CraftedItem.Quantity, false);
+			const int32 QuantityAdded = AddItemToAnySlot(URISSubsystem::Get(this), CraftedItem.ItemId, CraftedItem.Quantity, false);
 			if (QuantityAdded < ItemRecipe->QuantityCreated)
 			{
 				UE_LOG(LogTemp, Display, TEXT("Failed to add crafted item to inventory, dropping item instead"));

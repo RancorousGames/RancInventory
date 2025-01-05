@@ -16,12 +16,16 @@ class RANCINVENTORYWEAPONS_API UWeaponStaticData : public UItemStaticData
 
 public:
     explicit UWeaponStaticData(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get()):
-	    HandCompatability(), Cooldown(0), BaseDamage(0), Range(0), WeaponWeight(0), WeaponMesh(nullptr) {}
+	    HandCompatability(), Cooldown(0), Damage(0), Range(0), WeaponWeight(0), WeaponMesh(nullptr) {}
 
     /** The hand compatibility of the weapon (e.g., mainhand, offhand, or two-handed) */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS | Weapon", meta = (AssetBundles = "Data"))
     EHandCompatibility HandCompatability;
 
+	/** The hand compatibility of the weapon (e.g., mainhand, offhand, or two-handed) */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS | Weapon", meta = (AssetBundles = "Data"))
+	FGameplayTag WeaponType;
+	
     /** Animation montage data for equipping the weapon */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS | Weapon", meta = (AssetBundles = "Data"))
     FMontageData EquipMontage;
@@ -35,7 +39,7 @@ public:
 
     /** Base damage dealt by the weapon */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS | Weapon", meta = (UIMin = 0, ClampMin = 0, AssetBundles = "Data"))
-    float BaseDamage;
+    float Damage;
 
     /** Range of the weapon for attacks */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS | Weapon", meta = (UIMin = 0, ClampMin = 0, AssetBundles = "Data"))

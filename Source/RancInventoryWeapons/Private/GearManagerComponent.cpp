@@ -108,30 +108,30 @@ void UGearManagerComponent::Initialize()
 		if (DefaultUnarmedWeaponData)
 		{
 			AddAndSelectWeapon(DefaultUnarmedWeaponData);
-			UnarmedWeaponActor = MainhandWeapon;
+			UnarmedWeaponActor = MainhandSlotWeapon;
 		}
 	}
 }
 
 AWeaponActor* UGearManagerComponent::GetActiveWeapon()
 {
-	if (MainhandWeapon) return MainhandWeapon;
+	if (MainhandSlotWeapon) return MainhandSlotWeapon;
 
-	return OffhandWeapon;
+	return OffhandSlotWeapon;
 }
 
-const UWeaponStaticData* UGearManagerComponent::GetMainhandWeaponData()
+const UWeaponStaticData* UGearManagerComponent::GetMainhandWeaponSlotData()
 {
-	if (!MainhandWeapon) return nullptr;
+	if (!MainhandSlotWeapon) return nullptr;
 
-	return MainhandWeapon->WeaponData;
+	return MainhandSlotWeapon->WeaponData;
 }
 
 const UWeaponStaticData* UGearManagerComponent::GetOffhandWeaponData()
 {
-	if (!OffhandWeapon) return nullptr;
+	if (!OffhandSlotWeapon) return nullptr;
 
-	return OffhandWeapon->WeaponData;
+	return OffhandSlotWeapon->WeaponData;
 }
 
 void UGearManagerComponent::HandleItemAddedToSlot(const FGameplayTag& SlotTag, const UItemStaticData* Data, int32 Quantity, EItemChangeReason Reason)
@@ -154,8 +154,8 @@ void UGearManagerComponent::HandleItemRemovedFromSlot(const FGameplayTag& SlotTa
 
 void UGearManagerComponent::TryAttack_Server_Implementation(FVector AimLocation, bool ForceOffHand, int32 MontageIdOverride)
 {
-	auto* WeaponActor =  MainhandWeapon;
-	if (!WeaponActor || !WeaponActor->CanAttack() || ForceOffHand) WeaponActor = OffhandWeapon;
+	auto* WeaponActor =  MainhandSlotWeapon;
+	if (!WeaponActor || !WeaponActor->CanAttack() || ForceOffHand) WeaponActor = OffhandSlotWeapon;
 	
 	if (!IsValid(WeaponActor))
 		return;
@@ -168,14 +168,14 @@ void UGearManagerComponent::TryAttack_Server_Implementation(FVector AimLocation,
 
 		if (WeaponActor->CanAttack())
 		{
-			Attack_Multicast(AimLocation, WeaponActor == OffhandWeapon, MontageIdOverride);
+			Attack_Multicast(AimLocation, WeaponActor == OffhandSlotWeapon, MontageIdOverride);
 		}
 	}
 }
 
 void UGearManagerComponent::Attack_Multicast_Implementation(FVector AimLocation, bool UseOffhand, int32 MontageIdOverride)
 {
-	AWeaponActor* WeaponActor = UseOffhand ? OffhandWeapon : MainhandWeapon;
+	AWeaponActor* WeaponActor = UseOffhand ? OffhandSlotWeapon : MainhandSlotWeapon;
 
 	if (!WeaponActor)
 		return;
@@ -197,7 +197,7 @@ void UGearManagerComponent::AddAndSelectWeapon(const UWeaponStaticData* WeaponDa
 	int32 ExistingEntry = SelectableWeaponsData.Find(WeaponData);
 	if (ExistingEntry != INDEX_NONE)
 	{
-		SelectWeapon_Server(ExistingEntry, true);
+		SelectActiveWeapon_Server(ExistingEntry, nullptr);
 	}
 	else
 	{
@@ -209,7 +209,7 @@ void UGearManagerComponent::AddAndSelectWeapon(const UWeaponStaticData* WeaponDa
 		}
 
 		SelectableWeaponsData.Add(WeaponData);
-		SelectWeapon_Server(SelectableWeaponsData.Num() - 1, true);
+		SelectActiveWeapon_Server(SelectableWeaponsData.Num() - 1, nullptr);
 	}
 }
 
@@ -222,10 +222,10 @@ const FGearSlotDefinition* UGearManagerComponent::GetHandSlotToUse(const UWeapon
 		return MainHandSlot;
 	case EHandCompatibility::OnlyOffhand:
 		// Return offhand unless mainhand is two handed
-		return MainhandWeapon && MainhandWeapon->WeaponData->HandCompatability == EHandCompatibility::TwoHanded ? nullptr : OffhandSlot;
+		return MainhandSlotWeapon && MainhandSlotWeapon->WeaponData->HandCompatability == EHandCompatibility::TwoHanded ? nullptr : OffhandSlot;
 	case EHandCompatibility::AnyHand:
 		{
-			if (MainhandWeapon && MainhandWeapon->WeaponData->HandCompatability != EHandCompatibility::TwoHanded && !OffhandWeapon)
+			if (MainhandSlotWeapon && MainhandSlotWeapon->WeaponData->HandCompatability != EHandCompatibility::TwoHanded && !OffhandSlotWeapon)
 				return OffhandSlot;
 			return MainHandSlot;
 		}
@@ -238,11 +238,11 @@ const AWeaponActor* UGearManagerComponent::GetWeaponForSlot(const FGearSlotDefin
 {
 	if (Slot == MainHandSlot)
 	{
-		return MainhandWeapon;
+		return MainhandSlotWeapon;
 	}
 	else if (Slot == OffhandSlot)
 	{
-		return OffhandWeapon;
+		return OffhandSlotWeapon;
 	}
 
 	return nullptr;
@@ -346,7 +346,12 @@ void UGearManagerComponent::DropGearFromSlot(FGameplayTag Slot) const
 }
 
 
-void UGearManagerComponent::SelectWeapon_Server_Implementation(int32 WeaponIndex, bool bPlayEquipMontage)
+void UGearManagerComponent::SelectActiveWeapon(int32 WeaponIndex, AWeaponActor* AlreadySpawnedWeapon)
+{
+	SelectActiveWeapon_Server(WeaponIndex, AlreadySpawnedWeapon);
+}
+
+void UGearManagerComponent::SelectActiveWeapon_Server_Implementation(int32 WeaponIndex, AWeaponActor* AlreadySpawnedWeapon)
 {
 
 	if (SelectableWeaponsData.Num() == 0 || WeaponIndex < 0 || WeaponIndex > SelectableWeaponsData.Num())
@@ -354,6 +359,8 @@ void UGearManagerComponent::SelectWeapon_Server_Implementation(int32 WeaponIndex
 		UE_LOG(LogRISInventory, Warning, TEXT("Slot is < 0 || Slot > WeaponSlot. EquipWeapon() Failed"))
 		return;
 	}
+
+	bool bPlayEquipMontage = true; // TODO: I think this was removed, try to figure out why, maybe because i abandoned the notify route or smth
 	
 	bool DelayConfigured = false;
 	if (bPlayEquipMontage)
@@ -370,8 +377,8 @@ void UGearManagerComponent::SelectWeapon_Server_Implementation(int32 WeaponIndex
 		return;
 	}
 
-	AWeaponActor* WeaponActor = nullptr;
-	if (!DelayConfigured)
+	AWeaponActor* WeaponActor = AlreadySpawnedWeapon;
+	if (!DelayConfigured && !WeaponActor)
 	{
 		WeaponActor = SpawnWeapon_IfServer(WeaponData);
 
@@ -405,11 +412,11 @@ void UGearManagerComponent::SelectWeapon_Server_Implementation(int32 WeaponIndex
 
 		if (HandSlot == MainHandSlot)
 		{
-			MainhandWeapon = WeaponActor;
+			MainhandSlotWeapon = WeaponActor;
 		}
 		else if (HandSlot == OffhandSlot)
 		{
-			OffhandWeapon = WeaponActor;
+			OffhandSlotWeapon = WeaponActor;
 		}
 		ActiveWeaponIndex = WeaponIndex;
 		WeaponActor->Equip();
@@ -423,9 +430,9 @@ void UGearManagerComponent::SelectUnarmed_Server_Implementation()
 {
 	if (UnarmedWeaponActor)
 	{
-		OffhandWeapon = nullptr;
+		OffhandSlotWeapon = nullptr;
 		ActiveWeaponIndex = 0;
-		MainhandWeapon = UnarmedWeaponActor;
+		MainhandSlotWeapon = UnarmedWeaponActor;
 		UnarmedWeaponActor->Equip();
 		
 		OnWeaponSelected.Broadcast(UnarmedWeaponActor);
@@ -523,7 +530,7 @@ void UGearManagerComponent::DelayedGearChangeTriggered()
 		UnequipGear(DelayedGearChangeSlot, DelayedGearChangeItemData, false);
 		break;
 	case EPendingGearChangeType::WeaponSelect:
-		SelectWeapon_Server(DelayedWeaponSelectionIndex, false);
+		SelectActiveWeapon_Server(DelayedWeaponSelectionIndex, nullptr);
 		break;
 	default: ;
 	}
@@ -570,29 +577,29 @@ void UGearManagerComponent::UnequipGear(FGameplayTag Slot, const UItemStaticData
 	{
 		DelayConfigured = SetupDelayedGearChange(EPendingGearChangeType::Unequip, Slot, ItemData);
 	}
-	
+	AWeaponActor* WeaponToUnequip = nullptr;
 	if (ItemData && Slot == MainHandSlot->SlotTag || Slot == OffhandSlot->SlotTag)
 	{
-		AWeaponActor* WeaponToUnequip = MainhandWeapon; // assume mainhand
+		WeaponToUnequip = MainhandSlotWeapon; // assume mainhand
 		
 		// cast to weapon data
 		const UWeaponStaticData* WeaponData = Cast<UWeaponStaticData>(ItemData);
 
 		if (!WeaponData) return;
 		
-		if (Slot == MainHandSlot->SlotTag && WeaponData->HandCompatability == EHandCompatibility::OnlyOffhand && OffhandWeapon)
+		if (Slot == MainHandSlot->SlotTag && WeaponData->HandCompatability == EHandCompatibility::OnlyOffhand && OffhandSlotWeapon)
 		{
-			WeaponToUnequip = OffhandWeapon;
-			OffhandWeapon = nullptr;
+			WeaponToUnequip = OffhandSlotWeapon;
+			OffhandSlotWeapon = nullptr;
 		}
-		else if (Slot == OffhandSlot->SlotTag && OffhandWeapon)
+		else if (Slot == OffhandSlot->SlotTag && OffhandSlotWeapon)
 		{
-			WeaponToUnequip = OffhandWeapon;
-			OffhandWeapon = nullptr;
+			WeaponToUnequip = OffhandSlotWeapon;
+			OffhandSlotWeapon = nullptr;
 		}
 		else
 		{
-			MainhandWeapon = nullptr;
+			MainhandSlotWeapon = nullptr;
 		}
 
 		if (PlayUnequipMontage)
@@ -607,7 +614,7 @@ void UGearManagerComponent::UnequipGear(FGameplayTag Slot, const UItemStaticData
 				WeaponToUnequip->Destroy();
 			OnEquippedWeaponsChange.Broadcast();
 
-			if (!MainhandWeapon && !OffhandWeapon && UnarmedWeaponActor)
+			if (!MainhandSlotWeapon && !OffhandSlotWeapon && UnarmedWeaponActor)
 			{
 				SelectUnarmed_Server();
 			}
@@ -626,7 +633,7 @@ void UGearManagerComponent::UnequipGear(FGameplayTag Slot, const UItemStaticData
 	}
 
 	if (!DelayConfigured)
-		OnGearUnequipped.Broadcast(Slot, ItemData->ItemId);
+		OnGearUnequipped.Broadcast(Slot, ItemData->ItemId, WeaponToUnequip);
 }
 
 void UGearManagerComponent::SelectNextActiveWeapon(bool bPlayMontage)
@@ -651,7 +658,7 @@ void UGearManagerComponent::SelectNextActiveWeaponServer_Implementation(bool bPl
 
 	const int32 NextWeaponIndex = (ActiveWeaponIndex + 1) % SelectableWeaponsData.Num();
 	
-	SelectWeapon_Server(NextWeaponIndex, bPlayMontage);
+	SelectActiveWeapon_Server(NextWeaponIndex, nullptr);
 }
 
 bool UGearManagerComponent::IsWeaponVisible(AWeaponActor* InputWeaponActor)
@@ -905,5 +912,6 @@ void UGearManagerComponent::StopAttackReplay()
     GetWorld()->GetTimerManager().ClearTimer(ReplayTimerHandle);
     ReplayedAttackData = nullptr;
     bReplayInitialOwnerPositionSaved = false;
+	OnAttackAnimNotifyEndEvent.Broadcast();
     UE_LOG(LogTemp, Log, TEXT("Attack replay stopped."));
 }

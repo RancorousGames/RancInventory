@@ -149,6 +149,26 @@ struct FInitialItem
 
 
 USTRUCT(BlueprintType, Category = "RIS | Structs")
+struct FRandomItemSelection
+{
+    GENERATED_BODY()
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ranc Inventory")
+    UItemStaticData* ItemData;
+
+    
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ranc Inventory")
+    int32 DiceCount = 1;
+    
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ranc Inventory")
+    int32 DiceSides = 1;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ranc Inventory")
+    bool DiceHas0 = false;
+    
+};
+
+USTRUCT(BlueprintType, Category = "RIS | Structs")
 struct FRandomItemPool
 {
     GENERATED_BODY()
@@ -160,6 +180,6 @@ struct FRandomItemPool
     TArray<float> ItemWeights;
     
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ranc Inventory")
-    TArray<FItemBundle> Items;
+    TArray<FRandomItemSelection> Items;
     // TArray<FRandomItemSelection> Items; old version had a struct but why cant we just use itembundle? i dont know what was in that struct originally
 };

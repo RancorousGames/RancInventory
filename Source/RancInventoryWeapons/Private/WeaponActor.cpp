@@ -22,9 +22,9 @@ void AWeaponActor::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLife
 {
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
-    DOREPLIFETIME(AWeaponActor, PlacedInWorld);
-    DOREPLIFETIME(AWeaponActor, MontageCycleIndex);
-    DOREPLIFETIME(AWeaponActor, WeaponData);
+   // DOREPLIFETIME(AWeaponActor, PlacedInWorld);
+   // DOREPLIFETIME(AWeaponActor, MontageCycleIndex);
+   // DOREPLIFETIME(AWeaponActor, WeaponData);
 }
 
 UNetConnection* AWeaponActor::GetNetConnection() const
