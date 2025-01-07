@@ -26,6 +26,8 @@ void UInventoryComponent::InitializeComponent()
 	OnItemAddedToContainer.AddDynamic(this, &UInventoryComponent::OnInventoryItemAddedHandler);
 	OnItemRemovedFromContainer.AddDynamic(this, &UInventoryComponent::OnInventoryItemRemovedHandler);
 
+	Subsystem = URISSubsystem::Get(this);
+	
 	// Initialize available recipes based on initial inventory and recipes
 	CheckAndUpdateRecipeAvailability();
 }
@@ -43,7 +45,7 @@ void UInventoryComponent::UpdateWeightAndSlots()
 	// then subtract the slots of the tagged items
 	for (const FTaggedItemBundle& TaggedInstance : TaggedSlotItemInstances)
 	{
-		if (const UItemStaticData* const ItemData = URISSubsystem::Get(this)->GetItemDataById(
+		if (const UItemStaticData* const ItemData = URISSubsystem::GetItemDataById(
 			TaggedInstance.ItemBundle.ItemId))
 		{
 			int32 SlotsTakenPerStack = 1;
@@ -125,7 +127,7 @@ int32 UInventoryComponent::AddItemsToTaggedSlot_IfServer(TScriptInterface<IItemS
 	// Locate the existing item in the tagged slot
 	const int32 Index = GetIndexForTaggedSlot(SlotTag); // -1 if not found
 
-	UItemStaticData* ItemData = URISFunctions::GetItemDataById(ItemId);
+	UItemStaticData* ItemData = URISSubsystem::GetItemDataById(ItemId);
 	FTaggedItemBundle* ExistingItem = nullptr;
 	
 	if (TaggedSlotItemInstances.IsValidIndex(Index))
@@ -172,7 +174,7 @@ int32 UInventoryComponent::AddItemsToTaggedSlot_IfServer(TScriptInterface<IItemS
 
 int32 UInventoryComponent::AddItemToAnySlot(TScriptInterface<IItemSource> ItemSource, const FGameplayTag& ItemId, int32 RequestedQuantity, bool PreferTaggedSlots)
 {
-	const auto* ItemData = URISFunctions::GetItemDataById(ItemId);
+	const auto* ItemData = URISSubsystem::GetItemDataById(ItemId);
 	if (!ItemData)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Could not find item data for item: %s"), *ItemId.ToString());
@@ -287,7 +289,7 @@ int32 UInventoryComponent::RemoveQuantityFromTaggedSlot_IfServer(const FGameplay
 
 	UpdateWeightAndSlots();
 
-	const auto* ItemData = URISFunctions::GetItemDataById(RemovedId);
+	const auto* ItemData = URISSubsystem::GetItemDataById(RemovedId);
 	OnItemRemovedFromTaggedSlot.Broadcast(RemovedFromTag, ItemData, ActualRemovedQuantity, Reason);
 	MARK_PROPERTY_DIRTY_FROM_NAME(UInventoryComponent, TaggedSlotItemInstances, this);
 	return ActualRemovedQuantity;
@@ -410,7 +412,7 @@ int32 UInventoryComponent::MoveItems_ServerImpl(const FGameplayTag& ItemId, int3
 
 		if (TargetIndex >= 0)
 		{
-			TargetItemData = URISFunctions::GetItemDataById(TargetItem->ItemId);
+			TargetItemData = URISSubsystem::GetItemDataById(TargetItem->ItemId);
 			if (!TargetItemData)
 			{
 				UE_LOG(LogTemp, Warning, TEXT("Could not find item data for item: %s"), *ItemId.ToString());
@@ -435,7 +437,7 @@ int32 UInventoryComponent::MoveItems_ServerImpl(const FGameplayTag& ItemId, int3
 		
 		if (TargetItem)
 		{
-			TargetItemData = URISFunctions::GetItemDataById(TargetItem->ItemId);
+			TargetItemData = URISSubsystem::GetItemDataById(TargetItem->ItemId);
 		}
 
 		ensureMsgf(TargetItem, TEXT("Target item not found"));
@@ -458,7 +460,7 @@ int32 UInventoryComponent::MoveItems_ServerImpl(const FGameplayTag& ItemId, int3
 		return 0;
 	}
 
-	const auto SourceItemData = URISFunctions::GetItemDataById(SourceItem->ItemId);
+	const auto SourceItemData = URISSubsystem::GetItemDataById(SourceItem->ItemId);
 
 	// Now execute the move
 	int32 MovedQuantity = RequestedQuantity;
@@ -618,7 +620,7 @@ bool UInventoryComponent::CanTaggedSlotReceiveItem(const FItemBundle& ItemInstan
 int32 UInventoryComponent::GetQuantityOfItemTaggedSlotCanReceive(const FGameplayTag& ItemId,
                                                                     const FGameplayTag& SlotTag) const
 {
-	const UItemStaticData* ItemData = URISFunctions::GetItemDataById(ItemId);
+	const UItemStaticData* ItemData = URISSubsystem::GetItemDataById(ItemId);
 	if (!ItemData)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Could not find item data for item: %s"), *ItemId.ToString());
@@ -806,7 +808,7 @@ void UInventoryComponent::DetectAndPublishContainerChanges()
 
 bool UInventoryComponent::IsTaggedSlotCompatible(const FGameplayTag& ItemId, const FGameplayTag& SlotTag) const
 {
-	const UItemStaticData* ItemData = URISFunctions::GetItemDataById(ItemId);
+	const UItemStaticData* ItemData = URISSubsystem::GetItemDataById(ItemId);
 	if (!ItemData)
 	{
 		return false; // Item data not found, assume slot cannot receive item
@@ -969,13 +971,13 @@ bool UInventoryComponent::CraftRecipe_IfServer(const UObjectRecipeData* Recipe)
 		if (const UItemRecipeData* ItemRecipe = Cast<UItemRecipeData>(Recipe))
 		{
 			const FItemBundle CraftedItem = FItemBundle(ItemRecipe->ResultingItemId, ItemRecipe->QuantityCreated);
-			const int32 QuantityAdded = AddItemToAnySlot(URISSubsystem::Get(this), CraftedItem.ItemId, CraftedItem.Quantity, false);
+			const int32 QuantityAdded = AddItemToAnySlot(Subsystem, CraftedItem.ItemId, CraftedItem.Quantity, false);
 			if (QuantityAdded < ItemRecipe->QuantityCreated)
 			{
 				UE_LOG(LogTemp, Display, TEXT("Failed to add crafted item to inventory, dropping item instead"));
 
 				TArray<UItemInstanceData*> DroppingItemState;
-				Execute_ExtractItem_IfServer(URISSubsystem::Get(this), CraftedItem.ItemId, CraftedItem.Quantity - QuantityAdded,
+				Execute_ExtractItem_IfServer(Subsystem, CraftedItem.ItemId, CraftedItem.Quantity - QuantityAdded,
 				                              EItemChangeReason::Transformed, DroppingItemState);
 				
 				DropItemsFromContainer_Server(CraftedItem.ItemId, CraftedItem.Quantity - QuantityAdded);
@@ -1122,7 +1124,7 @@ void UInventoryComponent::ClearImpl()
 	for (auto& Item : ItemsVer.Items)
 	{
 		const int32 ContainedQuantityWithoutTaggedSlots = GetContainerItemQuantityImpl(Item.ItemBundle.ItemId);
-		const UItemStaticData* ItemData = URISFunctions::GetItemDataById(Item.ItemBundle.ItemId);
+		const UItemStaticData* ItemData = URISSubsystem::GetItemDataById(Item.ItemBundle.ItemId);
 		if (ContainedQuantityWithoutTaggedSlots > 0)
 			OnItemRemovedFromContainer.Broadcast(ItemData, ContainedQuantityWithoutTaggedSlots, EItemChangeReason::ForceDestroyed);
 	}
@@ -1140,7 +1142,7 @@ void UInventoryComponent::ClearImpl()
 
 int32 UInventoryComponent::GetReceivableQuantityImpl(const FGameplayTag& ItemId) const
 {
-	const UItemStaticData* ItemData = URISFunctions::GetItemDataById(ItemId);
+	const UItemStaticData* ItemData = URISSubsystem::GetItemDataById(ItemId);
 	if (!ItemData)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Could not find item data for item: %s"), *ItemId.ToString());

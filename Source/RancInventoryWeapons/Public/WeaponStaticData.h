@@ -16,7 +16,9 @@ class RANCINVENTORYWEAPONS_API UWeaponStaticData : public UItemStaticData
 
 public:
     explicit UWeaponStaticData(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get()):
-	    HandCompatability(), Cooldown(0), Damage(0), Range(0), WeaponWeight(0), WeaponMesh(nullptr) {}
+	    HandCompatability(), Cooldown(0), Damage(0), Range(0), WeaponWeight(0), IsLowPriority(false)
+    {
+    }
 
     /** The hand compatibility of the weapon (e.g., mainhand, offhand, or two-handed) */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS | Weapon", meta = (AssetBundles = "Data"))
@@ -48,14 +50,14 @@ public:
     /** Weight of the weapon, contributing to inventory weight limits */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS | Weapon", meta = (UIMin = 0, ClampMin = 0, AssetBundles = "Data"))
     float WeaponWeight;
-
-    /** A static mesh representing the weapon in the world */
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS | Weapon", meta = (AssetBundles = "Data"))
-    UStaticMesh* WeaponMesh;
-
+	
     /** The socket name where the weapon will be attached to the character */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS | Weapon", meta = (AssetBundles = "Data"))
     FName AttachSocketName;
+
+	// If a weapon is low priority then it will be readily replaced by other non-low priority weapons
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS | Weapon", meta = (AssetBundles = "Data"))
+	bool IsLowPriority;
 	
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS | Weapon", meta = (AssetBundles = "Data"))
 	TSubclassOf<AActor> WeaponActorClass;

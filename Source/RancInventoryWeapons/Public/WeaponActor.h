@@ -51,7 +51,7 @@ public:
 	UPROPERTY(BlueprintReadWrite, Category = "Ranc Inventory | Weapon", meta = (ExposeOnSpawn))
 	int32 MontageCycleIndex = 0;
 
-	UFUNCTION()
+	UFUNCTION(BlueprintNativeEvent, Category = "Ranc Inventory | Weapon")
 	void Initialize();
 	
 	virtual void Initialize_Impl();

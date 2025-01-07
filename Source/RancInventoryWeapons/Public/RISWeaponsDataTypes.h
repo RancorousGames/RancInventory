@@ -12,7 +12,7 @@ enum class EHandCompatibility : uint8
     /** Compatible with both hands */
     BothHands UMETA(DisplayName = "Both Hands"),
     
-       OnlyMainHand, TwoHanded, OnlyOffhand, AnyHand,
+       OnlyMainHand, TwoHanded, OnlyOffhand,
     /** Not compatible with any hand */
     None UMETA(DisplayName = "None")
 };

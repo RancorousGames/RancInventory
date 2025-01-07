@@ -10,6 +10,10 @@ AWeaponActor::AWeaponActor(const FObjectInitializer& ObjectInitializer)
     : Super(ObjectInitializer), WeaponData(nullptr)
 {
     PrimaryActorTick.bCanEverTick = false;
+    SetMobility(EComponentMobility::Movable);
+    GetStaticMeshComponent()->SetSimulatePhysics(false);
+    GetStaticMeshComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    GetStaticMeshComponent()->SetCollisionProfileName(TEXT("NoCollision"));
 }
 
 void AWeaponActor::BeginPlay()
@@ -36,14 +40,19 @@ UNetConnection* AWeaponActor::GetNetConnection() const
     return Super::GetNetConnection();
 }
 
-void AWeaponActor::Initialize()
+void AWeaponActor::Initialize_Implementation()
 {
     Initialize_Impl();
 }
 
 void AWeaponActor::Initialize_Impl()
 {
-    
+    // Set static actor model based on weapon data
+    if (WeaponData && WeaponData->ItemWorldMesh)
+    {
+        GetStaticMeshComponent()->SetStaticMesh(WeaponData->ItemWorldMesh);
+        GetStaticMeshComponent()->SetWorldScale3D(WeaponData->ItemWorldScale);
+    }
 }
 
 bool AWeaponActor::CanAttack_Implementation()

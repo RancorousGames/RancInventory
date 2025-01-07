@@ -5,6 +5,7 @@
 #include <CoreMinimal.h>
 #include <Components/ActorComponent.h>
 #include "ItemContainerComponent.h"
+#include "Core/RISSubsystem.h"
 #include "InventoryComponent.generated.h"
 
 USTRUCT(Blueprintable)
@@ -92,7 +93,7 @@ public:
 	DECLARE_DYNAMIC_MULTICAST_DELEGATE_FourParams(FOnItemAddedToTaggedSlot, const FGameplayTag&, SlotTag, const UItemStaticData*, ItemData, int32, Quantity, EItemChangeReason, Reason);
 	UPROPERTY(BlueprintAssignable, Category = "RIS | Equipment")
 	FOnItemAddedToTaggedSlot OnItemAddedToTaggedSlot;
-	
+
 	DECLARE_DYNAMIC_MULTICAST_DELEGATE_FourParams(FOnItemRemovedFromTaggedSlot, const FGameplayTag&, SlotTag, const UItemStaticData*, ItemData, int32, Quantity, EItemChangeReason, Reason);
 	// Note: This also gets called for partial removing, e.g. moving 1 apple in a stack of 5
 	UPROPERTY(BlueprintAssignable, Category = "RIS | Equipment")
@@ -258,6 +259,8 @@ protected:
 	TMap<FGameplayTag, FItemBundle> CachedTaggedSlotItems;
 	
 private:
+	UPROPERTY()
+	URISSubsystem* Subsystem;
 	TArray<FGameplayTag> _SlotsToRemove; // Could be a local value but just slight optimization to avoid creating a new array every time.
 	// The cache is a copy of Items that is not replicated, used to detect changes after replication, only used on client
 	TMap<FGameplayTag, FItemBundle> TaggedItemsCache; // Slot to quantity;

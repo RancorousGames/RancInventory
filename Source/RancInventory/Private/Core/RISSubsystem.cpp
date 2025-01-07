@@ -290,7 +290,24 @@ TArray<UObjectRecipeData*> URISSubsystem::GetAllRISItemRecipes()
 
 UItemStaticData* URISSubsystem::GetItemDataById(FGameplayTag TagId)
 {
-	return AllLoadedItemsByTag.FindRef(TagId);
+	UItemStaticData* FoundItem = AllLoadedItemsByTag.FindRef(TagId);
+
+	if (!FoundItem)
+	{
+		if (UAssetManager* const AssetManager = UAssetManager::GetIfInitialized())
+		{
+			auto IDToLoad = FPrimaryAssetId(TEXT("RancInventory_ItemData"), *(TagId.ToString()));
+			if (const TSharedPtr<FStreamableHandle> StreamableHandle = AssetManager->LoadPrimaryAsset(IDToLoad);
+				StreamableHandle.IsValid())
+			{
+				StreamableHandle->WaitUntilComplete(5.f);
+				return Cast<UItemStaticData>(StreamableHandle->GetLoadedAsset());
+			}
+		}
+		return nullptr;
+	}
+
+	return FoundItem;
 }
 
 bool URISSubsystem::AreAllRecipesLoaded()

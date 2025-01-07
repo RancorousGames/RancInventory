@@ -13,9 +13,9 @@ class ACharacter;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FWeaponEvent);
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FWeaponState, AWeaponActor*, WeaponActor);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FWeaponState, FGameplayTag, Slot, AWeaponActor*, WeaponActor);
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FGearUpdated, FGameplayTag, Slot, FGameplayTag, ItemId, AActor*, GearActor);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FGearUpdated, FGameplayTag, Slot, FGameplayTag, ItemId);
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FWeaponEquipState, FName, WeaponType, bool , bEquipState);
 
@@ -287,7 +287,7 @@ public:
 		
 	/* Adds the weapon to the list of weapons that can be hotswapped to with
 	 * SelectNextActiveWeapon, SelectPreviousWeapon and SelectActiveWeapon	*/
-	void AddAndSelectWeapon(const UWeaponStaticData* WeaponData);
+	void AddAndSelectWeapon(const UWeaponStaticData* WeaponData, FGameplayTag ForcedSlot = FGameplayTag());
 
 	UFUNCTION(BlueprintCallable, Category = "Ranc Inventory Weapons | Gear")
 	void SelectNextActiveWeapon(bool bPlayMontage = true);
@@ -302,14 +302,14 @@ public:
 	void SelectPreviousActiveWeaponServer(bool bPlayMontage = true);
 	
 	UFUNCTION(BlueprintCallable, Category = "Ranc Inventory Weapons | Gear")
-	void SelectActiveWeapon(int32 WeaponIndex, AWeaponActor* AlreadySpawnedWeapon = nullptr);
+	void SelectActiveWeapon(int32 WeaponIndex, bool bPlayEquipMontage, AWeaponActor* AlreadySpawnedWeapon = nullptr);
 
 	/*
 	If bPlayEquipMontage is false then the swap will happen immediately
 	Otherwise the swap time will depend on configuration of GearChangeCommitAnimNotifyName
 	*/
 	UFUNCTION(Reliable, Server, BlueprintCallable, Category = "Ranc Inventory Weapons | Gear")
-	void SelectActiveWeapon_Server(int32 WeaponIndex, AWeaponActor* AlreadySpawnedWeapon = nullptr);
+	void SelectActiveWeapon_Server(int32 WeaponIndex, bool bPlayEquipMontage, FGameplayTag ForcedSlot = FGameplayTag(), AWeaponActor* AlreadySpawnedWeapon = nullptr);
 
 	UFUNCTION(Reliable, Server, BlueprintCallable, Category = "Ranc Inventory Weapons | Gear")
 	void SelectUnarmed_Server();
@@ -411,6 +411,9 @@ protected:
 	float LastAttackTime = 0.0f;
 	
 	bool UseOffhandNext = false;
+	
+	// ReSharper disable once CppUE4ProbableMemoryIssuesWithUObject
+	AWeaponActor* WeaponToUnequip;
 
 	// Trace replays
 	int ReplayCurrentIndex;

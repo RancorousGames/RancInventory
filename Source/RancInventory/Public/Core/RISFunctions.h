@@ -44,14 +44,10 @@ public:
     /* Return the item data related to the given id */
     UFUNCTION(BlueprintCallable, Category = "Ranc Inventory")
     static UItemStaticData* GetSingleItemDataById(const FPrimaryRISItemId& InID, const TArray<FName>& InBundles, const bool bAutoUnload = true);
-
-    /* Return a array of data depending of the given ids */
-    UFUNCTION(BlueprintCallable, Category = "Ranc Inventory")
-    static TArray<UItemStaticData*> GetItemDataArrayById(const TArray<FPrimaryRISItemId> InIDs, const TArray<FName>& InBundles, const bool bAutoUnload = true);
     
     /* Uses static map from GameplayTag to URancItemData, works faster after having called PermanentlyLoadAllItems */
     UFUNCTION(BlueprintPure, Category = "Ranc Inventory")
-    static UItemStaticData* GetItemDataById(FGameplayTag TagId);
+    static UItemStaticData* GetItemDataById(FGameplayTag ItemId);
     
     // Utiltiy function to check if moving an item from one slot to another would cause a swap
     static bool ShouldItemsBeSwapped(FItemBundle* Source, FItemBundle* Target);

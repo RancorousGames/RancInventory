@@ -62,7 +62,7 @@ public:
     TArray<UObjectRecipeData*> GetAllRISItemRecipes();
 
     UFUNCTION(BlueprintPure, Category = "RIS")
-    UItemStaticData* GetItemDataById(FGameplayTag TagId);
+    static UItemStaticData* GetItemDataById(FGameplayTag TagId);
 
     UFUNCTION(BlueprintCallable, Category = "RIS")
     UItemStaticData* GetSingleItemDataById(const FPrimaryRISItemId& InID, const TArray<FName>& InBundles, const bool bAutoUnload = true);

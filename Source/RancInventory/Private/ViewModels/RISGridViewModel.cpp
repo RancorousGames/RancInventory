@@ -41,7 +41,7 @@ void URISGridViewModel::Initialize_Implementation(UInventoryComponent* Inventory
 
 	for (FItemBundleWithInstanceData BackingItem : Items)
 	{
-		if (const UItemStaticData* const ItemData = URISFunctions::GetItemDataById(BackingItem.ItemBundle.ItemId))
+		if (const UItemStaticData* const ItemData = URISSubsystem::GetItemDataById(BackingItem.ItemBundle.ItemId))
 		{
 			int32 RemainingQuantity = BackingItem.ItemBundle.Quantity;
 			while (RemainingQuantity > 0)
@@ -157,7 +157,7 @@ bool URISGridViewModel::SplitItem_Implementation(FGameplayTag SourceTaggedSlot, 
 		return false;
 	}
 
-	const UItemStaticData* ItemData = URISFunctions::GetItemDataById(SourceItem.ItemId);
+	const UItemStaticData* ItemData = URISSubsystem::GetItemDataById(SourceItem.ItemId);
 	if (!ItemData) return false; // Item data not found
 
 	// Calculate total quantity after split and check against max stack size
@@ -279,7 +279,20 @@ int32 URISGridViewModel::DropItem(FGameplayTag TaggedSlot, int32 SlotIndex, int3
 
 int32 URISGridViewModel::UseItem(FGameplayTag TaggedSlot, int32 SlotIndex)
 {
-	// TODO RECOVERY:
+	if (!LinkedInventoryComponent ||
+		(TaggedSlot.IsValid() && !ViewableTaggedSlots.Contains(TaggedSlot)) ||
+		(!TaggedSlot.IsValid() && !ViewableGridSlots.IsValidIndex(SlotIndex)))
+		return false;
+
+	if (TaggedSlot.IsValid())
+	{
+		LinkedInventoryComponent->ActivateItemFromTaggedSlot(TaggedSlot);
+	}
+	else
+	{
+		LinkedInventoryComponent->ActivateItem(ViewableGridSlots[SlotIndex].ItemId);
+	}
+	
 	return 0;
 }
 
@@ -412,7 +425,7 @@ bool URISGridViewModel::CanSlotReceiveItem_Implementation(const FGameplayTag& It
 	const FItemBundle& TargetSlotItem = ViewableGridSlots[SlotIndex];
 	if (TargetSlotEmpty || TargetSlotItem.ItemId == ItemId)
 	{
-		const UItemStaticData* ItemData = URISFunctions::GetItemDataById(ItemId);
+		const UItemStaticData* ItemData = URISSubsystem::GetItemDataById(ItemId);
 		if (!ItemData)
 		{
 			return false; // Item data not found
@@ -436,7 +449,7 @@ bool URISGridViewModel::CanTaggedSlotReceiveItem_Implementation(const FGameplayT
 	const FItemBundle& TargetSlotItem = ViewableTaggedSlots.FindChecked(SlotTag);
 	if (TargetSlotEmpty || TargetSlotItem.ItemId == ItemId)
 	{
-		const UItemStaticData* ItemData = URISFunctions::GetItemDataById(ItemId);
+		const UItemStaticData* ItemData = URISSubsystem::GetItemDataById(ItemId);
 		if (!ItemData)
 		{
 			return false; // Item data not found
@@ -632,7 +645,7 @@ void URISGridViewModel::PickupItem(AWorldItem* WorldItem, bool PreferTaggedSlots
 
 int32 URISGridViewModel::FindSlotIndexForItem_Implementation(const FGameplayTag& ItemId, int32 Quantity)
 {
-	const UItemStaticData* ItemData = URISFunctions::GetItemDataById(ItemId);
+	const UItemStaticData* ItemData = URISSubsystem::GetItemDataById(ItemId);
 	for (int32 Index = 0; Index < ViewableGridSlots.Num(); ++Index)
 	{
 		const FItemBundle& ExistingItem = ViewableGridSlots[Index];
@@ -658,7 +671,7 @@ FGameplayTag URISGridViewModel::FindTaggedSlotForItem(const FItemBundle& Item) c
 	// Validate
 	if (!Item.IsValid()) return FGameplayTag::EmptyTag;
 
-	const UItemStaticData* ItemData = URISFunctions::GetItemDataById(Item.ItemId);
+	const UItemStaticData* ItemData = URISSubsystem::GetItemDataById(Item.ItemId);
 	if (!ItemData) return FGameplayTag::EmptyTag; // Ensure the item data is valid
 
 	FGameplayTag FallbackSwapSlot = FGameplayTag::EmptyTag;

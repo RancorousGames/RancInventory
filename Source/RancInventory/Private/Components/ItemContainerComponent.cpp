@@ -99,7 +99,7 @@ int32 UItemContainerComponent::AddItem_IfServer(TScriptInterface<IItemSource> It
 
 
 	// get item data
-	const UItemStaticData* ItemData = URISFunctions::GetItemDataById(ItemId);
+	const UItemStaticData* ItemData = URISSubsystem::GetItemDataById(ItemId);
 	if (!ItemData)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Could not find item data for item: %s"), *ItemId.ToString());
@@ -172,7 +172,7 @@ int32 UItemContainerComponent::DestroyItemImpl(const FGameplayTag& ItemId, int32
 
 	if (SendEventAfter)
 	{
-		const UItemStaticData* ItemData = URISFunctions::GetItemDataById(ItemId);
+		const UItemStaticData* ItemData = URISSubsystem::GetItemDataById(ItemId);
 		OnItemRemovedFromContainer.Broadcast(ItemData, QuantityRemoved, Reason);
 	}
 
@@ -246,7 +246,7 @@ void UItemContainerComponent::DropItemsFromContainer_ServerImpl(const FGameplayT
 void UItemContainerComponent::ActivateItem_Server_Implementation(const FGameplayTag& ItemId)
 {
 	// todo cast to usable item
-	const UItemStaticData* ItemData = URISFunctions::GetItemDataById(ItemId);
+	const UItemStaticData* ItemData = URISSubsystem::GetItemDataById(ItemId);
 	if (!ItemData)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Could not find item data for item: %s"), *ItemId.ToString());
@@ -323,7 +323,7 @@ int32 UItemContainerComponent::ExtractItemFromContainer_IfServer(const FGameplay
 	ItemInstance->ItemBundle.Quantity += QuantityExtracted;
 	
 	UpdateWeightAndSlots();
-	OnItemAddedToContainer.Broadcast(URISFunctions::GetItemDataById(ItemId), QuantityExtracted, EItemChangeReason::Transferred);
+	OnItemAddedToContainer.Broadcast(URISSubsystem::GetItemDataById(ItemId), QuantityExtracted, EItemChangeReason::Transferred);
 	MARK_PROPERTY_DIRTY_FROM_NAME(UItemContainerComponent, ItemsVer, this);
 
 	return Quantity;
@@ -342,7 +342,7 @@ int32 UItemContainerComponent::ExtractItem_IfServer_Implementation(const FGamepl
 
 int32 UItemContainerComponent::ExtractItemImpl_IfServer(const FGameplayTag& ItemId, int32 Quantity, EItemChangeReason Reason, TArray<UItemInstanceData*>& StateArrayToAppendTo, bool SuppressUpdate)
 {
-	const UItemStaticData* ItemData = URISFunctions::GetItemDataById(ItemId);
+	const UItemStaticData* ItemData = URISSubsystem::GetItemDataById(ItemId);
 	if (!ItemData)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Could not find item data for item: %s"), *ItemId.ToString());
@@ -426,7 +426,7 @@ int32 UItemContainerComponent::GetReceivableQuantity(const FGameplayTag& ItemId)
 
 int32 UItemContainerComponent::GetReceivableQuantityImpl(const FGameplayTag& ItemId) const
 {
-	const UItemStaticData* ItemData = URISFunctions::GetItemDataById(ItemId);
+	const UItemStaticData* ItemData = URISSubsystem::GetItemDataById(ItemId);
 	if (!ItemData)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Could not find item data for item: %s"), *ItemId.ToString());
@@ -478,7 +478,7 @@ int32 UItemContainerComponent::GetQuantityContainerCanReceiveByWeight(const UIte
 
 bool UItemContainerComponent::HasWeightCapacityForItems(const FGameplayTag& ItemId, int32 Quantity) const
 {
-	const UItemStaticData* ItemData = URISFunctions::GetItemDataById(ItemId);
+	const UItemStaticData* ItemData = URISSubsystem::GetItemDataById(ItemId);
 	if (!ItemData)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Could not find item data for item: %s"), *ItemId.ToString());
@@ -562,7 +562,7 @@ void UItemContainerComponent::ClearImpl()
 
 	for (auto& Item : ItemsVer.Items)
 	{
-		const UItemStaticData* ItemData = URISFunctions::GetItemDataById(Item.ItemBundle.ItemId);
+		const UItemStaticData* ItemData = URISSubsystem::GetItemDataById(Item.ItemBundle.ItemId);
 		OnItemRemovedFromContainer.Broadcast(ItemData, Item.ItemBundle.Quantity, EItemChangeReason::ForceDestroyed);
 	}
 
@@ -582,7 +582,7 @@ void UItemContainerComponent::UpdateWeightAndSlots()
 	UsedContainerSlotCount = 0;
 	for (const auto& ItemInstanceWithState : ItemsVer.Items)
 	{
-		if (const UItemStaticData* const ItemData = URISFunctions::GetItemDataById(ItemInstanceWithState.ItemBundle.ItemId))
+		if (const UItemStaticData* const ItemData = URISSubsystem::GetItemDataById(ItemInstanceWithState.ItemBundle.ItemId))
 		{
 			int32 SlotsTakenPerStack = 1;
 			if (JigsawMode)
@@ -640,7 +640,7 @@ void UItemContainerComponent::DetectAndPublishChanges()
 			// Item exists, check for quantity change
 			if (OldItem->ItemBundle.Quantity != NewItem.ItemBundle.Quantity)
 			{
-				const auto* ItemData = URISFunctions::GetItemDataById(NewItem.ItemBundle.ItemId);
+				const auto* ItemData = URISSubsystem::GetItemDataById(NewItem.ItemBundle.ItemId);
 				if (OldItem->ItemBundle.Quantity < NewItem.ItemBundle.Quantity)
 				{
 					OnItemAddedToContainer.Broadcast(ItemData, NewItem.ItemBundle.Quantity - OldItem->ItemBundle.Quantity, EItemChangeReason::Synced);
@@ -656,7 +656,7 @@ void UItemContainerComponent::DetectAndPublishChanges()
 		else
 		{
 			// New item
-			const auto* ItemData = URISFunctions::GetItemDataById(NewItem.ItemBundle.ItemId);
+			const auto* ItemData = URISSubsystem::GetItemDataById(NewItem.ItemBundle.ItemId);
 			OnItemAddedToContainer.Broadcast(ItemData, NewItem.ItemBundle.Quantity, EItemChangeReason::Synced);
 			NewItem.ItemBundle.Quantity = -NewItem.ItemBundle.Quantity; // Mark as processed
 			CachedItemsVer.Items.Add(NewItem);
@@ -669,7 +669,7 @@ void UItemContainerComponent::DetectAndPublishChanges()
 		if (CachedItemsVer.Items[i].ItemBundle.Quantity >= 0)
 		{
 			// Item was not processed (not found in Items), so it has been removed
-			const auto* ItemData = URISFunctions::GetItemDataById(CachedItemsVer.Items[i].ItemBundle.ItemId);
+			const auto* ItemData = URISSubsystem::GetItemDataById(CachedItemsVer.Items[i].ItemBundle.ItemId);
 			OnItemRemovedFromContainer.Broadcast(ItemData, CachedItemsVer.Items[i].ItemBundle.Quantity, EItemChangeReason::Synced);
 			CachedItemsVer.Items.RemoveAt(i);
 		}

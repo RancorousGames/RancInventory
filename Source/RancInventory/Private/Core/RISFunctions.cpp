@@ -76,22 +76,9 @@ UItemStaticData* URISFunctions::GetSingleItemDataById(const FPrimaryRISItemId& I
 	return Output;
 }
 
-TArray<UItemStaticData*> URISFunctions::GetItemDataArrayById(const TArray<FPrimaryRISItemId> InIDs,
-                                                                     const TArray<FName>& InBundles,
-                                                                     const bool bAutoUnload)
+UItemStaticData* URISFunctions::GetItemDataById(FGameplayTag ItemId)
 {
-	TArray<UItemStaticData*> Output;
-
-#if ENGINE_MAJOR_VERSION > 5 || (ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3)
-	if (UAssetManager* const AssetManager = UAssetManager::GetIfInitialized())
-#else
-    if (UAssetManager* const AssetManager = UAssetManager::GetIfValid())
-#endif
-	{
-    	const TArray<FPrimaryAssetId>& IdArray = reinterpret_cast<const TArray<FPrimaryAssetId>&>(InIDs);
-		Output = LoadRancItemData_Internal(AssetManager, IdArray, InBundles, bAutoUnload);
-	}
-	return Output;
+	return URISSubsystem::GetItemDataById(ItemId);
 }
 
 TArray<UItemStaticData*> URISFunctions::LoadRancItemData_Internal(
@@ -185,7 +172,7 @@ bool URISFunctions::ShouldItemsBeSwapped(FItemBundle* Source, FItemBundle* Targe
 	// This code is copied and slightly modified from MoveBetweenSlots
 	if (Target->IsValid())
 	{
-		const UItemStaticData* SourceItemData = URISFunctions::GetItemDataById(Source->ItemId);
+		const UItemStaticData* SourceItemData = URISSubsystem::GetItemDataById(Source->ItemId);
 		if (!SourceItemData)
 		{
 			return false;
@@ -198,31 +185,9 @@ bool URISFunctions::ShouldItemsBeSwapped(FItemBundle* Source, FItemBundle* Targe
 	return false;
 }
 
-UItemStaticData* URISFunctions::GetItemDataById(FGameplayTag TagId)
-{
-	// TODO Recovery:
-	//if (const auto* ItemData = AllLoadedItemsByTag.Find(TagId))
-	//{
-	//	return *ItemData;
-	//}
-
-	if (UAssetManager* const AssetManager = UAssetManager::GetIfInitialized())
-	{
-		auto IDToLoad = FPrimaryAssetId(TEXT("RancInventory_ItemData"), *(TagId.ToString()));
-		if (const TSharedPtr<FStreamableHandle> StreamableHandle = AssetManager->LoadPrimaryAsset(IDToLoad);
-			StreamableHandle.IsValid())
-		{
-			StreamableHandle->WaitUntilComplete(5.f);
-			return Cast<UItemStaticData>(StreamableHandle->GetLoadedAsset());
-		}
-	}
-
-	return nullptr;
-}
-
 FRISMoveResult URISFunctions::MoveBetweenSlots(FItemBundle* Source, FItemBundle* Target, bool IgnoreMaxStacks, int32 RequestedQuantity, bool AllowPartial)
 {
-	const UItemStaticData* SourceItemData = URISFunctions::GetItemDataById(Source->ItemId);
+	const UItemStaticData* SourceItemData = URISSubsystem::GetItemDataById(Source->ItemId);
 	if (!SourceItemData)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Failed to retrieve item data for source item"));

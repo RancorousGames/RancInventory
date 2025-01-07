@@ -211,6 +211,7 @@ protected:
 private:
     TArray<FGameplayTag> _KeysToRemove; // Could be a local value but just slight optimization to avoid creating a new array every time.
     
+	
     void DetectAndPublishChanges();
 	
     UFUNCTION()
