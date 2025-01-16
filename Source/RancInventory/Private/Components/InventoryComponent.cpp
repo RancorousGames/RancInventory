@@ -1065,14 +1065,11 @@ int32 UInventoryComponent::DropAllItems_ServerImpl()
 	}
 	
 	TaggedSlotItemInstances.Empty();
-	
-	while (ItemsVer.Items.Num() > 0)
-	{
-		const FItemBundle& NextToDrop = ItemsVer.Items.Last().ItemBundle;
-		FVector DropLocation = GetOwner()->GetActorForwardVector() * DefaultDropDistance + FVector(FMath::FRand() * 100, FMath::FRand() * 100 , 100);
 
-		// This will call back to Inventories overridden ExtractItem
-		DropItemsFromContainer_Server(NextToDrop.ItemId, NextToDrop.Quantity, DropLocation);
+	for (int i = ItemsVer.Items.Num() - 1; i >= 0; i--)
+	{
+		FVector DropLocation = GetOwner()->GetActorForwardVector() * DefaultDropDistance + FVector(FMath::FRand() * 100, FMath::FRand() * 100 , 100);
+		DropItemsFromContainer_Server(ItemsVer.Items[i].ItemBundle.ItemId, ItemsVer.Items[i].ItemBundle.Quantity, DropLocation);
 		DroppedCount++;
 	}
 	

@@ -4,10 +4,12 @@
 #include <GameplayTagContainer.h>
 #include <Engine/DataAsset.h>
 
+#include "ItemDefinitionBase.h"
 #include "Actors/WorldItem.h"
 #include "Data/RISDataTypes.h"
 #include "ItemStaticData.generated.h"
 
+class UUsableItemDefinition;
 class UTexture2D;
 class UStaticMesh;
 
@@ -16,6 +18,27 @@ enum class EFoundState : uint8
 {
 	Found UMETA(DisplayName = "Found"),
 	NotFound UMETA(DisplayName = "Not Found")
+};
+
+UCLASS(Blueprintable, DefaultToInstanced, EditInlineNew, CollapseCategories, HideCategories = Object, Abstract)
+class UTestBaseClass : public UObject
+{
+	GENERATED_BODY()
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RIS | Classes | Data")
+	int32 TestInt = 0;
+};
+
+UCLASS(Blueprintable, editinlinenew)
+class  USubClassTest : public UTestBaseClass
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Test")
+	FVector SubClassTest;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Test")
+	FVector SubClassTestX;
 };
 
 
@@ -77,9 +100,8 @@ public:
 	UStaticMesh* ItemWorldMesh = nullptr;
 	
 	/* Allows extending item data without inheritance. Similar to components */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS",
-		meta = (DisplayName = "Item definitions"))
-	TMap<TSubclassOf<UObject>, UObject*> ItemDefinitions;
+	UPROPERTY(EditDefaultsOnly, Instanced, BlueprintReadOnly, Category = "RIS", meta = (DisplayName = "Item definitions"))
+	TMap<TSubclassOf<UObject>, UItemDefinitionBase*> ItemDefinitions;
 	
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS",
 		meta = (UIMin = 0, ClampMin = 0, AssetBundles = "Data"))
@@ -99,16 +121,27 @@ public:
 		meta = (DisplayName = "Item Relations", AssetBundles = "Custom"))
 	TMap<FGameplayTag, FPrimaryRISItemIdContainer> Relations;
 	
-	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "Definition", ExpandEnumAsExecs = "Found"))
-	UObject* GetItemDefinition(class TSubclassOf<UObject> Definition, EFoundState& Found)
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "RIS", meta = (DeterminesOutputType = "Definition"))
+	UObject* GetItemDefinition(class TSubclassOf<UItemDefinitionBase> Definition, bool& Found)
 	{
 		if (ItemDefinitions.Contains(Definition))
 		{
-			Found = EFoundState::Found;
+			Found = true;
 			return ItemDefinitions[Definition];
 		}
 		
-		Found = EFoundState::NotFound;
+		Found = false;
+		return nullptr;
+	}
+
+	template<typename T>
+	T* GetItemDefinition(TSubclassOf<T> Definition) const
+	{
+		if (ItemDefinitions.Contains(Definition))
+		{
+			return Cast<T>(ItemDefinitions[Definition]);
+		}
+
 		return nullptr;
 	}
 };

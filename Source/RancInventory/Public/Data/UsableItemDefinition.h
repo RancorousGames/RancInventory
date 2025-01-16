@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "ItemDefinitionBase.h"
 #include "UObject/Object.h"
 #include "UsableItemDefinition.generated.h"
 
@@ -8,7 +9,7 @@
  * Base class for defining usable items, allowing inline creation in editor.
  */
 UCLASS(Blueprintable, EditInlineNew)
-class RANCINVENTORY_API UUsableItemDefinition : public UObject
+class RANCINVENTORY_API UUsableItemDefinition : public UItemDefinitionBase
 {
 	GENERATED_BODY()
 

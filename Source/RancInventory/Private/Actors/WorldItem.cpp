@@ -33,15 +33,21 @@ void AWorldItem::SetItem(const FItemBundleWithInstanceData& NewItem)
 
 void AWorldItem::OnRep_Item()
 {
-	Initialize();
+	if (GetClass()->HasAnyClassFlags(CLASS_CompiledFromBlueprint) || !GetClass()->HasAnyClassFlags(CLASS_Native))
+	{
+		Initialize();
+	}
 }
 
 void AWorldItem::Initialize()
-{
+{	
 	ItemData = URISSubsystem::GetItemDataById(RepresentedItem.ItemBundle.ItemId);
 
 	SetMobility(EComponentMobility::Movable);
 	auto* mesh = GetStaticMeshComponent();
+
+	mesh->SetSimulatePhysics(true);
+	mesh->SetEnableGravity(true);
 
 	if (ItemData && ItemData->ItemWorldMesh)
 	{
@@ -55,6 +61,8 @@ void AWorldItem::Initialize()
 		mesh->SetStaticMesh(Cast<UStaticMesh>(StaticLoadObject(UStaticMesh::StaticClass(), NULL, *CubePath)));
 		mesh->SetWorldScale3D(FVector(0.2f, 0.2f, 0.2f));
 	}
+	
+	ReceiveInitialize();
 }
 
 void AWorldItem::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const

@@ -26,7 +26,12 @@ public:
 	
 	virtual void BeginPlay() override;
 	void OnRep_Item();
-	void Initialize();
+	
+	virtual void Initialize();
+
+	
+	UFUNCTION(BlueprintImplementableEvent, meta=(DisplayName = "Initialize"))
+	void ReceiveInitialize();
 
 	
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Ranc Inventory") // ReSharper disable once CppHidingFunction

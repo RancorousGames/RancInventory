@@ -42,7 +42,7 @@ void ARangedWeaponActor::Initialize_Impl()
     
     if (URISSubsystem::Get(this)->AreAllItemsLoaded())
     {
-        RangedWeaponData = Cast<URangedWeaponStaticData>(WeaponData);
+        RangedWeaponData = Cast<URangedWeaponDefinition>(WeaponData);
 
         if (!WeaponData || !RangedWeaponData)
         {

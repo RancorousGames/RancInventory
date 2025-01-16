@@ -163,7 +163,7 @@ public:
 
 	/* The data definition for unarmed attacks */
 	UPROPERTY(EditAnywhere,BlueprintReadWrite, Category = "Ranc Inventory Weapons | Gear | Configuration")
-	UWeaponStaticData* DefaultUnarmedWeaponData = nullptr;
+	UItemStaticData* DefaultUnarmedWeaponData = nullptr;
 	
 	/*
 	 * The notify that must be triggered to complete equipment changes.
@@ -214,7 +214,7 @@ public:
 	ACharacter* Owner = nullptr;
 
 	UPROPERTY(EditAnywhere,BlueprintReadWrite, Category = "Ranc Inventory Weapons | Gear | Internal")
-	TArray<const UWeaponStaticData*> SelectableWeaponsData;
+	TArray<const UItemStaticData*> SelectableWeaponsData;
 	
 	UPROPERTY(VisibleAnywhere,BlueprintReadOnly, Category = "Ranc Inventory Weapons | Gear | Internal")
 	AWeaponActor* UnarmedWeaponActor = nullptr;
@@ -254,12 +254,12 @@ public:
 	/* Convenience function to get the mainhand weapons data.
 	 * Equivalent to WeaponPerSlot[MainHandSlot]*/
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Ranc Inventory Weapons | Gear")
-	const UWeaponStaticData* GetMainhandWeaponSlotData();
+	const UWeaponDefinition* GetMainhandWeaponSlotData();
 
 	/* Convenience function to get the Offhand weapons data.
 	 * Equivalent to WeaponPerSlot[OffhandSlot] */
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Ranc Inventory Weapons | Gear")
-	const UWeaponStaticData* GetOffhandWeaponData();
+	const UWeaponDefinition* GetOffhandWeaponData();
 
 	
 	UFUNCTION()
@@ -287,7 +287,7 @@ public:
 		
 	/* Adds the weapon to the list of weapons that can be hotswapped to with
 	 * SelectNextActiveWeapon, SelectPreviousWeapon and SelectActiveWeapon	*/
-	void AddAndSelectWeapon(const UWeaponStaticData* WeaponData, FGameplayTag ForcedSlot = FGameplayTag());
+	void AddAndSelectWeapon(const UItemStaticData* WeaponData, FGameplayTag ForcedSlot = FGameplayTag());
 
 	UFUNCTION(BlueprintCallable, Category = "Ranc Inventory Weapons | Gear")
 	void SelectNextActiveWeapon(bool bPlayMontage = true);
@@ -363,7 +363,7 @@ public:
 	the spawned actor is immediately passed to AddWeaponToArray(NewWeaponActor)
 	*/
 	UFUNCTION(BlueprintCallable, Category = "Ranc Inventory Weapons | Gear")
-	AWeaponActor* SpawnWeapon_IfServer(const UWeaponStaticData* WeaponType);
+	AWeaponActor* SpawnWeapon_IfServer(const UWeaponDefinition* WeaponType);
 
 protected:
 	// Called when the game starts
@@ -391,7 +391,7 @@ protected:
 	void RotateToAimLocation(FVector AimLocation);
 	void UpdateRotation();
 
-	const FGearSlotDefinition* GetHandSlotToUse(const UWeaponStaticData* WeaponData) const;
+	const FGearSlotDefinition* GetHandSlotToUse(const UWeaponDefinition* WeaponData) const;
 	const AWeaponActor* GetWeaponForSlot(const FGearSlotDefinition* Slot) const;
 	
 	bool SetupDelayedGearChange(EPendingGearChangeType InPendingGearChangeType, const FGameplayTag& GearChangeSlot, const UItemStaticData* ItemData, int32 WeaponSelectionIndex = 0);

@@ -26,8 +26,7 @@ void FItemBundleWithInstanceData::DestroyQuantity(int32 quantity)
 
 int32 FItemBundleWithInstanceData::ExtractQuantity(int32 Quantity, TArray<UItemInstanceData*> StateArrayToAppendTo)
 {
-	// Prevent underflow
-	const int32 numToExtract = FMath::Min(Quantity, InstanceData.Num());
+	const int32 numToExtract = FMath::Min(Quantity, ItemBundle.Quantity);
    
 	if (numToExtract > 0)
 	{
@@ -35,10 +34,12 @@ int32 FItemBundleWithInstanceData::ExtractQuantity(int32 Quantity, TArray<UItemI
 		const int32 startIndex = InstanceData.Num() - numToExtract;
        
 		// Copy to target array
-		StateArrayToAppendTo.Append(InstanceData.GetData() + startIndex, numToExtract);
-       
-		// Remove from source
-		InstanceData.RemoveAt(startIndex, numToExtract);
+		int32 DynamicDataCount = FMath::Min(numToExtract, InstanceData.Num());
+		if (DynamicDataCount > 0)
+		{
+			StateArrayToAppendTo.Append(InstanceData.GetData() + startIndex, DynamicDataCount);
+			InstanceData.RemoveAt(startIndex, DynamicDataCount);
+		}
 		ItemBundle.Quantity = InstanceData.Num();
 	}
    

@@ -7,7 +7,7 @@
 #include "RecordingSystem/WeaponAttackRecorderComponent.h"
 
 AWeaponActor::AWeaponActor(const FObjectInitializer& ObjectInitializer)
-    : Super(ObjectInitializer), WeaponData(nullptr)
+    : Super(ObjectInitializer), WeaponData(nullptr), ItemData(nullptr)
 {
     PrimaryActorTick.bCanEverTick = false;
     SetMobility(EComponentMobility::Movable);
@@ -48,10 +48,11 @@ void AWeaponActor::Initialize_Implementation()
 void AWeaponActor::Initialize_Impl()
 {
     // Set static actor model based on weapon data
-    if (WeaponData && WeaponData->ItemWorldMesh)
+    if (ItemData && ItemData->ItemWorldMesh)
     {
-        GetStaticMeshComponent()->SetStaticMesh(WeaponData->ItemWorldMesh);
-        GetStaticMeshComponent()->SetWorldScale3D(WeaponData->ItemWorldScale);
+        GetStaticMeshComponent()->SetStaticMesh(ItemData->ItemWorldMesh);
+        GetStaticMeshComponent()->SetWorldScale3D(ItemData->ItemWorldScale);
+        WeaponData = ItemData->GetItemDefinition<UWeaponDefinition>(UWeaponDefinition::StaticClass());
     }
 }
 
@@ -89,9 +90,23 @@ FTransform AWeaponActor::GetAttachTransform_Impl(FName SocketName)
     return FTransform();
 }
 
-FMontageData AWeaponActor::GetAttackMontage(int32 MontageIdOverride)
+FMontageData AWeaponActor::GetAttackMontage_Implementation(int32 MontageIdOverride)
 {
-    return ReceiveGetAttackMontage(MontageIdOverride);
+    return GetAttackMontage_Impl(MontageIdOverride);
+}
+
+FMontageData AWeaponActor::GetAttackMontage_Impl(int32 MontageIdOverride)
+{
+    if (MontageIdOverride >= 0)
+    {
+        MontageCycleIndex = MontageIdOverride;
+    }
+    else
+    {
+        MontageCycleIndex = (MontageCycleIndex+1) % WeaponData->AttackMontages.Num();
+    }
+
+    return WeaponData->AttackMontages[MontageCycleIndex];
 }
 
 void AWeaponActor::Equip()

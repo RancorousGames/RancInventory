@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "WeaponDefinition.h"
 #include "Templates/SharedPointer.h"
 #include "WeaponStaticData.h"
 #include "Actors/WorldItem.h"
@@ -41,15 +42,18 @@ public:
 
 	UPROPERTY(BlueprintAssignable)
 	FWeaponStateChange OnWeaponHolstered;
-	
+
 	AWeaponActor(const FObjectInitializer& ObjectInitializer);
 	
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Ranc Inventory | Weapon", meta = (ExposeOnSpawn))
-	const UWeaponStaticData* WeaponData;
+	const UWeaponDefinition* WeaponData;
 
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Ranc Inventory | Weapon", meta = (ExposeOnSpawn))
+	const UItemStaticData* ItemData;
+	
 	/* Index of the next attack montage to play */
 	UPROPERTY(BlueprintReadWrite, Category = "Ranc Inventory | Weapon", meta = (ExposeOnSpawn))
-	int32 MontageCycleIndex = 0;
+	int32 MontageCycleIndex = -1;
 
 	UFUNCTION(BlueprintNativeEvent, Category = "Ranc Inventory | Weapon")
 	void Initialize();
@@ -72,12 +76,13 @@ public:
 	UFUNCTION(BlueprintNativeEvent, Category = "Ranc Inventory | Weapon")
 	FTransform GetAttachTransform(FName SocketName);
 	virtual FTransform GetAttachTransform_Impl(FName SocketName);
-
-	virtual FMontageData GetAttackMontage(int32 MontageIdOverride = -1);
 	
-	UFUNCTION(BlueprintImplementableEvent, Category = "Ranc Inventory | Weapon", meta=(DisplayName = "GetAttackMontage"))
-	FMontageData ReceiveGetAttackMontage(int32 MontageIdOverride = -1);
+	UFUNCTION(BlueprintNativeEvent, Category = "Ranc Inventory | Weapon", meta=(DisplayName = "GetAttackMontage"))
+	FMontageData GetAttackMontage(int32 MontageIdOverride = -1);
 
+	virtual FMontageData GetAttackMontage_Impl(int32 MontageIdOverride = -1);
+
+	
 	void Equip();
 
 	UFUNCTION(NetMulticast, Reliable)

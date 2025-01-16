@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "RangedWeaponDefinition.h"
 #include "WeaponActor.h"
 #include "RangedWeaponStaticData.h"
 #include "Components/ItemContainerComponent.h"
@@ -35,7 +36,7 @@ protected:
     void ApplyInstantHit_Impl(FHitResult HitResult);
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Ranged Weapon")
-    const URangedWeaponStaticData* RangedWeaponData;
+    const URangedWeaponDefinition* RangedWeaponData;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Ranged Weapon")
     UItemContainerComponent* InternalMagazineAmmoContainer;
