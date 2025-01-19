@@ -56,9 +56,9 @@ public:
 	int32 MontageCycleIndex = -1;
 
 	UFUNCTION(BlueprintNativeEvent, Category = "Ranc Inventory | Weapon")
-	void Initialize();
+	void Initialize(bool InitializeWeaponData = true, bool InitializeStaticMesh = true);
 	
-	virtual void Initialize_Impl();
+	virtual void Initialize_Impl(bool InitializeWeaponData = true, bool InitializeStaticMesh = true);
 
 	/* Function to notify the weapon an attack is requested
 	 * @return true if the weapon can attack, false otherwise */

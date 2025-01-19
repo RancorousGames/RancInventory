@@ -21,7 +21,7 @@ public:
 protected:
     virtual void BeginPlay() override;
 
-    virtual void Initialize_Impl() override;
+    virtual void Initialize_Impl(bool InitializeWeaponData = true, bool InitializeStaticMesh = true) override;
 
     void EquipMulticastImpl();
     void ReloadWeapon();

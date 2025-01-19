@@ -363,7 +363,7 @@ public:
 	the spawned actor is immediately passed to AddWeaponToArray(NewWeaponActor)
 	*/
 	UFUNCTION(BlueprintCallable, Category = "Ranc Inventory Weapons | Gear")
-	AWeaponActor* SpawnWeapon_IfServer(const UWeaponDefinition* WeaponType);
+	AWeaponActor* SpawnWeapon_IfServer(const UItemStaticData* ItemData, const UWeaponDefinition* WeaponType);
 
 protected:
 	// Called when the game starts

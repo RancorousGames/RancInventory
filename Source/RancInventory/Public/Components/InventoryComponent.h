@@ -45,7 +45,7 @@ public:
 
 	// Add an item to a tagged slot, if the slot is already occupied it will return the quantity that was added. Allows partial
 	UFUNCTION(BlueprintCallable, Category = "RIS | Equipment", Meta = (HidePin="OverrideExistingItem"))
-	int32 AddItemsToTaggedSlot_IfServer(TScriptInterface<IItemSource> ItemSource, const FGameplayTag& SlotTag, const FGameplayTag& ItemId, int32 RequestedQuantity);
+	int32 AddItemToTaggedSlot_IfServer(TScriptInterface<IItemSource> ItemSource, const FGameplayTag& SlotTag, const FGameplayTag& ItemId, int32 RequestedQuantity);
 
 	/* Attempts to add an item to a generic or tagged slot, PreferTaggedSlots determines which is tried first.
 	 * Typically only called on server but if called on client it can be used as a form of client prediction
@@ -61,7 +61,7 @@ public:
 
 	// Remove up to Quantity item from any tagged slot, will return the count that was removed, always allows partial removal
 	UFUNCTION(BlueprintCallable, Category = "RIS | Equipment")
-	int32 RemoveItemsFromAnyTaggedSlots_IfServer(FGameplayTag ItemId, int32 QuantityToRemove, EItemChangeReason Reason, bool DestroyFromContainer = true);
+	int32 RemoveItemFromAnyTaggedSlots_IfServer(FGameplayTag ItemId, int32 QuantityToRemove, EItemChangeReason Reason, bool DestroyFromContainer = true);
 	
 	/* Attempts to activate the item from the inventory, e.g. use a potion or active a magical item	 */
 	UFUNCTION(BlueprintCallable, Category = "RIS | Equipment")
@@ -199,7 +199,7 @@ protected:
 	 * Moves items from one tagged slot to another, always allows partial moves but source must contain right amount
 	 * Leave SourceTaggedSlot as empty tag to move from container or leave TargetTaggedSlot empty to move to container */
 	UFUNCTION(Server, Reliable, Category = "RIS")
-	void MoveItems_Server(const FGameplayTag& ItemId, int32 Quantity,
+	void MoveItem_Server(const FGameplayTag& ItemId, int32 Quantity,
 						  const FGameplayTag& SourceTaggedSlot = FGameplayTag(),
 						  const FGameplayTag& TargetTaggedSlot = FGameplayTag(),
 						  const FGameplayTag& SwapItemId = FGameplayTag(), int32 SwapQuantity = 0);
@@ -217,7 +217,7 @@ protected:
 	 * @param SwapQuantity Quantity to swap back, must match the target item quantity if specified
 	 * @return The quantity actually moved
 	 */
-	int32 MoveItems_ServerImpl(const FGameplayTag& ItemId, int32 RequestedQuantity,
+	int32 MoveItem_ServerImpl(const FGameplayTag& ItemId, int32 RequestedQuantity,
 							   const FGameplayTag& SourceTaggedSlot = FGameplayTag(),
 							   const FGameplayTag& TargetTaggedSlot = FGameplayTag(),
 							   bool AllowAutomaticSwapping = true,

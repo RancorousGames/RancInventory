@@ -238,11 +238,11 @@ const FGearSlotDefinition* UGearManagerComponent::GetHandSlotToUse(const UWeapon
 
 const AWeaponActor* UGearManagerComponent::GetWeaponForSlot(const FGearSlotDefinition* Slot) const
 {
-	if (Slot == MainHandSlot)
+	if (Slot == MainHandSlot && MainhandSlotWeapon)
 	{
 		return MainhandSlotWeapon;
 	}
-	else if (Slot == OffhandSlot)
+	else if (Slot == OffhandSlot && OffhandSlotWeapon)
 	{
 		return OffhandSlotWeapon;
 	}
@@ -383,7 +383,7 @@ void UGearManagerComponent::SelectActiveWeapon_Server_Implementation(int32 Weapo
 	AWeaponActor* WeaponActor = AlreadySpawnedWeapon;
 	if (!DelayConfigured && !WeaponActor)
 	{
-		WeaponActor = SpawnWeapon_IfServer(WeaponData);
+		WeaponActor = SpawnWeapon_IfServer(ItemData, WeaponData);
 
 		if (!Check(WeaponActor) || !Owner)
 		{
@@ -407,6 +407,12 @@ void UGearManagerComponent::SelectActiveWeapon_Server_Implementation(int32 Weapo
 		{
 			EquipMontageToBlendInto = WeaponData->EquipMontage;
 			GetWorld()->GetTimerManager().SetTimer(TimerHandle_UnequipEquipBlendDelay, this, &UGearManagerComponent::PlayBlendInEquipMontage, EquipUnequipAnimBlendDelay, false);
+		}
+
+		if (!WeaponToReplace->ItemData)
+		{
+			UE_LOG(LogRISInventory, Warning, TEXT("WeaponToReplace->ItemData is nullptr. EquipWeapon() Failed"))
+			return;
 		}
 		
 		UnequipGear(HandSlot->SlotTag, WeaponToReplace->ItemData, bPlayEquipMontage);
@@ -645,7 +651,7 @@ void UGearManagerComponent::UnequipGear(FGameplayTag Slot, const UItemStaticData
 		}
 		if (!DelayConfigured)
 		{
-			WeaponToUnequip->Holster();
+			WeaponToUnequip->Holster(); // TODO: Doesn't make sense to tell the weapon to holster if we are going to destroy it after. 
 			OnWeaponHolstered.Broadcast(Slot, WeaponToUnequip);
 			if (!DefaultUnarmedWeaponData || WeaponToUnequip->ItemData != DefaultUnarmedWeaponData)
 			{
@@ -671,8 +677,17 @@ void UGearManagerComponent::UnequipGear(FGameplayTag Slot, const UItemStaticData
 		}
 	}
 
+	if (!IsValid(ItemData) || !ItemData->ItemId.IsValid())
+	{
+		UE_LOG(LogRISInventory, Error, TEXT("ItemData or ItemData->ItemId is invalid. Something went wrong"))
+		return;
+	}
+	
 	if (!DelayConfigured)
+	{
+		UE_LOG(LogRISInventory, Warning, TEXT("OnGearUnequipped.Broadcast slot %s, item %s"), *Slot.ToString(), *ItemData->ItemId.ToString())
 		OnGearUnequipped.Broadcast(Slot, ItemData->ItemId);
+	}
 }
 
 void UGearManagerComponent::SelectNextActiveWeapon(bool bPlayMontage)
@@ -756,7 +771,7 @@ bool UGearManagerComponent::PlayWeaponHolsterMontage(AWeaponActor* InputWeaponAc
 	return true;
 }
 
-AWeaponActor* UGearManagerComponent::SpawnWeapon_IfServer(const UWeaponDefinition* WeaponData)
+AWeaponActor* UGearManagerComponent::SpawnWeapon_IfServer(const UItemStaticData* ItemData, const UWeaponDefinition* WeaponData)
 {
 	if (!Owner || !Owner->HasAuthority())
 	{
@@ -776,7 +791,7 @@ AWeaponActor* UGearManagerComponent::SpawnWeapon_IfServer(const UWeaponDefinitio
 	
 	if (AWeaponActor* NewWeaponActor = Cast<AWeaponActor>( GetWorld()->SpawnActorDeferred<AWeaponActor>(WeaponClass, FTransform(FRotator(0.0f, 0.0f, 0.0f), SpawnLocation, FVector::OneVector), GetOwner())))
 		{
-			NewWeaponActor->WeaponData = WeaponData;
+			NewWeaponActor->ItemData = ItemData;
 
 			NewWeaponActor->FinishSpawning(FTransform(FRotator(0.0f, 0.0f, 0.0f), SpawnLocation, FVector::OneVector));
 			return NewWeaponActor;

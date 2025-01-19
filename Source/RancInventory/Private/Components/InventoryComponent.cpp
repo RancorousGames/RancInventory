@@ -83,7 +83,7 @@ int32 UInventoryComponent::ExtractItemImpl_IfServer(const FGameplayTag& ItemId, 
 	const int32 QuantityUnderflow = GetContainerItemQuantity(ItemId);
 	if (QuantityUnderflow < 0)
 	{
-		RemoveItemsFromAnyTaggedSlots_IfServer(ItemId, -QuantityUnderflow, Reason, false);
+		RemoveItemFromAnyTaggedSlots_IfServer(ItemId, -QuantityUnderflow, Reason, false);
 	}
 
 	return ExtractedFromContainer;
@@ -106,7 +106,7 @@ int32 UInventoryComponent::ExtractItemFromTaggedSlot_IfServer(const FGameplayTag
 
 
 ////////////////////////////////////////////////////// TAGGED SLOTS ///////////////////////////////////////////////////////
-int32 UInventoryComponent::AddItemsToTaggedSlot_IfServer(TScriptInterface<IItemSource> ItemSource, const FGameplayTag& SlotTag, const FGameplayTag& ItemId,
+int32 UInventoryComponent::AddItemToTaggedSlot_IfServer(TScriptInterface<IItemSource> ItemSource, const FGameplayTag& SlotTag, const FGameplayTag& ItemId,
                                                             int32 RequestedQuantity)
 {
 	// Reminder: Items in tagged slots are duplicated in container
@@ -205,7 +205,7 @@ int32 UInventoryComponent::AddItemToAnySlot(TScriptInterface<IItemSource> ItemSo
 		if (SlotTag.IsValid())
 		{
 			// We do a move because the item has already been added to the container
-			const int32 ActualAddedQuantity = MoveItems_ServerImpl(ItemId, QuantityToAddSlot, FGameplayTag::EmptyTag, SlotTag, false, FGameplayTag(), 0, true);
+			const int32 ActualAddedQuantity = MoveItem_ServerImpl(ItemId, QuantityToAddSlot, FGameplayTag::EmptyTag, SlotTag, false, FGameplayTag(), 0, true);
 			OnItemAddedToTaggedSlot.Broadcast(SlotTag, ItemData, ActualAddedQuantity, EItemChangeReason::Added);
 
 			ensureMsgf(ActualAddedQuantity == QuantityToAddSlot, TEXT("Failed to add all items to tagged slot despite plan calculated"));
@@ -295,7 +295,7 @@ int32 UInventoryComponent::RemoveQuantityFromTaggedSlot_IfServer(const FGameplay
 	return ActualRemovedQuantity;
 }
 
-int32 UInventoryComponent::RemoveItemsFromAnyTaggedSlots_IfServer(FGameplayTag ItemId, int32 QuantityToRemove, EItemChangeReason Reason, bool DestroyFromContainer)
+int32 UInventoryComponent::RemoveItemFromAnyTaggedSlots_IfServer(FGameplayTag ItemId, int32 QuantityToRemove, EItemChangeReason Reason, bool DestroyFromContainer)
 {
 	int32 RemovedCount = 0;
 	for (int i = TaggedSlotItemInstances.Num() - 1; i >= 0; i--)
@@ -314,17 +314,17 @@ int32 UInventoryComponent::RemoveItemsFromAnyTaggedSlots_IfServer(FGameplayTag I
 	return RemovedCount;
 }
 
-void UInventoryComponent::MoveItems_Server_Implementation(const FGameplayTag& ItemId, int32 Quantity,
+void UInventoryComponent::MoveItem_Server_Implementation(const FGameplayTag& ItemId, int32 Quantity,
                                                              const FGameplayTag& SourceTaggedSlot,
                                                              const FGameplayTag& TargetTaggedSlot,
                                                              const FGameplayTag& SwapItemId,
                                                              int32 SwapQuantity)
 {
-	MoveItems_ServerImpl(ItemId, Quantity, SourceTaggedSlot, TargetTaggedSlot, true, SwapItemId, SwapQuantity);
+	MoveItem_ServerImpl(ItemId, Quantity, SourceTaggedSlot, TargetTaggedSlot, true, SwapItemId, SwapQuantity);
 }
 
 
-int32 UInventoryComponent::MoveItems_ServerImpl(const FGameplayTag& ItemId, int32 RequestedQuantity,
+int32 UInventoryComponent::MoveItem_ServerImpl(const FGameplayTag& ItemId, int32 RequestedQuantity,
                                                    const FGameplayTag& SourceTaggedSlot,
                                                    const FGameplayTag& TargetTaggedSlot, bool AllowAutomaticSwapping,
                                                    const FGameplayTag& SwapItemId, int32 SwapQuantity, bool SuppressUpdate)
@@ -585,12 +585,12 @@ int32 UInventoryComponent::MoveItem(const FGameplayTag& ItemId, int32 Quantity, 
 	if (GetOwnerRole() < ROLE_Authority && GetOwnerRole() != ROLE_None)
 	{
 		// TODO: Make sure tests dont rely on return value so we can set return type to void
-		MoveItems_Server(ItemId, Quantity, SourceTaggedSlot, TargetTaggedSlot, SwapItemId, SwapQuantity);
+		MoveItem_Server(ItemId, Quantity, SourceTaggedSlot, TargetTaggedSlot, SwapItemId, SwapQuantity);
 		return -1;
 	}
 	else
 	{
-		return MoveItems_ServerImpl(ItemId, Quantity, SourceTaggedSlot, TargetTaggedSlot, true, SwapItemId, SwapQuantity);
+		return MoveItem_ServerImpl(ItemId, Quantity, SourceTaggedSlot, TargetTaggedSlot, true, SwapItemId, SwapQuantity);
 	}
 	
 }
@@ -1085,7 +1085,7 @@ int32 UInventoryComponent::DestroyItemImpl(const FGameplayTag& ItemId, int32 Qua
 	const int32 QuantityUnderflow = GetContainerItemQuantity(ItemId);
 	if (QuantityUnderflow < 0)
 	{
-		RemoveItemsFromAnyTaggedSlots_IfServer(ItemId, -QuantityUnderflow, Reason, false);
+		RemoveItemFromAnyTaggedSlots_IfServer(ItemId, -QuantityUnderflow, Reason, false);
 	}
 
 	return DestroyedCount;

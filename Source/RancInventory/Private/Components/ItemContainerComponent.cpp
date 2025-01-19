@@ -7,6 +7,7 @@
 #include "Data/ItemInstanceData.h"
 #include "Core/RISFunctions.h"
 #include "Core/RISSubsystem.h"
+#include "Data/UsableItemDefinition.h"
 #include "Net/UnrealNetwork.h"
 #include "Net/Core/PushModel/PushModel.h"
 
@@ -205,10 +206,25 @@ int32 UItemContainerComponent::ActivateItem(const FGameplayTag& ItemId)
 	if (GetOwnerRole() != ROLE_Authority)
 		RequestedOperationsToServer.Add(FRISExpectedOperation(Remove, ItemId, 1));
 
+	const auto* ItemData = URISSubsystem::GetItemDataById(ItemId);
+	if (!ItemData)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Could not find item data for item: %s"), *ItemId.ToString());
+		return 0;
+	}
+
+	const UUsableItemDefinition* UsableItem = ItemData->GetItemDefinition<UUsableItemDefinition>(UUsableItemDefinition::StaticClass());
+
+	if (!UsableItem)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Item is not usable: %s"), *ItemId.ToString());
+		return 0;
+	}
+	
 	ActivateItem_Server(ItemId);
 
 	// On client the below is just a guess
-	int32 QuantityToDrop = 1; // todo: make configurable
+	int32 QuantityToDrop = UsableItem->QuantityPerUse;
 
 	return QuantityToDrop;
 }
@@ -252,13 +268,20 @@ void UItemContainerComponent::ActivateItem_Server_Implementation(const FGameplay
 		UE_LOG(LogTemp, Warning, TEXT("Could not find item data for item: %s"), *ItemId.ToString());
 		return;
 	}
+	
+	UUsableItemDefinition* UsableItem = ItemData->GetItemDefinition<UUsableItemDefinition>(UUsableItemDefinition::StaticClass());
 
-	constexpr int32 QuantityToConsume = 1; // todo: make configurable
-	const int32 ActualQuantity = DestroyItems_IfServer(ItemId, QuantityToConsume, EItemChangeReason::Consumed);
+	if (!UsableItem)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Item is not usable: %s"), *ItemId.ToString());
+		return;
+	}
+
+	const int32 ActualQuantity = DestroyItems_IfServer(ItemId, UsableItem->QuantityPerUse, EItemChangeReason::Consumed, false);
 	if (ActualQuantity > 0)
 	{
-		OnItemRemovedFromContainer.Broadcast(ItemData, QuantityToConsume, EItemChangeReason::Consumed);
-
+		UsableItem->Use(GetOwner());
+		
 		UpdateWeightAndSlots();
 	}
 }

@@ -19,7 +19,7 @@ AWeaponActor::AWeaponActor(const FObjectInitializer& ObjectInitializer)
 void AWeaponActor::BeginPlay()
 {
     Super::BeginPlay();
-    Initialize();
+    Initialize(true, true);
 }
 
 void AWeaponActor::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -40,19 +40,32 @@ UNetConnection* AWeaponActor::GetNetConnection() const
     return Super::GetNetConnection();
 }
 
-void AWeaponActor::Initialize_Implementation()
+void AWeaponActor::Initialize_Implementation(bool InitializeWeaponData, bool InitializeStaticMesh)
 {
-    Initialize_Impl();
+    Initialize_Impl(InitializeWeaponData, InitializeStaticMesh);
 }
 
-void AWeaponActor::Initialize_Impl()
+void AWeaponActor::Initialize_Impl(bool InitializeWeaponData, bool InitializeStaticMesh)
 {
     // Set static actor model based on weapon data
     if (ItemData && ItemData->ItemWorldMesh)
     {
-        GetStaticMeshComponent()->SetStaticMesh(ItemData->ItemWorldMesh);
-        GetStaticMeshComponent()->SetWorldScale3D(ItemData->ItemWorldScale);
-        WeaponData = ItemData->GetItemDefinition<UWeaponDefinition>(UWeaponDefinition::StaticClass());
+        if (InitializeStaticMesh)
+        {
+            GetStaticMeshComponent()->SetStaticMesh(ItemData->ItemWorldMesh);
+            GetStaticMeshComponent()->SetWorldScale3D(ItemData->ItemWorldScale);
+            GetStaticMeshComponent()->SetSimulatePhysics(false);
+            GetStaticMeshComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+            GetStaticMeshComponent()->SetCollisionProfileName(TEXT("NoCollision"));
+        }
+        if (InitializeWeaponData)
+        {
+            WeaponData = ItemData->GetItemDefinition<UWeaponDefinition>(UWeaponDefinition::StaticClass());
+        }
+    }
+    else
+    {
+        UE_LOG(LogTemp, Warning, TEXT("WeaponActor::Initialize_Impl: ItemData is nullptr."));
     }
 }
 

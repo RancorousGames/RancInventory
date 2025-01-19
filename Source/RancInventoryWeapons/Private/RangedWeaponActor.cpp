@@ -20,9 +20,9 @@ ARangedWeaponActor::ARangedWeaponActor(const FObjectInitializer& ObjectInitializ
 {
 }
 
-void ARangedWeaponActor::Initialize_Impl()
+void ARangedWeaponActor::Initialize_Impl(bool InitializeWeaponData, bool InitializeStaticMesh)
 {
-    Super::Initialize_Impl();
+    Super::Initialize_Impl(InitializeWeaponData, InitializeStaticMesh);
     UE_LOG(LogRISInventory, Verbose, TEXT("Initialize_Impl called for %s"), *GetName());
 
     InternalMagazineAmmoContainer = GetComponentByClass<UItemContainerComponent>();
@@ -267,6 +267,12 @@ void ARangedWeaponActor::PerformAttack_Impl()
 void ARangedWeaponActor::EquipMulticastImpl()
 {
     Super::EquipMulticastImpl();
+
+    if (!RangedWeaponData)
+    {
+        UE_LOG(LogRISInventory, Warning, TEXT("EquipMulticastImpl called for %s but no RangedWeaponData"), *GetName());
+        return;
+    }
     
     if (!RangedWeaponData->bInfiniteAmmo && CurrentAmmo <= 0)
     {
