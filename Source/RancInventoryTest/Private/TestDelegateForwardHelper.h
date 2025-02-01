@@ -11,10 +11,10 @@ class UTestDelegateForwardHelper : public UObject
 
 public:
 	TFunction<void()> CallFn;
-	TFunction<bool(const FItemBundle&)> CallFuncItemToBool;
+	TFunction<int(const FGameplayTag&, int32)> CallFuncItemToInt;
 	UFUNCTION()
 	void Dispatch() { CallFn(); }
 
 	UFUNCTION()
-	bool DispatchItemToBool(const FItemBundle& Item) { return CallFuncItemToBool(Item); }
+	int32 DispatchItemToInt(const FGameplayTag& ItemId, int32 Quantity) { return CallFuncItemToInt(ItemId, Quantity); }
 };

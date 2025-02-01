@@ -10,6 +10,7 @@
 #include "Data/ItemStaticData.h"
 #include "Engine/Engine.h"
 #include "Engine/GameInstance.h"
+#include "GameFramework/WorldSettings.h"
 
 UE_DEFINE_GAMEPLAY_TAG(LeftHandSlot, "Hands.LeftHand");
 UE_DEFINE_GAMEPLAY_TAG(RightHandSlot, "Hands.RightHand");
@@ -54,65 +55,86 @@ FItemBundle GiantBoulder(ItemIdGiantBoulder, 1);*/
 FGameplayTag NoTag = FGameplayTag::EmptyTag;
 
 
+static UWorld* CreateTestWorld()
+{
+	// Create a new world with default parameters
+	UWorld* TestWorld = UWorld::CreateWorld(EWorldType::Game, false);
+        
+	// Initialize the world
+	FWorldContext& WorldContext = GEngine->CreateNewWorldContext(EWorldType::Game);
+	WorldContext.SetCurrentWorld(TestWorld);
+        
+	// Setup basic world settings
+	AWorldSettings* WorldSettings = TestWorld->GetWorldSettings();
+	if (WorldSettings)
+	{
+		WorldSettings->SetActorTickEnabled(true);
+	}
+
+	// Initialize the world's scene
+	if (!TestWorld->bIsWorldInitialized)
+	{
+		TestWorld->InitializeNewWorld(UWorld::InitializationValues()
+			.ShouldSimulatePhysics(false)
+			.AllowAudioPlayback(false)
+			.RequiresHitProxies(false)
+			.CreatePhysicsScene(true)
+			.CreateNavigation(false)
+			.CreateAISystem(false));
+	}
+
+	return TestWorld;
+}
+
+UWorld* GetOrCreateWorld()
+{
+	static UWorld* PersistentWorld = nullptr;
+    
+	if (!PersistentWorld)
+	{
+		PersistentWorld = CreateTestWorld();
+	}
+    
+	return PersistentWorld;
+}
+
 UWorld* FindWorld(const UObject* ContextObject)
 {
-	if (ContextObject)
-	{
-		if (UWorld* World = GEngine->GetWorldFromContextObject(ContextObject, EGetWorldErrorMode::ReturnNull))
-		{
-			return World;
-		}
-	}
-
-	if (GEngine && GEngine->GetWorldContexts().Num() > 0)
-	{
-		TIndirectArray<FWorldContext> worlds = GEngine->GetWorldContexts();
-		for (const FWorldContext& WorldContext : worlds)
-		{
-			if (WorldContext.WorldType != EWorldType::Editor && WorldContext.WorldType != EWorldType::EditorPreview)
-			{
-				return WorldContext.World();
-			}
-		}
-
-		return worlds[0].World(); // Needed for tests
-	}
-
-	return nullptr;
+	return GetOrCreateWorld();
 }
 
 URISSubsystem* SetupSubsystem()
 {
 	UGameInstance* GameInstance = NewObject<UGameInstance>();
-	FindWorld(nullptr)->SetGameInstance(GameInstance);
+	UWorld* World = FindWorld(nullptr);
+	if (World)
+	{
+		World->SetGameInstance(GameInstance);
+	}
 	GameInstance->Init();
-	
-	URISSubsystem* Subsystem = GameInstance->GetSubsystem<URISSubsystem>();
-
-	return Subsystem;
+    
+	return GameInstance->GetSubsystem<URISSubsystem>();
 }
 
 void InitializeTestItems()
 {
-	URISSubsystem* SubSystem = SetupSubsystem();
+	URISSubsystem* SubSystem = SetupSubsystem(); 
 	
 	UItemStaticData* RockItemData = NewObject<UItemStaticData>();
 	RockItemData->ItemId = ItemIdRock;
 	RockItemData->ItemName = FName("Rock");
 	RockItemData->ItemDescription = FText::FromString("A sturdy rock, useful for crafting and building.");
 	RockItemData->ItemPrimaryType = ItemTypeResource;
-	RockItemData->bIsStackable = true;
 	RockItemData->MaxStackSize = 5;
 	RockItemData->ItemWeight = 1;
 	RockItemData->ItemCategories.AddTag(ItemTypeResource);
 	SubSystem->HardcodeItem(ItemIdRock, RockItemData);
 
 	UItemStaticData* SticksItemData = NewObject<UItemStaticData>();
-	SticksItemData->ItemId = ItemIdRock;
+	SticksItemData->ItemId = ItemIdSticks;
 	SticksItemData->ItemName = FName("Sticks");
 	SticksItemData->ItemDescription = FText::FromString("Some sticks");
 	SticksItemData->ItemPrimaryType = ItemTypeResource;
-	SticksItemData->bIsStackable = true;
 	SticksItemData->MaxStackSize = 5;
 	SticksItemData->ItemWeight = 1;
 	SticksItemData->ItemCategories.AddTag(ItemTypeResource);
@@ -123,7 +145,6 @@ void InitializeTestItems()
 	HelmetItemData->ItemName = FName("Helmet");
 	HelmetItemData->ItemDescription = FText::FromString("Protective gear for the head.");
 	HelmetItemData->ItemPrimaryType = ItemTypeArmor;
-	HelmetItemData->bIsStackable = false;
 	HelmetItemData->MaxStackSize = 1;
 	HelmetItemData->ItemWeight = 2;
 	HelmetItemData->ItemCategories.AddTag(HelmetSlot);
@@ -134,7 +155,6 @@ void InitializeTestItems()
 	SpecialHelmetItemData->ItemName = FName("SpecialHelmet");
 	SpecialHelmetItemData->ItemDescription = FText::FromString("Protective gear for the head.");
 	SpecialHelmetItemData->ItemPrimaryType = ItemTypeArmor;
-	SpecialHelmetItemData->bIsStackable = false;
 	SpecialHelmetItemData->MaxStackSize = 1;
 	SpecialHelmetItemData->ItemWeight = 2;
 	SpecialHelmetItemData->ItemCategories.AddTag(HelmetSlot);
@@ -145,7 +165,6 @@ void InitializeTestItems()
 	ChestItemData->ItemName = FName("Chest Armor");
 	ChestItemData->ItemDescription = FText::FromString("Armor protecting the torso.");
 	ChestItemData->ItemPrimaryType = ItemTypeArmor;
-	ChestItemData->bIsStackable = false;
 	ChestItemData->MaxStackSize = 1;
 	ChestItemData->ItemWeight = 5; // Adjusted weight for chest armor
 	ChestItemData->ItemCategories.AddTag(ChestSlot); // Adjust for chest slot
@@ -156,8 +175,7 @@ void InitializeTestItems()
 	SpearItemData->ItemName = FName("Spear");
 	SpearItemData->ItemDescription = FText::FromString("Sharp!");
 	SpearItemData->ItemPrimaryType = ItemTypeWeapon;
-	SpearItemData->bIsStackable = false;
-	SpearItemData->MaxStackSize = 5; // should not matter
+	SpearItemData->MaxStackSize = 1;
 	SpearItemData->ItemWeight = 3;
 	SpearItemData->ItemCategories.AddTag(ItemTypeWeapon);
 	SubSystem->HardcodeItem(ItemIdSpear, SpearItemData);
@@ -168,7 +186,6 @@ void InitializeTestItems()
 	GiantBoulderItemData->ItemName = FName("Giant Boulder");
 	GiantBoulderItemData->ItemDescription = FText::FromString("HEAVY!");
 	GiantBoulderItemData->ItemPrimaryType = ItemTypeResource;
-	GiantBoulderItemData->bIsStackable = false;
 	GiantBoulderItemData->MaxStackSize = 1;
 	GiantBoulderItemData->ItemWeight = 10;
 	GiantBoulderItemData->ItemCategories.AddTag(ItemTypeResource);

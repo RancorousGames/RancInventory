@@ -69,10 +69,7 @@ public:
 	FGameplayTag ItemPrimaryType;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS", meta = (AssetBundles = "Data"))
-	bool bIsStackable = true;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS", meta = (AssetBundles = "Data"))
-	int32 MaxStackSize = 5;
+	int32 MaxStackSize = 1;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS",
 		meta = (UIMin = 0, ClampMin = 0, AssetBundles = "Data"))

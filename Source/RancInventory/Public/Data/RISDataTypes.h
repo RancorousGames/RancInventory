@@ -136,7 +136,6 @@ struct FInitialItem
     {
     }
 
-    // TODO RECOVERY: 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RIS")
     FPrimaryRISItemId ItemId;
     

@@ -26,7 +26,7 @@ public:
     float GetMaxWeight() const;
 
     UFUNCTION(BlueprintPure, Category=RIS)
-    const FItemBundle& FindItemById(const FGameplayTag& ItemId) const;
+    const FItemBundleWithInstanceData& FindItemById(const FGameplayTag& ItemId) const;
 
     /* Add items to the inventory
      * Typically only called on server but if called on client it can be used as a form of client prediction
@@ -39,7 +39,7 @@ public:
      * Instead have the client send an input like UseItem or DropItem
      * Returns the amount removed, if AllowPartial is false and there is insufficient quantity then removes 0*/
     UFUNCTION(BlueprintCallable, Category=RIS)
-    int32 DestroyItems_IfServer(const FGameplayTag& ItemId, int32 Quantity, EItemChangeReason Reason, bool AllowPartial = false);
+    int32 DestroyItem_IfServer(const FGameplayTag& ItemId, int32 Quantity, EItemChangeReason Reason, bool AllowPartial = false);
 
     /* Attempts to drop the item from the inventory, attempting to spawn an Item object in the world
      * Specify DropItemClass and DropDistance properties to customize the drop
@@ -52,7 +52,7 @@ public:
 
 	// Attempt to activate the item, e.g. use a potion, activate a magic item, etc.
 	UFUNCTION(BlueprintCallable, Category=RIS)
-    int32 ActivateItem(const FGameplayTag& ItemId);
+    int32 UseItem(const FGameplayTag& ItemId);
 
     /* Useful for e.g. Death, drops items evenly spaced in a circle with radius DropDistance */
     UFUNCTION(BlueprintCallable, Category=RIS)
@@ -73,9 +73,10 @@ public:
     UFUNCTION(BlueprintPure, Category=RIS)
     bool Contains(const FGameplayTag& ItemId, int32 Quantity = 1) const;
 
-	/* Returns an item id and quantity exists among the items in the containers generic slots */
+	/* Returns an item id and quantity exists among the items in the containers generic slots
+	 * This is equivalent to GetContainedQuantity if this is an Itemcontainer but NOT an InventoryComponent */
     UFUNCTION(BlueprintPure, Category=RIS)
-    int32 GetContainerItemQuantity(const FGameplayTag& ItemId) const;
+    int32 GetContainerOnlyItemQuantity(const FGameplayTag& ItemId) const;
 	
 	UFUNCTION(BlueprintPure, Category=RIS)
 	TArray<UItemInstanceData*> GetItemState(const FGameplayTag& ItemId);
@@ -95,7 +96,7 @@ public:
 	
 	/* This allows you to set a delegate that will be called to validate if/how many of an item can be added to the container
 	 * Items can still be added to tagged slots even if this returns false which results in it also existing in the container items
-	* TODO: change this to perhaps return an int of number of allowed items and consider whether it might want to know the item state */
+	* TODO: consider whether it might want to know the item state */
 	DECLARE_DYNAMIC_DELEGATE_RetVal_TwoParams(int32, FAddItemValidationDelegate, const FGameplayTag&, ItemId, int32, Quantity);
 	UFUNCTION(BlueprintCallable, Category=RIS)
 	void SetAddItemValidationCallback_IfServer(const FAddItemValidationDelegate& ValidationDelegate);
@@ -171,15 +172,15 @@ protected:
 	FAddItemValidationDelegate OnValidateAddItemToContainer;
 
     UFUNCTION(Server, Reliable)
-    void DropItemsFromContainer_Server(const FGameplayTag& ItemId, int32 Quantity, FVector RelativeDropLocation = FVector(1e+300, 0,0));
-	void DropItemsFromContainer_ServerImpl(const FGameplayTag& ItemId, int32 Quantity, FVector RelativeDropLocation, TArray<UItemInstanceData*> DroppedItemStateArray);
+    void DropItemFromContainer_Server(const FGameplayTag& ItemId, int32 Quantity, FVector RelativeDropLocation = FVector(1e+300, 0,0));
+	void SpawnItemIntoWorldFromContainer_ServerImpl(const FGameplayTag& ItemId, int32 Quantity, FVector RelativeDropLocation, TArray<UItemInstanceData*> DroppedItemStateArray);
 	
 	UFUNCTION(Server, Reliable)
-	void ActivateItem_Server(const FGameplayTag& ItemId);
+	void UseItem_Server(const FGameplayTag& ItemId);
     
     // virtual drop implementation for override in subclasses
     virtual int32 DropAllItems_ServerImpl();
-	virtual int32 GetContainerItemQuantityImpl(const FGameplayTag& ItemId) const;
+	virtual int32 GetContainerOnlyItemQuantityImpl(const FGameplayTag& ItemId) const;
 	virtual bool ContainsImpl(const FGameplayTag& ItemId, int32 Quantity = 1) const;
 	virtual void ClearImpl();
 	virtual int32 DestroyItemImpl(const FGameplayTag& ItemId, int32 Quantity, EItemChangeReason Reason, bool AllowPartial = false, bool UpdateAfter = true, bool SendEventAfter = true);

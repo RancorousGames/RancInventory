@@ -56,7 +56,6 @@ private:
     FText ItemDescription;
     FGameplayTag ItemType;
     FGameplayTagContainer ItemCategories;
-    bool bIsStackable = false;
     float ItemValue = 0.f;
     float ItemWeight = 0.f;
     FVector ItemWorldScale = FVector(1,1,1);

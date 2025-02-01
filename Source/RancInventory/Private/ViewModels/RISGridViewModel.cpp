@@ -41,29 +41,29 @@ void URISGridViewModel::Initialize_Implementation(UInventoryComponent* Inventory
 
 	for (FItemBundleWithInstanceData BackingItem : Items)
 	{
-		if (const UItemStaticData* const ItemData = URISSubsystem::GetItemDataById(BackingItem.ItemBundle.ItemId))
+		if (const UItemStaticData* const ItemData = URISSubsystem::GetItemDataById(BackingItem.ItemId))
 		{
-			int32 RemainingQuantity = BackingItem.ItemBundle.Quantity;
+			int32 RemainingQuantity = BackingItem.Quantity;
 			while (RemainingQuantity > 0)
 			{
-				int32 SlotToAddTo = FindSlotIndexForItem(BackingItem.ItemBundle.ItemId, RemainingQuantity);
+				int32 SlotToAddTo = FindSlotIndexForItem(BackingItem.ItemId, RemainingQuantity);
 				if (SlotToAddTo == -1)
 				{
 					UE_LOG(LogTemp, Warning, TEXT("Could not find a slot to add the item to"));
-					LinkedInventoryComponent->DropItems(BackingItem.ItemBundle.ItemId, RemainingQuantity);
+					LinkedInventoryComponent->DropItems(BackingItem.ItemId, RemainingQuantity);
 					continue;
 				}
 
 				FItemBundle& ExistingItem = ViewableGridSlots[SlotToAddTo];
 
-				int32 AddLimit = ItemData->bIsStackable ? ItemData->MaxStackSize : 1;
+				int32 AddLimit = ItemData->MaxStackSize > 1 ? ItemData->MaxStackSize : 1;
 				if (ExistingItem.ItemId.IsValid())
 				{
 					AddLimit -= ExistingItem.Quantity;
 				}
 				else
 				{
-					ExistingItem.ItemId = BackingItem.ItemBundle.ItemId;
+					ExistingItem.ItemId = BackingItem.ItemId;
 					ExistingItem.Quantity = 0;
 				}
 
@@ -76,17 +76,17 @@ void URISGridViewModel::Initialize_Implementation(UInventoryComponent* Inventory
 
 	for (FGameplayTag& Tag : LinkedInventoryComponent->UniversalTaggedSlots)
 	{
-		ViewableTaggedSlots.Add(Tag, FItemBundle());
+		ViewableTaggedSlots.Add(Tag, FTaggedItemBundle());
 	}
 	for (FGameplayTag& Tag : LinkedInventoryComponent->SpecializedTaggedSlots)
 	{
-		ViewableTaggedSlots.Add(Tag, FItemBundle());
+		ViewableTaggedSlots.Add(Tag, FTaggedItemBundle());
 	}
 
 	const TArray<FTaggedItemBundle>& TaggedItems = LinkedInventoryComponent->GetAllTaggedItems();
 	for (const FTaggedItemBundle& TaggedItem : TaggedItems)
 	{
-		ViewableTaggedSlots[TaggedItem.Tag] = TaggedItem.ItemBundle;
+		ViewableTaggedSlots[TaggedItem.Tag] = TaggedItem;
 	}
 }
 
@@ -118,33 +118,33 @@ bool URISGridViewModel::SplitItem_Implementation(FGameplayTag SourceTaggedSlot, 
 {
 	if (!LinkedInventoryComponent) return false;
 
-	FItemBundle SourceItem;
+	FGenericItemBundle SourceItem;
 	if (SourceTaggedSlot.IsValid())
 	{
-		SourceItem = GetItemForTaggedSlot(SourceTaggedSlot);
+		SourceItem = &GetItemForTaggedSlot(SourceTaggedSlot);
 	}
 	else if (ViewableGridSlots.IsValidIndex(SourceSlotIndex))
 	{
-		SourceItem = GetItem(SourceSlotIndex);
+		SourceItem = &ViewableGridSlots[SourceSlotIndex];
 	}
 	else
 	{
 		return false; // Invalid source
 	}
 
-	if (SourceItem.Quantity < Quantity) return false; // Not enough items in source
+	if (SourceItem.GetQuantity() < Quantity) return false; // Not enough items in source
 
-	FItemBundle TargetItem;
+	FGenericItemBundle TargetItem;
 	if (TargetTaggedSlot.IsValid())
 	{
 		if (ViewableTaggedSlots.Contains(TargetTaggedSlot))
-			TargetItem = GetItemForTaggedSlot(TargetTaggedSlot);
+			TargetItem = &GetItemForTaggedSlot(TargetTaggedSlot);
 		else
 			return false; // Invalid target
 	}
 	else if (ViewableGridSlots.IsValidIndex(TargetSlotIndex))
 	{
-		TargetItem = GetItem(TargetSlotIndex);
+		TargetItem = &ViewableGridSlots[TargetSlotIndex];
 	}
 	else
 	{
@@ -152,16 +152,16 @@ bool URISGridViewModel::SplitItem_Implementation(FGameplayTag SourceTaggedSlot, 
 	}
 
 	// If target slot is occupied by a different item, fail the operation
-	if (TargetItem.ItemId.IsValid() && TargetItem.ItemId != SourceItem.ItemId)
+	if (TargetItem.IsValid() && TargetItem.GetItemId() != SourceItem.GetItemId())
 	{
 		return false;
 	}
 
-	const UItemStaticData* ItemData = URISSubsystem::GetItemDataById(SourceItem.ItemId);
+	const UItemStaticData* ItemData = URISSubsystem::GetItemDataById(SourceItem.GetItemId());
 	if (!ItemData) return false; // Item data not found
 
 	// Calculate total quantity after split and check against max stack size
-	int32 TotalQuantityAfterSplit = TargetItem.Quantity + Quantity;
+	int32 TotalQuantityAfterSplit = TargetItem.GetQuantity() + Quantity;
 	if (TotalQuantityAfterSplit > ItemData->MaxStackSize) return false; // Exceeds max stack size
 
 	// Perform the split
@@ -169,7 +169,7 @@ bool URISGridViewModel::SplitItem_Implementation(FGameplayTag SourceTaggedSlot, 
 	{
 		ViewableTaggedSlots[SourceTaggedSlot].Quantity -= Quantity;
 		if (ViewableTaggedSlots[SourceTaggedSlot].Quantity <= 0)
-			ViewableTaggedSlots[SourceTaggedSlot] = FItemBundle(); // Reset if empty
+			ViewableTaggedSlots[SourceTaggedSlot] = FTaggedItemBundle(); // Reset if empty
 	}
 	else
 	{
@@ -186,7 +186,7 @@ bool URISGridViewModel::SplitItem_Implementation(FGameplayTag SourceTaggedSlot, 
 		}
 		else
 		{
-			ViewableTaggedSlots[TargetTaggedSlot] = FItemBundle(SourceItem.ItemId, Quantity);
+			ViewableTaggedSlots[TargetTaggedSlot] = FTaggedItemBundle(TargetTaggedSlot, SourceItem.GetItemId(), Quantity);
 		}
 	}
 	else
@@ -197,7 +197,7 @@ bool URISGridViewModel::SplitItem_Implementation(FGameplayTag SourceTaggedSlot, 
 		}
 		else
 		{
-			ViewableGridSlots[TargetSlotIndex] = FItemBundle(SourceItem.ItemId, Quantity);
+			ViewableGridSlots[TargetSlotIndex] = FItemBundle(SourceItem.GetItemId(), Quantity);
 		}
 	}
 
@@ -206,30 +206,30 @@ bool URISGridViewModel::SplitItem_Implementation(FGameplayTag SourceTaggedSlot, 
 	// Broadcast updates
 	if (SourceTaggedSlot.IsValid())
 	{
-		OperationsToConfirm.Emplace(FRISExpectedOperation(RemoveTagged, SourceTaggedSlot, SourceItem.ItemId, Quantity));
+		OperationsToConfirm.Emplace(FRISExpectedOperation(RemoveTagged, SourceTaggedSlot, SourceItem.GetItemId(), Quantity));
 		OnTaggedSlotUpdated.Broadcast(SourceTaggedSlot);
 	}
 	else
 	{
-		if (!IsPureSplit) OperationsToConfirm.Emplace(FRISExpectedOperation(Remove, SourceItem.ItemId, Quantity));
+		if (!IsPureSplit) OperationsToConfirm.Emplace(FRISExpectedOperation(Remove, SourceItem.GetItemId(), Quantity));
 		OnSlotUpdated.Broadcast(SourceSlotIndex);
 	}
 
 	if (TargetTaggedSlot.IsValid())
 	{
-		OperationsToConfirm.Emplace(FRISExpectedOperation(AddTagged, TargetTaggedSlot, SourceItem.ItemId, Quantity));
+		OperationsToConfirm.Emplace(FRISExpectedOperation(AddTagged, TargetTaggedSlot, SourceItem.GetItemId(), Quantity));
 		if (SourceTaggedSlot.IsValid())
-			LinkedInventoryComponent->MoveItem(SourceItem.ItemId, Quantity, SourceTaggedSlot, TargetTaggedSlot);
+			LinkedInventoryComponent->MoveItem(SourceItem.GetItemId(), Quantity, SourceTaggedSlot, TargetTaggedSlot);
 		else
-			LinkedInventoryComponent->MoveItem(SourceItem.ItemId, Quantity, FGameplayTag::EmptyTag, TargetTaggedSlot);
+			LinkedInventoryComponent->MoveItem(SourceItem.GetItemId(), Quantity, FGameplayTag::EmptyTag, TargetTaggedSlot);
 		OnTaggedSlotUpdated.Broadcast(TargetTaggedSlot);
 	}
 	else
 	{
 		if (!IsPureSplit)
 		{
-			OperationsToConfirm.Emplace(FRISExpectedOperation(Add, SourceItem.ItemId, Quantity));
-			LinkedInventoryComponent->MoveItem(SourceItem.ItemId, Quantity, SourceTaggedSlot, FGameplayTag::EmptyTag);
+			OperationsToConfirm.Emplace(FRISExpectedOperation(Add, SourceItem.GetItemId(), Quantity));
+			LinkedInventoryComponent->MoveItem(SourceItem.GetItemId(), Quantity, SourceTaggedSlot, FGameplayTag::EmptyTag);
 		}
 		OnSlotUpdated.Broadcast(TargetSlotIndex);
 	}
@@ -248,12 +248,12 @@ int32 URISGridViewModel::DropItem(FGameplayTag TaggedSlot, int32 SlotIndex, int3
 	if (TaggedSlot.IsValid())
 	{
 		Quantity = FMath::Min(
-			Quantity, LinkedInventoryComponent->GetItemForTaggedSlot(TaggedSlot).ItemBundle.Quantity);
+			Quantity, LinkedInventoryComponent->GetItemForTaggedSlot(TaggedSlot).Quantity);
 		DroppedCount = LinkedInventoryComponent->DropFromTaggedSlot(TaggedSlot, Quantity);
 		ViewableTaggedSlots[TaggedSlot].Quantity -= DroppedCount;
 		if (ViewableTaggedSlots[TaggedSlot].Quantity <= 0)
 		{
-			ViewableTaggedSlots[TaggedSlot] = FItemBundle::EmptyItemInstance; // Reset the slot to empty
+			ViewableTaggedSlots[TaggedSlot] = FTaggedItemBundle::EmptyItemInstance; // Reset the slot to empty
 		}
 		OperationsToConfirm.Emplace(FRISExpectedOperation(RemoveTagged, TaggedSlot, DroppedCount));
 		OnTaggedSlotUpdated.Broadcast(TaggedSlot);
@@ -286,11 +286,11 @@ int32 URISGridViewModel::UseItem(FGameplayTag TaggedSlot, int32 SlotIndex)
 
 	if (TaggedSlot.IsValid())
 	{
-		LinkedInventoryComponent->ActivateItemFromTaggedSlot(TaggedSlot);
+		LinkedInventoryComponent->UseItemFromTaggedSlot(TaggedSlot);
 	}
 	else
 	{
-		LinkedInventoryComponent->ActivateItem(ViewableGridSlots[SlotIndex].ItemId);
+		LinkedInventoryComponent->UseItem(ViewableGridSlots[SlotIndex].ItemId);
 	}
 	
 	return 0;
@@ -311,12 +311,12 @@ bool URISGridViewModel::MoveItem_Implementation(FGameplayTag SourceTaggedSlot, i
 	bool SourceIsTaggedSlot = SourceTaggedSlot.IsValid();
 	bool TargetIsTaggedSlot = TargetTaggedSlot.IsValid();
 
-	FItemBundle* SourceItem = nullptr;
+	FGenericItemBundle SourceItem;
 	if (SourceIsTaggedSlot)
 	{
 		SourceItem = ViewableTaggedSlots.Find(SourceTaggedSlot);
 
-		if (!SourceItem)
+		if (!SourceItem.IsValid())
 		{
 			UE_LOG(LogTemp, Warning, TEXT("Source tagged slot does not exist"));
 			return 0;
@@ -324,20 +324,20 @@ bool URISGridViewModel::MoveItem_Implementation(FGameplayTag SourceTaggedSlot, i
 	}
 	else
 	{
-		SourceItem = &ViewableGridSlots[SourceSlotIndex];
+		SourceItem =  &ViewableGridSlots[SourceSlotIndex];
 	}
 
-	FItemBundle* TargetItem;
+	FGenericItemBundle TargetItem;
 	if (TargetIsTaggedSlot)
 	{
-		if (!LinkedInventoryComponent->IsTaggedSlotCompatible(SourceItem->ItemId, TargetTaggedSlot))
+		if (!LinkedInventoryComponent->IsTaggedSlotCompatible(SourceItem.GetItemId(), TargetTaggedSlot))
 		{
 			UE_LOG(LogTemp, Warning, TEXT("Item is not compatible with the target slot"));
 			return false;
 		}
 
 		TargetItem = ViewableTaggedSlots.Find(TargetTaggedSlot);
-		if (!TargetItem)
+		if (!TargetItem.IsValid())
 		{
 			if (!LinkedInventoryComponent->UniversalTaggedSlots.Contains(TargetTaggedSlot) && !LinkedInventoryComponent->SpecializedTaggedSlots.Contains(TargetTaggedSlot))
 			{
@@ -345,7 +345,7 @@ bool URISGridViewModel::MoveItem_Implementation(FGameplayTag SourceTaggedSlot, i
 				return false;
 			}
 
-			ViewableTaggedSlots.Add(TargetTaggedSlot, FItemBundle::EmptyItemInstance);
+			ViewableTaggedSlots.Add(TargetTaggedSlot, FTaggedItemBundle::EmptyItemInstance);
 			TargetItem = ViewableTaggedSlots.Find(TargetTaggedSlot);
 		}
 	}
@@ -354,17 +354,17 @@ bool URISGridViewModel::MoveItem_Implementation(FGameplayTag SourceTaggedSlot, i
 		TargetItem = &ViewableGridSlots[TargetSlotIndex];
 	}
 
-	if (TargetItem && SourceIsTaggedSlot && URISFunctions::ShouldItemsBeSwapped(SourceItem, TargetItem) && !LinkedInventoryComponent->IsTaggedSlotCompatible(
-		TargetItem->ItemId, SourceTaggedSlot))
+	if (TargetItem.IsValid() && SourceIsTaggedSlot && URISFunctions::ShouldItemsBeSwapped(SourceItem.GetItemId(), TargetItem.GetItemId()) && !LinkedInventoryComponent->IsTaggedSlotCompatible(
+		TargetItem.GetItemId(), SourceTaggedSlot))
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Item is not compatible with the source slot"));
 		return 0;
 	}
 
-	FItemBundle MoveItem = FItemBundle(SourceItem->ItemId, SourceItem->Quantity);
+	FItemBundle MoveItem = FItemBundle(SourceItem.GetItemId(), SourceItem.GetQuantity());
 
 	FRISMoveResult MoveResult = URISFunctions::MoveBetweenSlots(SourceItem, TargetItem, !TargetIsTaggedSlot,
-	                                                               SourceItem->Quantity, true);
+	                                                               SourceItem.GetQuantity(), true);
 
 	MoveItem.Quantity = MoveResult.QuantityMoved;
 	
@@ -431,7 +431,7 @@ bool URISGridViewModel::CanSlotReceiveItem_Implementation(const FGameplayTag& It
 			return false; // Item data not found
 		}
 
-		const int32 AvailableSpace = ItemData->bIsStackable ? ItemData->MaxStackSize - TargetSlotItem.Quantity : TargetSlotEmpty ? 1 : 0;
+		const int32 AvailableSpace = ItemData->MaxStackSize > 1 ? ItemData->MaxStackSize - TargetSlotItem.Quantity : TargetSlotEmpty ? 1 : 0;
 		return AvailableSpace >= Quantity;
 	}
 
@@ -446,7 +446,7 @@ bool URISGridViewModel::CanTaggedSlotReceiveItem_Implementation(const FGameplayT
 	if (!BasicCheck) return false;
 
 	const bool TargetSlotEmpty = IsTaggedSlotEmpty(SlotTag);
-	const FItemBundle& TargetSlotItem = ViewableTaggedSlots.FindChecked(SlotTag);
+	const FTaggedItemBundle& TargetSlotItem = ViewableTaggedSlots.FindChecked(SlotTag);
 	if (TargetSlotEmpty || TargetSlotItem.ItemId == ItemId)
 	{
 		const UItemStaticData* ItemData = URISSubsystem::GetItemDataById(ItemId);
@@ -455,7 +455,7 @@ bool URISGridViewModel::CanTaggedSlotReceiveItem_Implementation(const FGameplayT
 			return false; // Item data not found
 		}
 
-		const int32 AvailableSpace = ItemData->bIsStackable ? ItemData->MaxStackSize - TargetSlotItem.Quantity : TargetSlotEmpty ? 1 : 0;
+		const int32 AvailableSpace = ItemData->MaxStackSize > 1 ? ItemData->MaxStackSize - TargetSlotItem.Quantity : TargetSlotEmpty ? 1 : 0;
 		return AvailableSpace >= Quantity;
 	}
 
@@ -495,11 +495,11 @@ void URISGridViewModel::HandleItemAdded_Implementation(const UItemStaticData* It
 		}
 
 		// Calculate how many items can be added to this slot
-		int32 ItemsToAdd = FMath::Min(RemainingItems, ItemData->bIsStackable ? ItemData->MaxStackSize : 1);
+		int32 ItemsToAdd = FMath::Min(RemainingItems, ItemData->MaxStackSize > 1 ? ItemData->MaxStackSize : 1);
 		FItemBundle& ExistingItem = ViewableGridSlots[SlotIndex];
 		if (ExistingItem.IsValid())
 		{
-			ItemsToAdd = FMath::Min(RemainingItems, ItemData->bIsStackable ? ItemData->MaxStackSize - ExistingItem.Quantity : 1);
+			ItemsToAdd = FMath::Min(RemainingItems, ItemData->MaxStackSize > 1 ? ItemData->MaxStackSize - ExistingItem.Quantity : 1);
 			ExistingItem.Quantity += ItemsToAdd;
 		}
 		else
@@ -533,7 +533,7 @@ void URISGridViewModel::HandleTaggedItemAdded_Implementation(const FGameplayTag&
 	if (ViewableTaggedSlots[SlotTag].ItemId == ItemData->ItemId)
 		ViewableTaggedSlots[SlotTag].Quantity += Quantity;
 	else
-		ViewableTaggedSlots[SlotTag] = FItemBundle(ItemData->ItemId, Quantity);
+		ViewableTaggedSlots[SlotTag] = FTaggedItemBundle(SlotTag, ItemData->ItemId, Quantity);
 	OnTaggedSlotUpdated.Broadcast(SlotTag);
 }
 
@@ -613,7 +613,7 @@ void URISGridViewModel::HandleTaggedItemRemoved_Implementation(const FGameplayTa
 		ViewableTaggedSlots[SlotTag].Quantity -= Quantity;
 		if (ViewableTaggedSlots[SlotTag].Quantity <= 0)
 		{
-			ViewableTaggedSlots[SlotTag] = FItemBundle::EmptyItemInstance; // Remove the item if quantity drops to 0 or below
+			ViewableTaggedSlots[SlotTag] = FTaggedItemBundle::EmptyItemInstance; // Remove the item if quantity drops to 0 or below
 		}
 
 		OnTaggedSlotUpdated.Broadcast(SlotTag);
@@ -625,13 +625,13 @@ void URISGridViewModel::ForceFullUpdate_Implementation()
 	// TODO: Implement this, we prefer not to just call initialize as that will loose all slot mappings
 }
 
-const FItemBundle& URISGridViewModel::GetItemForTaggedSlot(const FGameplayTag& SlotTag) const
+FTaggedItemBundle& URISGridViewModel::GetItemForTaggedSlot(const FGameplayTag& SlotTag) const
 {
-	return ViewableTaggedSlots.FindChecked(SlotTag);
+	// cast away constness to allow for modification
+	return const_cast<FTaggedItemBundle&>(ViewableTaggedSlots.FindChecked(SlotTag));
 }
 
-void URISGridViewModel::PickupItem(AWorldItem* WorldItem, bool PreferTaggedSlots,
-	bool DestroyAfterPickup)
+void URISGridViewModel::PickupItem(AWorldItem* WorldItem, bool PreferTaggedSlots, bool DestroyAfterPickup)
 {
 	if (WorldItem == nullptr || !WorldItem->IsValidLowLevel())
 	{
@@ -656,7 +656,7 @@ int32 URISGridViewModel::FindSlotIndexForItem_Implementation(const FGameplayTag&
 		}
 		if (ExistingItem.ItemId == ItemId)
 		{
-			if (ItemData->bIsStackable && ExistingItem.Quantity < ItemData->MaxStackSize)
+			if (ItemData->MaxStackSize > 1 && ExistingItem.Quantity < ItemData->MaxStackSize)
 			{
 				return Index;
 			}
@@ -666,12 +666,12 @@ int32 URISGridViewModel::FindSlotIndexForItem_Implementation(const FGameplayTag&
 	return -1;
 }
 
-FGameplayTag URISGridViewModel::FindTaggedSlotForItem(const FItemBundle& Item) const
+FGameplayTag URISGridViewModel::FindTaggedSlotForItem(const FGameplayTag& ItemId, int32 Quanitity) const
 {
 	// Validate
-	if (!Item.IsValid()) return FGameplayTag::EmptyTag;
+	if (!ItemId.IsValid()) return FGameplayTag::EmptyTag;
 
-	const UItemStaticData* ItemData = URISSubsystem::GetItemDataById(Item.ItemId);
+	const UItemStaticData* ItemData = URISSubsystem::GetItemDataById(ItemId);
 	if (!ItemData) return FGameplayTag::EmptyTag; // Ensure the item data is valid
 
 	FGameplayTag FallbackSwapSlot = FGameplayTag::EmptyTag;
@@ -731,7 +731,7 @@ bool URISGridViewModel::MoveItemToAnyTaggedSlot_Implementation(const FGameplayTa
 
 	const bool SourceIsTagSlot = SourceTaggedSlot.IsValid();
 
-	const FItemBundle* SourceItem = nullptr;
+	FGenericItemBundle SourceItem;
 	if (SourceIsTagSlot)
 	{
 		SourceItem = &ViewableTaggedSlots[SourceTaggedSlot];
@@ -741,9 +741,9 @@ bool URISGridViewModel::MoveItemToAnyTaggedSlot_Implementation(const FGameplayTa
 		SourceItem = &ViewableGridSlots[SourceSlotIndex];
 	}
 
-	if (!SourceItem || !SourceItem->IsValid()) return false;
+	if (!SourceItem.IsValid()) return false;
 
-	const auto TargetSlot = FindTaggedSlotForItem(*SourceItem);
+	const auto TargetSlot = FindTaggedSlotForItem(SourceItem.GetItemId(), SourceItem.GetQuantity());
 
 	return MoveItem(SourceTaggedSlot, SourceSlotIndex, TargetSlot, -1);
 }

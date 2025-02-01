@@ -29,7 +29,8 @@ URISSubsystem* URISSubsystem::Get(UObject* WorldContext)
 		return nullptr;
 	}
 
-	UGameInstance* GameInstance = WorldContext->GetWorld() ? WorldContext->GetWorld()->GetGameInstance() : nullptr;
+	auto* World = WorldContext->GetWorld();
+	UGameInstance* GameInstance = World ? World->GetGameInstance() : nullptr;
 	if (!GameInstance)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("GameInstance is null in URISSubsystem::Get."));

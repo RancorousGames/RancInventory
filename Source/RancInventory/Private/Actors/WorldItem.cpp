@@ -19,7 +19,7 @@ void AWorldItem::BeginPlay()
 {
 	Super::BeginPlay();
 
-	if (RepresentedItem.ItemBundle.ItemId.IsValid())
+	if (RepresentedItem.ItemId.IsValid())
 	{
 		Initialize();
 	}
@@ -41,7 +41,7 @@ void AWorldItem::OnRep_Item()
 
 void AWorldItem::Initialize()
 {	
-	ItemData = URISSubsystem::GetItemDataById(RepresentedItem.ItemBundle.ItemId);
+	ItemData = URISSubsystem::GetItemDataById(RepresentedItem.ItemId);
 
 	SetMobility(EComponentMobility::Movable);
 	auto* mesh = GetStaticMeshComponent();
@@ -95,14 +95,14 @@ int32 AWorldItem::ExtractItem_IfServer_Implementation(
         return 0;
 
     // Check if the ItemId matches the represented item
-    if (RepresentedItem.ItemBundle.ItemId != ItemId)
+    if (RepresentedItem.ItemId != ItemId)
     {
         UE_LOG(LogTemp, Warning, TEXT("ExtractItem_IfServer failed: ItemId does not match the represented item."));
         return 0;
     }
 
     // Determine how much can be extracted
-    int32 AvailableQuantity = RepresentedItem.ItemBundle.Quantity;
+    int32 AvailableQuantity = RepresentedItem.Quantity;
     int32 QuantityToExtract = FMath::Min(Quantity, AvailableQuantity);
 
     if (QuantityToExtract <= 0)
@@ -111,7 +111,7 @@ int32 AWorldItem::ExtractItem_IfServer_Implementation(
     }
 
     // Adjust the represented item's quantity
-    RepresentedItem.ItemBundle.Quantity -= QuantityToExtract;
+    RepresentedItem.Quantity -= QuantityToExtract;
 
     // Create instance data if needed
     if (RepresentedItem.InstanceData.Num() > 0 && QuantityToExtract > 0)
@@ -139,5 +139,5 @@ int32 AWorldItem::ExtractItem_IfServer_Implementation(
 
 int32 AWorldItem::GetContainedQuantity_Implementation(const FGameplayTag& ItemId)
 {
-	return RepresentedItem.ItemBundle.ItemId == ItemId ? RepresentedItem.ItemBundle.Quantity : 0;
+	return RepresentedItem.ItemId == ItemId ? RepresentedItem.Quantity : 0;
 }

@@ -472,7 +472,6 @@ FReply SRISItemCreator::HandleCreateItemButtonClicked() const
         ItemData->ItemDescription = ItemDescription;
         ItemData->ItemPrimaryType = ItemType;
         ItemData->ItemCategories = ItemCategories;
-        ItemData->bIsStackable = bIsStackable;
         ItemData->ItemValue = ItemValue;
         ItemData->ItemWeight = ItemWeight;
         ItemData->ItemIcon = Cast<UTexture2D>(ObjectMap.FindRef(1));

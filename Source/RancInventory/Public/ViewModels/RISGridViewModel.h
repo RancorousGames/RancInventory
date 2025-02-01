@@ -49,7 +49,7 @@ public:
 	int32 UseItem(FGameplayTag TaggedSlot, int32 SlotIndex);
 	
     UFUNCTION(BlueprintCallable, Category=RIS)
-    const FItemBundle& GetItemForTaggedSlot(const FGameplayTag& SlotTag) const;
+    FTaggedItemBundle& GetItemForTaggedSlot(const FGameplayTag& SlotTag) const;
     
     
     /**
@@ -106,7 +106,7 @@ public:
     FOnTaggedSlotUpdated OnTaggedSlotUpdated;
     
 protected:
-    FGameplayTag FindTaggedSlotForItem(const FItemBundle& Item) const;
+    FGameplayTag FindTaggedSlotForItem(const FGameplayTag& ItemId, int32 Quanitity) const;
 
     UFUNCTION(BlueprintNativeEvent , Category = RIS)
     int32 FindSlotIndexForItem(const FGameplayTag& ItemId, int32 Quantity);
@@ -127,7 +127,7 @@ protected:
     TArray<FItemBundle> ViewableGridSlots;
     
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category=RIS)
-    TMap<FGameplayTag, FItemBundle> ViewableTaggedSlots;
+    TMap<FGameplayTag, FTaggedItemBundle> ViewableTaggedSlots;
 
     UPROPERTY(VisibleAnywhere, Category=RIS)
     TArray<FRISExpectedOperation> OperationsToConfirm;

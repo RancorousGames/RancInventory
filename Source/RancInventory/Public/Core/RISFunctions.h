@@ -50,7 +50,7 @@ public:
     static UItemStaticData* GetItemDataById(FGameplayTag ItemId);
     
     // Utiltiy function to check if moving an item from one slot to another would cause a swap
-    static bool ShouldItemsBeSwapped(FItemBundle* Source, FItemBundle* Target);
+    static bool ShouldItemsBeSwapped(const FGameplayTag& Source, const FGameplayTag& Target);
 
     
     /* Moves from a source ItemInstance to a target one, either moving, stacking stackable items or swapping
@@ -58,7 +58,7 @@ public:
      * IgnoreMaxStacks will allow a target slot to go above the item datas maxstacksize (used for itemcontainer)
      * AllowPartial if enabled will allow a move to partially succeed, e.g. only move 2 of requested 3 quantity, if false moves full or nothing
      */
-    static FRISMoveResult MoveBetweenSlots(FItemBundle* Source, FItemBundle* Target, bool IgnoreMaxStacks, int32 RequestedQuantity, bool AllowPartial);
+    static FRISMoveResult MoveBetweenSlots(FGenericItemBundle Source, FGenericItemBundle Target, bool IgnoreMaxStacks, int32 RequestedQuantity, bool AllowPartial);
     
     
     template<typename Ty>

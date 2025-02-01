@@ -167,60 +167,60 @@ TArray<UItemStaticData*> URISFunctions::LoadRancItemData_Internal(
 }
 
 
-bool URISFunctions::ShouldItemsBeSwapped(FItemBundle* Source, FItemBundle* Target)
+bool URISFunctions::ShouldItemsBeSwapped(const FGameplayTag& Source, const FGameplayTag& Target)
 {
 	// This code is copied and slightly modified from MoveBetweenSlots
-	if (Target->IsValid())
+	if (Target.IsValid())
 	{
-		const UItemStaticData* SourceItemData = URISSubsystem::GetItemDataById(Source->ItemId);
+		const UItemStaticData* SourceItemData = URISSubsystem::GetItemDataById(Source);
 		if (!SourceItemData)
 		{
 			return false;
 		}
 		
-		const bool ShouldStack = SourceItemData->bIsStackable && Source->ItemId == Target->ItemId;
+		const bool ShouldStack = SourceItemData->MaxStackSize > 1 && Source == Target;
 		return !ShouldStack;
 	}
 
 	return false;
 }
 
-FRISMoveResult URISFunctions::MoveBetweenSlots(FItemBundle* Source, FItemBundle* Target, bool IgnoreMaxStacks, int32 RequestedQuantity, bool AllowPartial)
+FRISMoveResult URISFunctions::MoveBetweenSlots(FGenericItemBundle Source, FGenericItemBundle Target, bool IgnoreMaxStacks, int32 RequestedQuantity, bool AllowPartial)
 {
-	const UItemStaticData* SourceItemData = URISSubsystem::GetItemDataById(Source->ItemId);
+	const UItemStaticData* SourceItemData = URISSubsystem::GetItemDataById(Source.GetItemId());
 	if (!SourceItemData)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Failed to retrieve item data for source item"));
 		return FRISMoveResult(0, false);
 	}
 	
-	if (!AllowPartial && RequestedQuantity > Source->Quantity)
+	if (!AllowPartial && RequestedQuantity > Source.GetQuantity())
 	{
 		UE_LOG(LogTemp, Warning, TEXT("AllowPartial set to false, can't move more than is contained."));
 		return FRISMoveResult(0, false);
 	}
 		
-	int32 TransferAmount = FMath::Min(RequestedQuantity, Source->Quantity);
+	int32 TransferAmount = FMath::Min(RequestedQuantity, Source.GetQuantity());
 
 	bool DoSimpleSwap = false;
 	
-	if (Target->IsValid())
+	if (Target.IsValid())
 	{
-		const bool ShouldStack = SourceItemData->bIsStackable && Source->ItemId == Target->ItemId;
-		if (!ShouldStack && Source->Quantity > RequestedQuantity)
+		const bool ShouldStack = SourceItemData->MaxStackSize > 1 && Source.GetItemId()== Target.GetItemId();
+		if (!ShouldStack && Source.GetQuantity() > RequestedQuantity)
 		{
 			UE_LOG(LogTemp, Warning, TEXT("Not possible to split source slot to a occupied slot with a different item."));
 			return FRISMoveResult(0, false);
 		}
 
-		const int32 RemainingSpace = IgnoreMaxStacks || !ShouldStack ? TransferAmount : SourceItemData->MaxStackSize - Target->Quantity;
+		const int32 RemainingSpace = IgnoreMaxStacks || !ShouldStack ? TransferAmount : SourceItemData->MaxStackSize - Target.GetQuantity();
 		TransferAmount = FMath::Min(TransferAmount, RemainingSpace);
 
 		DoSimpleSwap = !ShouldStack;
 	}
 	else
 	{
-		DoSimpleSwap = TransferAmount >= Source->Quantity;
+		DoSimpleSwap = TransferAmount >= Source.GetQuantity();
 	}
 
 	if (TransferAmount <= 0)
@@ -238,18 +238,25 @@ FRISMoveResult URISFunctions::MoveBetweenSlots(FItemBundle* Source, FItemBundle*
 
 	if (DoSimpleSwap)
 	{
-		const FItemBundle Temp = *Source;
-		*Source = *Target; // Target might be invalid but that's fine
-		*Target = Temp;
+		const FGameplayTag TempId = Source.GetItemId();
+		const int32 TempQuantity = Source.GetQuantity();
+		Source.SetItemId(Target.GetItemId());  // Target might be invalid but that's fine
+		Source.SetQuantity(Target.GetQuantity());
+		Target.SetItemId(TempId);
+		Target.SetQuantity(TempQuantity);
+		
 		return FRISMoveResult(TransferAmount, true);
 	}
 	else
 	{
-		Target->ItemId = Source->ItemId;
-		Target->Quantity += TransferAmount;
-		Source->Quantity -= TransferAmount;
-		if (Source->Quantity <= 0)
-			*Source = FItemBundle::EmptyItemInstance;
+		Target.SetItemId(Source.GetItemId());
+		Target.SetQuantity(Target.GetQuantity() + TransferAmount);
+		Source.SetQuantity(Source.GetQuantity() - TransferAmount);
+		if (Source.GetQuantity() <= 0)
+		{
+			Source.SetItemId(FItemBundle::EmptyItemInstance.ItemId);
+			Source.SetQuantity(FItemBundle::EmptyItemInstance.Quantity);
+		}
 		return FRISMoveResult(TransferAmount, false);
 	}
 

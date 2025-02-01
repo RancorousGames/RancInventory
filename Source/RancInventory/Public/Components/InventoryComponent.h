@@ -45,7 +45,7 @@ public:
 
 	// Add an item to a tagged slot, if the slot is already occupied it will return the quantity that was added. Allows partial
 	UFUNCTION(BlueprintCallable, Category = "RIS | Equipment", Meta = (HidePin="OverrideExistingItem"))
-	int32 AddItemToTaggedSlot_IfServer(TScriptInterface<IItemSource> ItemSource, const FGameplayTag& SlotTag, const FGameplayTag& ItemId, int32 RequestedQuantity);
+	int32 AddItemToTaggedSlot_IfServer(TScriptInterface<IItemSource> ItemSource, const FGameplayTag& SlotTag, const FGameplayTag& ItemId, int32 RequestedQuantity, bool AllowPartial = true);
 
 	/* Attempts to add an item to a generic or tagged slot, PreferTaggedSlots determines which is tried first.
 	 * Typically only called on server but if called on client it can be used as a form of client prediction
@@ -65,7 +65,7 @@ public:
 	
 	/* Attempts to activate the item from the inventory, e.g. use a potion or active a magical item	 */
 	UFUNCTION(BlueprintCallable, Category = "RIS | Equipment")
-	int32 ActivateItemFromTaggedSlot(const FGameplayTag& SlotTag);
+	int32 UseItemFromTaggedSlot(const FGameplayTag& SlotTag);
 
 	// Checks weight and count limits and compatability
 	UFUNCTION(BlueprintCallable, Category="Inventory Mapping")
@@ -227,7 +227,7 @@ protected:
 	void DropFromTaggedSlot_Server(const FGameplayTag& SlotTag, int32 Quantity, FVector RelativeDropLocation = FVector(1e+300, 0,0));
 
 	UFUNCTION(Server, Reliable)
-	void ActivateItemFromTaggedSlot_Server(const FGameplayTag& SlotTag);
+	void UseItemFromTaggedSlot_Server(const FGameplayTag& SlotTag);
 
 	virtual void UpdateWeightAndSlots() override;
 
@@ -236,7 +236,7 @@ protected:
 	// Container overrides
 	virtual int32 DropAllItems_ServerImpl() override;
 	virtual int32 DestroyItemImpl(const FGameplayTag& ItemId, int32 Quantity, EItemChangeReason Reason, bool AllowPartial = false, bool UpdateAfter = true, bool SendEventAfter = true) override;
-	virtual int32 GetContainerItemQuantityImpl(const FGameplayTag& ItemId) const override;
+	virtual int32 GetContainerOnlyItemQuantityImpl(const FGameplayTag& ItemId) const override;
 	virtual bool ContainsImpl(const FGameplayTag& ItemId, int32 Quantity = 1) const override;
 	virtual void ClearImpl() override;
 	virtual int32 GetReceivableQuantityImpl(const FGameplayTag& ItemId) const;
@@ -248,7 +248,7 @@ protected:
 
 	UPROPERTY(ReplicatedUsing=OnRep_Slots, BlueprintReadOnly, Category = "RIS")
 	TArray<FTaggedItemBundle> TaggedSlotItemInstances;
-
+	
 	TMap<FGameplayTag, TArray<UObjectRecipeData*>> CurrentAvailableRecipes;
 
 	void DetectAndPublishContainerChanges();

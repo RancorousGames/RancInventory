@@ -5,28 +5,35 @@ const FItemBundle FItemBundle::EmptyItemInstance(FGameplayTag(), 0);
 
 const FTaggedItemBundle FTaggedItemBundle::EmptyItemInstance(FGameplayTag(), FGameplayTag(), 0);
 
+const FItemBundleWithInstanceData FItemBundleWithInstanceData::EmptyItemInstance(FGameplayTag(), 0);
 
 bool FItemBundleWithInstanceData::IsValid() const
 {
-	return /*InstanceData->IsValid() &&*/ ItemBundle.IsValid();
+	return ItemId.IsValid() && Quantity > 0 && (InstanceData.Num() == Quantity || (InstanceData.Num() == 0));
 }
 
-void FItemBundleWithInstanceData::DestroyQuantity(int32 quantity)
+void FItemBundleWithInstanceData::DestroyQuantity(int32 InQuantity)
 {
 	// Prevent underflow - only destroy up to available quantity
-	const int32 numToDestroy = FMath::Min(quantity, InstanceData.Num());
-   
-	// Remove items from the end
-	if (numToDestroy > 0)
+	
+	int32 NumToDestroy = FMath::Min(InQuantity, Quantity);
+	if (InstanceData.Num() > 0)
 	{
-		InstanceData.RemoveAt(InstanceData.Num() - numToDestroy, numToDestroy);
-		ItemBundle.Quantity = InstanceData.Num();
+		NumToDestroy = FMath::Min(NumToDestroy, InstanceData.Num());
+		
+		// TODO: Prioritized destruction
+		if (NumToDestroy > 0)
+		{
+			InstanceData.RemoveAt(InstanceData.Num() - NumToDestroy, NumToDestroy);
+		}
 	}
+   
+	Quantity -= NumToDestroy;
 }
 
-int32 FItemBundleWithInstanceData::ExtractQuantity(int32 Quantity, TArray<UItemInstanceData*> StateArrayToAppendTo)
+int32 FItemBundleWithInstanceData::ExtractQuantity(int32 InQuantity, TArray<UItemInstanceData*> StateArrayToAppendTo)
 {
-	const int32 numToExtract = FMath::Min(Quantity, ItemBundle.Quantity);
+	const int32 numToExtract = FMath::Min(InQuantity, Quantity);
    
 	if (numToExtract > 0)
 	{
@@ -40,7 +47,7 @@ int32 FItemBundleWithInstanceData::ExtractQuantity(int32 Quantity, TArray<UItemI
 			StateArrayToAppendTo.Append(InstanceData.GetData() + startIndex, DynamicDataCount);
 			InstanceData.RemoveAt(startIndex, DynamicDataCount);
 		}
-		ItemBundle.Quantity = InstanceData.Num();
+		Quantity = InstanceData.Num();
 	}
    
 	return numToExtract;
