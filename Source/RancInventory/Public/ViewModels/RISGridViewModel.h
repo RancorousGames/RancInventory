@@ -116,7 +116,7 @@ protected:
     UFUNCTION(BlueprintNativeEvent , Category = RIS)
     void HandleItemRemoved(const UItemStaticData* ItemData, int32 Quantity, EItemChangeReason Reason);
     UFUNCTION(BlueprintNativeEvent , Category = RIS)
-    void HandleTaggedItemAdded(const FGameplayTag& SlotTag, const UItemStaticData* ItemData, int32 Quantity, EItemChangeReason Reason);
+    void HandleTaggedItemAdded(const FGameplayTag& SlotTag, const UItemStaticData* ItemData, int32 Quantity, FTaggedItemBundle PreviousItem, EItemChangeReason Reason);
     UFUNCTION(BlueprintNativeEvent , Category = RIS)
     void HandleTaggedItemRemoved(const FGameplayTag& SlotTag, const UItemStaticData* ItemData, int32 Quantity, EItemChangeReason Reason);
     
@@ -131,5 +131,8 @@ protected:
 
     UPROPERTY(VisibleAnywhere, Category=RIS)
     TArray<FRISExpectedOperation> OperationsToConfirm;
+
+private:
+	bool IsInitialized = false;
 };
 

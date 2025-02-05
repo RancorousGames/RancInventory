@@ -134,7 +134,7 @@ const UWeaponDefinition* UGearManagerComponent::GetOffhandWeaponData()
 	return OffhandSlotWeapon->WeaponData;
 }
 
-void UGearManagerComponent::HandleItemAddedToSlot(const FGameplayTag& SlotTag, const UItemStaticData* Data, int32 Quantity, EItemChangeReason Reason)
+void UGearManagerComponent::HandleItemAddedToSlot(const FGameplayTag& SlotTag, const UItemStaticData* Data, int32 Quantity, FTaggedItemBundle PreviousItem, EItemChangeReason Reason)
 {
 //	if (const UWeaponStaticData* WeaponData = Cast<UWeaponStaticData>(Data))
 //	{
@@ -143,7 +143,7 @@ void UGearManagerComponent::HandleItemAddedToSlot(const FGameplayTag& SlotTag, c
 //	}
 //	else
 //	{
-		EquipGear(SlotTag, Data, true);
+		EquipGear(SlotTag, Data, PreviousItem, true);
 //	}
 }
 
@@ -456,56 +456,96 @@ void UGearManagerComponent::SelectUnarmed_Server_Implementation()
 	}
 }
 
-void UGearManagerComponent::EquipGear(FGameplayTag Slot, const UItemStaticData* ItemData, bool PlayEquipMontage, bool PlayUnequipMontage)
+void UGearManagerComponent::EquipGear(FGameplayTag Slot, const UItemStaticData* NewItemData, FTaggedItemBundle PreviousItem, bool PlayEquipMontage, bool PlayUnequipMontage)
 {
-	bool DelayConfigured = false;
-    if (PlayEquipMontage)
+    if (!NewItemData)
     {
-    	DelayConfigured = SetupDelayedGearChange(EPendingGearChangeType::Equip, Slot, ItemData);
+        UE_LOG(LogRISInventory, Warning, TEXT("ItemData is nullptr. EquipGear() Failed"));
+        return;
     }
 
-	if (!ItemData)
-	{
-		UE_LOG(LogRISInventory, Warning, TEXT("ItemData is nullptr. EquipGear() Failed"))
-		return;
-	}
-	
-	// check if its weapon item data
-	UWeaponDefinition* WeaponData = ItemData->GetItemDefinition<UWeaponDefinition>(UWeaponDefinition::StaticClass());
-	if (WeaponData)
-	{
-		if (!DelayConfigured)
-			AddAndSelectWeapon(ItemData, Slot);
-		else if (PlayEquipMontage && !EquipMontageToBlendInto.IsValid())
-			PlayMontage(Owner, DefaultEquipMontage.Montage.Get(), DefaultEquipMontage.PlayRate, FName(""));
-	}
-	else
-	{
-		if (DelayConfigured)
-		{
-			FGearSlotDefinition* GearSlot = FindGearSlotDefinition(Slot);
-			if (!GearSlot) return;
+    // Find the gear slot definition for the given slot
+    FGearSlotDefinition* GearSlot = FindGearSlotDefinition(Slot);
+    if (!GearSlot)
+    {
+        UE_LOG(LogRISInventory, Warning, TEXT("No gear slot found for slot %s"), *Slot.ToString());
+        return;
+    }
 
-			if (GearSlot->MeshComponent->GetStaticMesh() != nullptr)
+    // Check if there is an item already equipped in this slot.
+    if (PreviousItem.IsValid())
+    {
+        // There is an item already in the slot. Retrieve its item data.
+        const UItemStaticData* PreviousItemData = URISSubsystem::GetItemDataById(PreviousItem.ItemId);
+        if (!PreviousItemData)
+        {
+            UE_LOG(LogRISInventory, Error, TEXT("Existing item data is nullptr. EquipGear() Failed"));
+            return;
+        }
+
+        // Play the unequip montage for the existing item.
+        UnequipGear(Slot, PreviousItemData, PlayUnequipMontage);
+
+        // Return immediately. After the montage has played (or the delay expires),
+        // the function is expected to be called again to proceed with equipping.
+        return;
+    }
+
+    // No existing item in the slot – proceed with equipping the new item.
+    // Hide the slot’s mesh so that the new item’s mesh can be set or the montage can blend in.
+    if (GearSlot->MeshComponent)
+    {
+        GearSlot->MeshComponent->SetVisibility(false);
+    }
+
+    // Configure a delay if an equip montage is to be played.
+    bool DelayConfigured = false;
+    if (PlayEquipMontage)
+    {
+        DelayConfigured = SetupDelayedGearChange(EPendingGearChangeType::Equip, Slot, NewItemData, 0, PreviousItem);
+    }
+
+    // Determine if this is a weapon item or a non-weapon item.
+    UWeaponDefinition* WeaponData = NewItemData->GetItemDefinition<UWeaponDefinition>(UWeaponDefinition::StaticClass());
+    if (WeaponData)
+    {
+        // Weapon item: if no delay is configured, spawn/select and attach the weapon.
+        if (!DelayConfigured)
+        {
+            AddAndSelectWeapon(NewItemData, Slot);
+        }
+        else if (PlayEquipMontage && !EquipMontageToBlendInto.IsValid())
+        {
+            // If a delay is active, play the default equip montage now.
+            PlayMontage(Owner, DefaultEquipMontage.Montage.Get(), DefaultEquipMontage.PlayRate, FName(""));
+        }
+    }
+    else
+    {
+        // Non-weapon item: if using delays, update the slot mesh.
+        if (DelayConfigured)
+        {
+            GearSlot->MeshComponent->SetStaticMesh(NewItemData->ItemWorldMesh);
+            GearSlot->MeshComponent->SetWorldScale3D(NewItemData->ItemWorldScale);
+        }
+        if (!EquipMontageToBlendInto.IsValid())
+        {
+            PlayMontage(Owner, DefaultEquipMontage.Montage.Get(), DefaultEquipMontage.PlayRate, FName(""));
+        }
+    }
+
+    // Finally, if there was no delay then broadcast that the gear has been equipped.
+    if (!DelayConfigured)
+    {
+    	if (GearSlot->SlotToBlock.IsValid())
+    	{
+    		if (!GearSlot->RequiredItemCategoryToBlock.IsValid() || NewItemData->ItemCategories.HasTag(GearSlot->RequiredItemCategoryToBlock))
 			{
-				UnequipGear(Slot, nullptr, PlayUnequipMontage);
-				if (PlayUnequipMontage)
-				{
-					EquipMontageToBlendInto = DefaultEquipMontage;
-					GetWorld()->GetTimerManager().SetTimer(TimerHandle_UnequipEquipBlendDelay, this, &UGearManagerComponent::PlayBlendInEquipMontage, EquipUnequipAnimBlendDelay, false);
-				}
+				LinkedInventoryComponent->SetTaggedSlotBlocked(GearSlot->SlotToBlock, true);
 			}
-
-			GearSlot->MeshComponent->SetStaticMesh(ItemData->ItemWorldMesh);
-			GearSlot->MeshComponent->SetWorldScale3D(ItemData->ItemWorldScale);
-		}
-
-		if (!EquipMontageToBlendInto.IsValid())
-			PlayMontage(Owner, DefaultEquipMontage.Montage.Get(), DefaultEquipMontage.PlayRate, FName(""));
-	}
-
-	if (!DelayConfigured)
-		OnGearEquipped.Broadcast(Slot, ItemData->ItemId);
+    	}
+        OnGearEquipped.Broadcast(Slot, NewItemData->ItemId);
+    }
 }
 
 void UGearManagerComponent::PlayBlendInEquipMontage()
@@ -517,7 +557,7 @@ void UGearManagerComponent::PlayBlendInEquipMontage()
 	}
 }
 
-bool UGearManagerComponent::SetupDelayedGearChange(EPendingGearChangeType InPendingGearChangeType, const FGameplayTag& GearChangeSlot, const UItemStaticData* ItemData, int32 WeaponSelectionIndex)
+bool UGearManagerComponent::SetupDelayedGearChange(EPendingGearChangeType InPendingGearChangeType, const FGameplayTag& GearChangeSlot, const UItemStaticData* ItemData, int32 WeaponSelectionIndex, FTaggedItemBundle PreviousItem)
 {
 	bool DelayUntilNotify = GearChangeCommitAnimNotifyName != NAME_None;
 	bool NeedsEquipDelay = PendingGearChangeType == EPendingGearChangeType::Equip && EquipDelay > 0;
@@ -529,6 +569,7 @@ bool UGearManagerComponent::SetupDelayedGearChange(EPendingGearChangeType InPend
 	{
 		DelayedWeaponSelectionIndex = WeaponSelectionIndex;
 		DelayedGearChangeSlot = GearChangeSlot;
+		DelayedPreviousItem = PreviousItem;
 		DelayedGearChangeItemData = ItemData;
 
 		if (!DelayUntilNotify)
@@ -553,7 +594,7 @@ void UGearManagerComponent::DelayedGearChangeTriggered()
 	switch (PendingGearChangeType)
 	{
 	case EPendingGearChangeType::Equip:
-		EquipGear(DelayedGearChangeSlot, DelayedGearChangeItemData, false);
+		EquipGear(DelayedGearChangeSlot, DelayedGearChangeItemData, DelayedPreviousItem, false);
 		break;
 	case EPendingGearChangeType::Unequip:
 		UnequipGear(DelayedGearChangeSlot, DelayedGearChangeItemData, false);
@@ -565,6 +606,7 @@ void UGearManagerComponent::DelayedGearChangeTriggered()
 	}
 
 	DelayedGearChangeSlot = FGameplayTag();
+	DelayedPreviousItem = FTaggedItemBundle();
 	DelayedGearChangeItemData = nullptr;
 	DelayedWeaponSelectionIndex = -1;
 }
@@ -581,6 +623,7 @@ void UGearManagerComponent::OnGearChangeAnimNotify(FName NotifyName, const FBran
 void UGearManagerComponent::CancelGearChange()
 {
 	DelayedGearChangeSlot = FGameplayTag();
+	DelayedPreviousItem = FTaggedItemBundle();
 	DelayedGearChangeItemData = nullptr;
 	DelayedWeaponSelectionIndex = -1;
 	
@@ -651,6 +694,15 @@ void UGearManagerComponent::UnequipGear(FGameplayTag Slot, const UItemStaticData
 		}
 		if (!DelayConfigured)
 		{
+			// Unblock any slots we had blocked
+			if (FGearSlotDefinition* GearSlot = FindGearSlotDefinition(Slot))
+			{
+				if (GearSlot->SlotToBlock.IsValid())
+				{
+					LinkedInventoryComponent->SetTaggedSlotBlocked(GearSlot->SlotToBlock, false);
+				}
+			}
+			
 			WeaponToUnequip->Holster(); // TODO: Doesn't make sense to tell the weapon to holster if we are going to destroy it after. 
 			OnWeaponHolstered.Broadcast(Slot, WeaponToUnequip);
 			if (!DefaultUnarmedWeaponData || WeaponToUnequip->ItemData != DefaultUnarmedWeaponData)

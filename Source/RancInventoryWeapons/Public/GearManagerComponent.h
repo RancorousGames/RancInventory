@@ -39,8 +39,17 @@ struct FGearSlotDefinition
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ranc Inventory")
 	bool bVisibleOnCharacter;
+
+	// If this is set then the given slot will be blocked when this slot is filled, depending on the condition below
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ranc Inventory")
+	FGameplayTag SlotToBlock;
+
+	// This is a conditional item category to look for in THIS slots item to determine whether we should block SlotToBlock
+	// If it is not set and SlotToBlock is, then we will block SlotToBlock always
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ranc Inventory")
+	FGameplayTag RequiredItemCategoryToBlock;
 	
-    // Transient property to avoid serialization and replication of the component reference
+    // Transient properties to avoid serialization and replication of the component reference
     UPROPERTY(Transient)
     UStaticMeshComponent* MeshComponent = nullptr;
 };
@@ -224,14 +233,17 @@ public:
 	UPROPERTY(VisibleAnywhere,BlueprintReadOnly, Category = "Ranc Inventory Weapons | Gear | Internal")
 	EPendingGearChangeType PendingGearChangeType = EPendingGearChangeType::NoChange;
 
-	UPROPERTY(VisibleAnywhere,BlueprintReadOnly, Category = "Ranc Inventory Weapons | Gear | Internal")
+	UPROPERTY()
 	FGameplayTag DelayedGearChangeSlot = FGameplayTag::EmptyTag;
 
-	UPROPERTY(VisibleAnywhere,BlueprintReadOnly, Category = "Ranc Inventory Weapons | Gear | Internal")
+	UPROPERTY()
 	int32 DelayedWeaponSelectionIndex = 0;
 
-	UPROPERTY(VisibleAnywhere,BlueprintReadOnly, Category = "Ranc Inventory Weapons | Gear | Internal")
+	UPROPERTY()
 	const UItemStaticData* DelayedGearChangeItemData = nullptr;
+	
+	UPROPERTY()
+	FTaggedItemBundle DelayedPreviousItem;
 	
 	UPROPERTY(VisibleAnywhere,BlueprintReadOnly, Category = "Ranc Inventory Weapons | Gear | Internal")
 	FMontageData EquipMontageToBlendInto = FMontageData();
@@ -263,7 +275,7 @@ public:
 
 	
 	UFUNCTION()
-	void HandleItemAddedToSlot(const FGameplayTag& SlotTag, const UItemStaticData* Data, int32 Quantity, EItemChangeReason Reason);
+	void HandleItemAddedToSlot(const FGameplayTag& SlotTag, const UItemStaticData* Data, int32 Quantity, FTaggedItemBundle PreviousItem, EItemChangeReason Reason);
 
 	UFUNCTION()
 	void HandleItemRemovedFromSlot(const FGameplayTag& SlotTag, const UItemStaticData* Data, int32 Quantity, EItemChangeReason Reason);
@@ -318,7 +330,7 @@ public:
 	 * If PlayEquipMontage is false then the swap will happen immediately
 	 * This is called internally by HandleItemAddedToSlot
 	 */ 
-	void EquipGear(FGameplayTag Slot, const UItemStaticData* ItemData, bool PlayEquipMontage, bool bPlayHolsterMontage = false);
+	void EquipGear(FGameplayTag Slot, const UItemStaticData* NewItemData, FTaggedItemBundle PreviousItem, bool PlayEquipMontage, bool bPlayHolsterMontage = false);
 
 	FGearSlotDefinition* FindGearSlotDefinition(FGameplayTag SlotTag);
 	
@@ -394,7 +406,7 @@ protected:
 	const FGearSlotDefinition* GetHandSlotToUse(const UWeaponDefinition* WeaponData) const;
 	const AWeaponActor* GetWeaponForSlot(const FGearSlotDefinition* Slot) const;
 	
-	bool SetupDelayedGearChange(EPendingGearChangeType InPendingGearChangeType, const FGameplayTag& GearChangeSlot, const UItemStaticData* ItemData, int32 WeaponSelectionIndex = 0);
+	bool SetupDelayedGearChange(EPendingGearChangeType InPendingGearChangeType, const FGameplayTag& GearChangeSlot, const UItemStaticData* ItemData, int32 WeaponSelectionIndex = 0, FTaggedItemBundle PreviousItem = FTaggedItemBundle());
 	UFUNCTION()
 	void DelayedGearChangeTriggered();
 

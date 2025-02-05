@@ -22,7 +22,9 @@ UItemContainerComponent::UItemContainerComponent(const FObjectInitializer& Objec
 
 void UItemContainerComponent::InitializeComponent()
 {
-	Super::InitializeComponent();
+	// This check is necessary because of tests since there's some weirdness going on
+	if (!HasBeenInitialized())
+		Super::InitializeComponent();
 
 	// Merge initial items based on item ids
 	for (int i = InitialItems.Num() - 1; i >= 0; --i)
@@ -216,17 +218,14 @@ void UItemContainerComponent::DropItemFromContainer_Server_Implementation(const 
 }
 
 
-void UItemContainerComponent::SpawnItemIntoWorldFromContainer_ServerImpl(const FGameplayTag& ItemId, int32 Quantity, FVector RelativeDropLocation, TArray<UItemInstanceData*> DroppedItemStateArray)
+void UItemContainerComponent::SpawnItemIntoWorldFromContainer_ServerImpl(const FGameplayTag& ItemId, int32 Quantity, FVector RelativeDropLocation, TArray<UItemInstanceData*> ItemInstanceData)
 {
 	FActorSpawnParameters SpawnParams;
 
 	if (RelativeDropLocation.X == 1e+300 && GetOwner()) // special default value
 		RelativeDropLocation = 	GetOwner()->GetActorForwardVector() * DefaultDropDistance;
 
-	if (auto* World = GetWorld())
-	{
-		URISSubsystem::Get(this)->SpawnWorldItem(World, DropItemClass, ItemId, Quantity, GetOwner()->GetActorLocation() + RelativeDropLocation, DroppedItemStateArray);
-	}
+	URISSubsystem::Get(this)->SpawnWorldItem(this, FItemBundleWithInstanceData(ItemId, Quantity,ItemInstanceData), GetOwner()->GetActorLocation() + RelativeDropLocation, DropItemClass);
 		
 	UpdateWeightAndSlots();
 }

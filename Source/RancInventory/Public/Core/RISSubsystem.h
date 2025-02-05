@@ -82,15 +82,13 @@ public:
 	
     UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Ranc Inventory") // ReSharper disable once CppHidingFunction
     int32 GetContainedQuantity(const FGameplayTag& ItemId);
-
-    UFUNCTION(BlueprintCallable, Category = "RIS")
-    AWorldItem* SpawnWorldItem(UWorld* World, 
-                              TSubclassOf<AWorldItem> WorldItemClass,
-                              const FGameplayTag& ItemId,
-                              int32 Quantity,
-                              const FVector& Location,
-                              TArray<UItemInstanceData*> InstanceData);
-
+    
+    UFUNCTION(BlueprintCallable, Category = "RIS", meta = (WorldContext = "WorldContextObject", HidePin = "WorldContextObject"))
+    AWorldItem* SpawnWorldItem(UObject* WorldContextObject,
+                                FItemBundleWithInstanceData Item,
+                                const FVector& Location,
+                                TSubclassOf<AWorldItem> WorldItemClass = nullptr);
+    
     // Helper function to get the appropriate world item class
     TSubclassOf<AWorldItem> GetWorldItemClass(const FGameplayTag& ItemId, 
                                              TSubclassOf<AWorldItem> DefaultClass) const;

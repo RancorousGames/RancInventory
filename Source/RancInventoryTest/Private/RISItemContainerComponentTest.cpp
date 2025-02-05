@@ -8,15 +8,19 @@
 #include "TestDelegateForwardHelper.h"
 #include "Components/ItemContainerComponent.h"
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRancItemContainerComponentTest, "GameTests.RIS.RancItemContainer", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+#define TestName "GameTests.RIS.RancItemContainer"
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRancItemContainerComponentTest, TestName, EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 #define SETUP_RANCITEMCONTAINER(MaxItems, CarryCapacity) \
-URISSubsystem* Subsystem = SetupSubsystem(); \
-UItemContainerComponent* ItemContainerComponent = NewObject<UItemContainerComponent>(); \
+URISSubsystem* Subsystem = FindSubsystem(TestName); \
+UWorld* World = FindWorld(nullptr,  TestName); \
+AActor* TempActor = World->SpawnActor<AActor>(); \
+UItemContainerComponent* ItemContainerComponent = NewObject<UItemContainerComponent>(TempActor); \
 ItemContainerComponent->MaxContainerSlotCount = MaxItems; \
 ItemContainerComponent->MaxWeight = CarryCapacity; \
+ItemContainerComponent->RegisterComponent(); \
 ItemContainerComponent->InitializeComponent(); \
-InitializeTestItems();
+InitializeTestItems(TestName);
 
 
 bool TestAddItems(FRancItemContainerComponentTest* Test)
@@ -202,8 +206,6 @@ bool TestMiscFunctions(FRancItemContainerComponentTest* Test)
     SETUP_RANCITEMCONTAINER(10, 50); // Setup with a capacity for 10 items and 50 weight capacity.
     
     bool Res = true;
-    // Assuming InitializeTestItems() initializes the items including a "Rock" and "Helmet" with their respective tags.
-    InitializeTestItems();
 
     // Test FindItemById - Initially, the container should not contain a "Rock" item.
     FItemBundleWithInstanceData RockItemInstance = ItemContainerComponent->FindItemById(ItemIdRock);

@@ -173,7 +173,7 @@ protected:
 
     UFUNCTION(Server, Reliable)
     void DropItemFromContainer_Server(const FGameplayTag& ItemId, int32 Quantity, FVector RelativeDropLocation = FVector(1e+300, 0,0));
-	void SpawnItemIntoWorldFromContainer_ServerImpl(const FGameplayTag& ItemId, int32 Quantity, FVector RelativeDropLocation, TArray<UItemInstanceData*> DroppedItemStateArray);
+	void SpawnItemIntoWorldFromContainer_ServerImpl(const FGameplayTag& ItemId, int32 Quantity, FVector RelativeDropLocation, TArray<UItemInstanceData*> ItemInstanceData);
 	
 	UFUNCTION(Server, Reliable)
 	void UseItem_Server(const FGameplayTag& ItemId);

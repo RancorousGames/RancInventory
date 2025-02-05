@@ -3,6 +3,7 @@
 #include "Core/RISSubsystem.h"
 
 #include "LogRancInventorySystem.h"
+#include "Components/ItemContainerComponent.h"
 #include "Engine/StreamableManager.h"
 #include "Core/RISFunctions.h"
 #include "Data/ItemStaticData.h"
@@ -33,7 +34,8 @@ URISSubsystem* URISSubsystem::Get(UObject* WorldContext)
 	UGameInstance* GameInstance = World ? World->GetGameInstance() : nullptr;
 	if (!GameInstance)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("GameInstance is null in URISSubsystem::Get."));
+		if (!World->IsEditorWorld())
+			UE_LOG(LogTemp, Warning, TEXT("GameInstance is null in URISSubsystem::Get."));
 		return nullptr;
 	}
 
@@ -350,30 +352,35 @@ TSubclassOf<AWorldItem> URISSubsystem::GetWorldItemClass(const FGameplayTag& Ite
     return DefaultClass;
 }
 
-AWorldItem* URISSubsystem::SpawnWorldItem(UWorld* World, 
-    TSubclassOf<AWorldItem> WorldItemClass,
-    const FGameplayTag& ItemId,
-    int32 Quantity,
+AWorldItem* URISSubsystem::SpawnWorldItem(UObject* WorldContextObject,
+    FItemBundleWithInstanceData Item,
     const FVector& Location,
-    TArray<UItemInstanceData*> InstanceData)
+    TSubclassOf<AWorldItem> WorldItemClass)
 {
-    if (!World || !WorldItemClass || !ItemId.IsValid())
+	auto* World = WorldContextObject->GetWorld();
+
+	if (WorldItemClass == nullptr)
+	{
+		WorldItemClass = World->GetFirstPlayerController()->GetPawn()->GetComponentByClass<UItemContainerComponent>()->DropItemClass;
+	}
+	
+    if (!World || !WorldItemClass || !Item.ItemId.IsValid())
     {
         UE_LOG(LogRISInventory, Warning, TEXT("SpawnWorldItem: Invalid parameters provided"));
         return nullptr;
     }
 
     // Get the item data
-    UItemStaticData* ItemData = AllLoadedItemsByTag.FindRef(ItemId);
+    UItemStaticData* ItemData = AllLoadedItemsByTag.FindRef(Item.ItemId);
     if (!ItemData)
     {
         UE_LOG(LogRISInventory, Warning, TEXT("SpawnWorldItem: Could not find item data for ID: %s"), 
-            *ItemId.ToString());
+            *Item.ItemId.ToString());
         return nullptr;
     }
 
     // Get the appropriate world item class (either default or override)
-    TSubclassOf<AWorldItem> FinalWorldItemClass = GetWorldItemClass(ItemId, WorldItemClass);
+    TSubclassOf<AWorldItem> FinalWorldItemClass = GetWorldItemClass(Item.ItemId, WorldItemClass);
 
     // Spawn parameters
     FActorSpawnParameters SpawnParams;
@@ -386,14 +393,14 @@ AWorldItem* URISSubsystem::SpawnWorldItem(UWorld* World,
     if (WorldItem)
     {
         // Set up the world item
-        WorldItem->SetItem(FItemBundle(ItemId, Quantity));
+        WorldItem->SetItem(FItemBundle(Item.ItemId, Item.Quantity));
         // TODO
         // WorldItem->SetInstanceData(InstanceData);
     }
     else
     {
         UE_LOG(LogRISInventory, Warning, TEXT("SpawnWorldItem: Failed to spawn world item for ID: %s"), 
-            *ItemId.ToString());
+            *Item.ItemId.ToString());
     }
 
     return WorldItem;

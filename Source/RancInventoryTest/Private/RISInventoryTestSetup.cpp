@@ -12,22 +12,22 @@
 #include "Engine/GameInstance.h"
 #include "GameFramework/WorldSettings.h"
 
-UE_DEFINE_GAMEPLAY_TAG(LeftHandSlot, "Hands.LeftHand");
-UE_DEFINE_GAMEPLAY_TAG(RightHandSlot, "Hands.RightHand");
-UE_DEFINE_GAMEPLAY_TAG(HelmetSlot, "Slots.Helmet");
-UE_DEFINE_GAMEPLAY_TAG(ChestSlot, "Slots.Chest");
+UE_DEFINE_GAMEPLAY_TAG(LeftHandSlot, "Test.Gameplay.Hands.LeftHand");
+UE_DEFINE_GAMEPLAY_TAG(RightHandSlot, "Test.Gameplay.Hands.RightHand");
+UE_DEFINE_GAMEPLAY_TAG(HelmetSlot, "Test.Gameplay.Slots.Helmet");
+UE_DEFINE_GAMEPLAY_TAG(ChestSlot, "Test.Gameplay.Slots.Chest");
 
-UE_DEFINE_GAMEPLAY_TAG(ItemTypeResource, "Items.Types.Resource");
-UE_DEFINE_GAMEPLAY_TAG(ItemTypeArmor, "Items.Types.Armor");
-UE_DEFINE_GAMEPLAY_TAG(ItemTypeWeapon, "Items.Types.Weapon");
+UE_DEFINE_GAMEPLAY_TAG(ItemTypeResource, "Test.Gameplay.Items.Types.Resource");
+UE_DEFINE_GAMEPLAY_TAG(ItemTypeArmor, "Test.Gameplay.Items.Types.Armor");
+UE_DEFINE_GAMEPLAY_TAG(ItemTypeWeapon, "Test.Gameplay.Items.Types.Weapon");
 
-UE_DEFINE_GAMEPLAY_TAG(ItemIdRock, "Items.IDs.Rock");
-UE_DEFINE_GAMEPLAY_TAG(ItemIdSticks, "Items.IDs.Sticks");
-UE_DEFINE_GAMEPLAY_TAG(ItemIdSpear, "Items.IDs.StoneSpear");
-UE_DEFINE_GAMEPLAY_TAG(ItemIdHelmet, "Items.IDs.Helmet");
-UE_DEFINE_GAMEPLAY_TAG(ItemIdSpecialHelmet, "Items.IDs.SpecialHelmet");
-UE_DEFINE_GAMEPLAY_TAG(ItemIdChestArmor, "Items.IDs.ChestArmor");
-UE_DEFINE_GAMEPLAY_TAG(ItemIdGiantBoulder, "Items.IDs.GiantBoulder");
+UE_DEFINE_GAMEPLAY_TAG(ItemIdRock, "Test.Gameplay.Items.IDs.Rock");
+UE_DEFINE_GAMEPLAY_TAG(ItemIdSticks, "Test.Gameplay.Items.IDs.Sticks");
+UE_DEFINE_GAMEPLAY_TAG(ItemIdSpear, "Test.Gameplay.Items.IDs.StoneSpear");
+UE_DEFINE_GAMEPLAY_TAG(ItemIdHelmet, "Test.Gameplay.Items.IDs.Helmet");
+UE_DEFINE_GAMEPLAY_TAG(ItemIdSpecialHelmet, "Test.Gameplay.Items.IDs.SpecialHelmet");
+UE_DEFINE_GAMEPLAY_TAG(ItemIdChestArmor, "Test.Gameplay.Items.IDs.ChestArmor");
+UE_DEFINE_GAMEPLAY_TAG(ItemIdGiantBoulder, "Test.Gameplay.Items.IDs.GiantBoulder");
 
 /*
 FItemBundle OneSpear(ItemIdSpear, 1);
@@ -55,10 +55,10 @@ FItemBundle GiantBoulder(ItemIdGiantBoulder, 1);*/
 FGameplayTag NoTag = FGameplayTag::EmptyTag;
 
 
-static UWorld* CreateTestWorld()
+static UWorld* CreateTestWorld(FName WorldName)
 {
 	// Create a new world with default parameters
-	UWorld* TestWorld = UWorld::CreateWorld(EWorldType::Game, false);
+	UWorld* TestWorld = UWorld::CreateWorld(EWorldType::Game, false, WorldName);
         
 	// Initialize the world
 	FWorldContext& WorldContext = GEngine->CreateNewWorldContext(EWorldType::Game);
@@ -86,39 +86,55 @@ static UWorld* CreateTestWorld()
 	return TestWorld;
 }
 
-UWorld* GetOrCreateWorld()
+UWorld* FindWorld(const UObject* ContextObject, FName TestName)
 {
 	static UWorld* PersistentWorld = nullptr;
+	static FName PreviousTestName = "noname";
     
-	if (!PersistentWorld)
+	if (!PersistentWorld || PreviousTestName != TestName)
 	{
-		PersistentWorld = CreateTestWorld();
+		PreviousTestName = TestName;
+		PersistentWorld = CreateTestWorld(TestName);
 	}
     
 	return PersistentWorld;
 }
 
-UWorld* FindWorld(const UObject* ContextObject)
+URISSubsystem* FindSubsystem(FName TestName)
 {
-	return GetOrCreateWorld();
-}
+	UGameInstance* GameInstance = nullptr;
+	UWorld* World = FindWorld(nullptr, TestName);
 
-URISSubsystem* SetupSubsystem()
-{
-	UGameInstance* GameInstance = NewObject<UGameInstance>();
-	UWorld* World = FindWorld(nullptr);
-	if (World)
+	if (!World)
 	{
-		World->SetGameInstance(GameInstance);
+		UE_LOG(LogTemp, Warning, TEXT("World is null in FindSubsystem."));
+		return nullptr;
 	}
-	GameInstance->Init();
+	
+	GameInstance = World->GetGameInstance();
+	if (!GameInstance)
+	{
+		GameInstance = NewObject<UGameInstance>();
+		World->SetGameInstance(GameInstance);
+		GameInstance->Init();
+	}
     
 	return GameInstance->GetSubsystem<URISSubsystem>();
 }
 
-void InitializeTestItems()
+bool AreGameplayTagsCorrupt()
 {
-	URISSubsystem* SubSystem = SetupSubsystem(); 
+	// For some reason gameplaytags sometimes breaks and HasTag incorrectly returns false for tags that are present
+	auto* ChestItemData = URISSubsystem::GetItemDataById(ItemIdChestArmor);
+	if (ChestItemData->ItemCategories.HasTag(ChestSlot))
+		return false;
+
+	return true;
+}
+
+void InitializeTestItems(FName TestName)
+{
+	URISSubsystem* SubSystem = FindSubsystem(TestName); 
 	
 	UItemStaticData* RockItemData = NewObject<UItemStaticData>();
 	RockItemData->ItemId = ItemIdRock;

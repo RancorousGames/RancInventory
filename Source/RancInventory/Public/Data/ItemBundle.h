@@ -61,15 +61,18 @@ struct FTaggedItemBundle
 
     static const FTaggedItemBundle EmptyItemInstance;
     
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RIS")
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "RIS")
     FGameplayTag Tag;
 	
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RIS")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "RIS")
 	FGameplayTag ItemId;
     
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RIS")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "RIS")
 	int32 Quantity = 0;
-    
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "RIS")
+	bool IsBlocked = false;
+	
     bool IsValid() const
     {
         return Tag.IsValid() && ItemId.IsValid() && Quantity > 0;

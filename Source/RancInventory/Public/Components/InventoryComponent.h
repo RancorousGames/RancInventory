@@ -88,9 +88,12 @@ public:
 	UFUNCTION(BlueprintPure, Category = "RIS | Equipment")
 	const FTaggedItemBundle& GetItemForTaggedSlot(const FGameplayTag& SlotTag) const;
 
+	// Allows you to set a certain tagged slot to be blocked, e.g. a two handed weapon might block the offhand slot
+	UFUNCTION(BlueprintCallable, Category = "RIS | Equipment")
+	void SetTaggedSlotBlocked(FGameplayTag Slot, bool IsBlocked);
 
 	// New events for slot equipment changes, this also gets called if an already held stackable item has its stack quantity increased
-	DECLARE_DYNAMIC_MULTICAST_DELEGATE_FourParams(FOnItemAddedToTaggedSlot, const FGameplayTag&, SlotTag, const UItemStaticData*, ItemData, int32, Quantity, EItemChangeReason, Reason);
+	DECLARE_DYNAMIC_MULTICAST_DELEGATE_FiveParams(FOnItemAddedToTaggedSlot, const FGameplayTag&, SlotTag, const UItemStaticData*, ItemData, int32, Quantity, FTaggedItemBundle, PreviousItem, EItemChangeReason, Reason);
 	UPROPERTY(BlueprintAssignable, Category = "RIS | Equipment")
 	FOnItemAddedToTaggedSlot OnItemAddedToTaggedSlot;
 

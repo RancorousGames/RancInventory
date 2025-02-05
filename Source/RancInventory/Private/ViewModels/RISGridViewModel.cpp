@@ -10,6 +10,8 @@ class UInventoryComponent;
 
 void URISGridViewModel::Initialize_Implementation(UInventoryComponent* InventoryComponent, int32 NumSlots,  bool bPreferEmptyUniversalSlots)
 {
+	if (IsInitialized)
+		return;
 	NumberOfSlots = NumSlots;
 	PreferEmptyUniversalSlots = bPreferEmptyUniversalSlots;
 	LinkedInventoryComponent = InventoryComponent;
@@ -23,6 +25,8 @@ void URISGridViewModel::Initialize_Implementation(UInventoryComponent* Inventory
 		return;
 	}
 
+	IsInitialized = true;
+	
 	// Initialize DisplayedSlots with empty item info for the specified number of slots
 	for (int32 i = 0; i < NumSlots; i++)
 	{
@@ -515,7 +519,7 @@ void URISGridViewModel::HandleItemAdded_Implementation(const UItemStaticData* It
 	}
 }
 
-void URISGridViewModel::HandleTaggedItemAdded_Implementation(const FGameplayTag& SlotTag, const UItemStaticData* ItemData, int32 Quantity, EItemChangeReason Reason)
+void URISGridViewModel::HandleTaggedItemAdded_Implementation(const FGameplayTag& SlotTag, const UItemStaticData* ItemData, int32 Quantity, FTaggedItemBundle PreviousItem, EItemChangeReason Reason)
 {
 	for (int32 i = OperationsToConfirm.Num() - 1; i >= 0; --i)
 	{

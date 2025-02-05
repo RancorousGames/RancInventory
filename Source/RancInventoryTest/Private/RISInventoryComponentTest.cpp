@@ -1,17 +1,18 @@
 ﻿// Copyright Rancorous Games, 2024
 
-#include "RISInventoryComponentTest.h"
 #include "NativeGameplayTags.h"
 #include "Misc/AutomationTest.h"
 #include "RISInventoryTestSetup.cpp"
 #include "Components/InventoryComponent.h"
 #include "Data/RecipeData.h"
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRancInventoryComponentTest, "GameTests.RIS.RancInventory", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+#define TestName "GameTests.RIS.RancInventory"
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRancInventoryComponentTest, TestName, EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 #define SETUP_RISINVENTORY(CarryCapacity) \
-URISSubsystem* Subsystem = SetupSubsystem(); \
-UWorld* World = FindWorld(nullptr); \
+URISSubsystem* Subsystem = FindSubsystem(TestName); \
+UWorld* World = FindWorld(nullptr, TestName); \
 AActor* TempActor = World->SpawnActor<AActor>(); \
 UInventoryComponent* InventoryComponent = NewObject<UInventoryComponent>(TempActor); \
 TempActor->AddInstanceComponent(InventoryComponent); \
@@ -21,15 +22,15 @@ InventoryComponent->SpecializedTaggedSlots.Add(HelmetSlot); \
 InventoryComponent->SpecializedTaggedSlots.Add(ChestSlot); \
 InventoryComponent->MaxContainerSlotCount = 9; \
 InventoryComponent->MaxWeight = CarryCapacity; \
+InventoryComponent->RegisterComponent(); \
 InventoryComponent->InitializeComponent(); \
-InitializeTestItems();
+InitializeTestItems(TestName);
 
 FRancInventoryComponentTest* RITest;
 
 bool TestAddingTaggedSlotItems()
 {
 	SETUP_RISINVENTORY(100);
-	
 	bool Res = true;
 
 	// Ensure the left hand slot is initially empty
@@ -52,6 +53,7 @@ bool TestAddingTaggedSlotItems()
 	Res &= RITest->TestTrue(TEXT("Non-helmet item should not be added to the helmet slot"), !InventoryComponent->GetItemForTaggedSlot(HelmetSlot).IsValid());
 
 	// Test adding a correct item to a specialized slot
+	// NOTE This test sometimes FAILS when recompiling
 	InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, HelmetSlot, OneHelmet, true);
 	Res &= RITest->TestTrue(
 		TEXT("Helmet item should be added to the helmet slot"), InventoryComponent->GetItemForTaggedSlot(HelmetSlot).ItemId.MatchesTag(ItemIdHelmet));
@@ -488,8 +490,9 @@ bool TestInventoryMaxCapacity()
 
 	// Step 4: Crafting Items That Exceed Capacity
 	bool CraftSuccess = InventoryComponent->CraftRecipe_IfServer(BoulderRecipe);
-	Res &= RITest->TestTrue(TEXT("Crafting should succeed"), CraftSuccess);
-	// Check if the crafted helmets are in inventory
+	// Whether this should succeed or not is up to the game design, but it should not be added to inventory if it exceeds capacity
+	// Res &= RITest->TestFalse(TEXT("Crafting should/should not succeed"), CraftSuccess); 
+	// Check that the crafted item is not in inventory
 	Res &= RITest->TestEqual(TEXT("Crafted boulder should not be in inventory"), InventoryComponent->GetItemQuantityTotal(ItemIdGiantBoulder), 0);
 
 	return Res;

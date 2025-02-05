@@ -130,20 +130,20 @@ int32 UInventoryComponent::AddItemToTaggedSlot_IfServer(TScriptInterface<IItemSo
 	const int32 Index = GetIndexForTaggedSlot(SlotTag); // -1 if not found
 
 	UItemStaticData* ItemData = URISSubsystem::GetItemDataById(ItemId);
-	FTaggedItemBundle* ExistingItem = nullptr;
+	FTaggedItemBundle* SlotItem = nullptr;
 	int32 QuantityToAdd = RequestedQuantity;
 	if (TaggedSlotItemInstances.IsValidIndex(Index))
 	{
-		ExistingItem = &TaggedSlotItemInstances[Index];
+		SlotItem = &TaggedSlotItemInstances[Index];
 
-		if (ExistingItem && ExistingItem->IsValid())
+		if (SlotItem && SlotItem->IsValid())
 		{
-			if ((ExistingItem->ItemId != ItemId || ItemData->MaxStackSize == 1))
+			if ((SlotItem->ItemId != ItemId || ItemData->MaxStackSize == 1))
 			{
 				return 0; // Slot taken
 			}
 
-			QuantityToAdd = FMath::Min(RequestedQuantity, ItemData->MaxStackSize - ExistingItem->Quantity);
+			QuantityToAdd = FMath::Min(RequestedQuantity, ItemData->MaxStackSize - SlotItem->Quantity);
 
 			if ((!AllowPartial && QuantityToAdd < RequestedQuantity) || QuantityToAdd == 0)
 			{
@@ -159,21 +159,25 @@ int32 UInventoryComponent::AddItemToTaggedSlot_IfServer(TScriptInterface<IItemSo
 	{
 		return 0;
 	}
+
+	FTaggedItemBundle PreviousItem = SlotItem ? *SlotItem : FTaggedItemBundle();
 	
-	if (!ExistingItem)
+	if (!SlotItem)
 	{
 		TaggedSlotItemInstances.Add(FTaggedItemBundle());
-		ExistingItem = &TaggedSlotItemInstances[TaggedSlotItemInstances.Num() - 1];
-		ExistingItem->Tag = SlotTag;
-		ExistingItem->ItemId = ItemId;
-		ExistingItem->Quantity = 0;
+		SlotItem = &TaggedSlotItemInstances[TaggedSlotItemInstances.Num() - 1];
+		SlotItem->Tag = SlotTag;
+		SlotItem->ItemId = ItemId;
+		SlotItem->Quantity = 0;
 	}
 	
-	ExistingItem->Quantity += QuantityToAdd;
+	
+	SlotItem->Quantity += QuantityToAdd;
+	
 
 	UpdateWeightAndSlots();
 	
-	OnItemAddedToTaggedSlot.Broadcast(SlotTag, ItemData, QuantityToAdd, EItemChangeReason::Added);
+	OnItemAddedToTaggedSlot.Broadcast(SlotTag, ItemData, QuantityToAdd, PreviousItem, EItemChangeReason::Added);
 	MARK_PROPERTY_DIRTY_FROM_NAME(UInventoryComponent, TaggedSlotItemInstances, this);
 
 	return QuantityToAdd;
@@ -211,9 +215,10 @@ int32 UInventoryComponent::AddItemToAnySlot(TScriptInterface<IItemSource> ItemSo
 
 		if (SlotTag.IsValid())
 		{
+			FTaggedItemBundle PreviousItem = GetItemForTaggedSlot(SlotTag);
 			// We do a move because the item has already been added to the container
 			const int32 ActualAddedQuantity = MoveItem_ServerImpl(ItemId, QuantityToAddSlot, FGameplayTag::EmptyTag, SlotTag, false, FGameplayTag(), 0, true);
-			OnItemAddedToTaggedSlot.Broadcast(SlotTag, ItemData, ActualAddedQuantity, EItemChangeReason::Added);
+			OnItemAddedToTaggedSlot.Broadcast(SlotTag, ItemData, ActualAddedQuantity, PreviousItem, EItemChangeReason::Added);
 
 			ensureMsgf(ActualAddedQuantity == QuantityToAddSlot, TEXT("Failed to add all items to tagged slot despite plan calculated"));
 		}
@@ -483,10 +488,10 @@ int32 UInventoryComponent::MoveItem_ServerImpl(const FGameplayTag& ItemId, int32
 			OnItemRemovedFromTaggedSlot.Broadcast(SourceTaggedSlot, SourceItemData, MovedQuantity, EItemChangeReason::Moved);
 			if (MoveResult.WereItemsSwapped && IsValid(TargetItemData)) // might be null if swapping to empty slot
 			{
-					OnItemRemovedFromTaggedSlot.Broadcast(TargetTaggedSlot, TargetItemData, SourceItem.GetQuantity(), EItemChangeReason::Moved);
-				OnItemAddedToTaggedSlot.Broadcast(SourceTaggedSlot, TargetItemData, SourceItem.GetQuantity(), EItemChangeReason::Moved);
+				OnItemRemovedFromTaggedSlot.Broadcast(TargetTaggedSlot, TargetItemData, SourceItem.GetQuantity(), EItemChangeReason::Moved);
+				OnItemAddedToTaggedSlot.Broadcast(SourceTaggedSlot, TargetItemData, SourceItem.GetQuantity(), FTaggedItemBundle(TargetTaggedSlot, TargetItem.GetItemId(), SourceItem.GetQuantity()), EItemChangeReason::Moved);
 			}
-			OnItemAddedToTaggedSlot.Broadcast(TargetTaggedSlot, SourceItemData, MovedQuantity, EItemChangeReason::Moved);
+			OnItemAddedToTaggedSlot.Broadcast(TargetTaggedSlot, SourceItemData, MovedQuantity, FTaggedItemBundle(TargetTaggedSlot, SourceItem.GetItemId(), MovedQuantity), EItemChangeReason::Moved);
 		}
 	}
 	else if (SourceIsTaggedSlot)
@@ -513,7 +518,7 @@ int32 UInventoryComponent::MoveItem_ServerImpl(const FGameplayTag& ItemId, int32
 			OnItemAddedToContainer.Broadcast(SourceItemData, MovedQuantity, EItemChangeReason::Moved);
 		
 			if (SwapBackRequested)
-				OnItemAddedToTaggedSlot.Broadcast(SourceTaggedSlot, TargetItemData, SwapQuantity, EItemChangeReason::Moved);
+				OnItemAddedToTaggedSlot.Broadcast(SourceTaggedSlot, TargetItemData, SwapQuantity, FTaggedItemBundle(SourceTaggedSlot, TargetItem.GetItemId(), SwapQuantity), EItemChangeReason::Moved);
 		}
 	}
 	else // TargetIsTaggedSlot
@@ -536,7 +541,7 @@ int32 UInventoryComponent::MoveItem_ServerImpl(const FGameplayTag& ItemId, int32
 		if (!SuppressUpdate)
 		{
 			OnItemRemovedFromContainer.Broadcast(SourceItemData, MovedQuantity, EItemChangeReason::Moved);
-			OnItemAddedToTaggedSlot.Broadcast(TargetTaggedSlot, SourceItemData, MovedQuantity, EItemChangeReason::Moved);
+			OnItemAddedToTaggedSlot.Broadcast(TargetTaggedSlot, SourceItemData, MovedQuantity, FTaggedItemBundle(TargetTaggedSlot, SourceItem.GetItemId(), MovedQuantity), EItemChangeReason::Moved);
 		}
 	}
 
@@ -754,6 +759,21 @@ const FTaggedItemBundle& UInventoryComponent::GetItemForTaggedSlot(const FGamepl
 	}
 
 	return TaggedSlotItemInstances[Index];
+}
+
+void UInventoryComponent::SetTaggedSlotBlocked(FGameplayTag Slot, bool IsBlocked)
+{
+	int32 SlotIndex = GetIndexForTaggedSlot(Slot);
+	if (SlotIndex >= 0)
+	{
+		TaggedSlotItemInstances[SlotIndex].IsBlocked = true;
+	}
+	else
+	{
+		// Add the slot with the blocked flag
+		TaggedSlotItemInstances.Add(FTaggedItemBundle(Slot, FGameplayTag(), 0));
+		TaggedSlotItemInstances.Last().IsBlocked = true;
+	}
 }
 
 int32 UInventoryComponent::GetIndexForTaggedSlot(const FGameplayTag& SlotTag) const
