@@ -40,7 +40,7 @@ public:
 
 	
 	UFUNCTION(BlueprintCallable, BlueprintCallable, Category=RIS)
-	void PickupItem(AWorldItem* WorldItem, bool PreferTaggedSlots, bool DestroyAfterPickup);
+	void PickupItem(AWorldItem* WorldItem, EPreferredSlotPolicy PreferTaggedSlots, bool DestroyAfterPickup);
 	
     UFUNCTION(BlueprintCallable, Category=RIS)
     int32 DropItem(FGameplayTag TaggedSlot, int32 SlotIndex, int32 Quantity);

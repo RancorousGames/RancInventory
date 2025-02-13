@@ -9,18 +9,50 @@
 #include "InventoryComponent.generated.h"
 
 USTRUCT(Blueprintable)
-struct FUniversalSlotExclusiveCategories
+struct FUniversalTaggedSlot
 {
 	GENERATED_BODY()
 
-	// The only slot an item with matching category can fit into
+	FUniversalTaggedSlot() : Slot(FGameplayTag::EmptyTag), SlotToBlock(FGameplayTag::EmptyTag), RequiredItemCategoryToBlock(FGameplayTag::EmptyTag) {}
+	FUniversalTaggedSlot(FGameplayTag InSlot) : Slot(InSlot), SlotToBlock(FGameplayTag::EmptyTag), RequiredItemCategoryToBlock(FGameplayTag::EmptyTag) {}
+	FUniversalTaggedSlot(FGameplayTag InSlot, FGameplayTag InSlotToBlock, FGameplayTag InRequiredItemCategoryToBlock)
+		: Slot(InSlot), SlotToBlock(InSlotToBlock), RequiredItemCategoryToBlock(InRequiredItemCategoryToBlock) {}
+	FUniversalTaggedSlot(FGameplayTag InSlot, FGameplayTag InSlotToBlock, FGameplayTag InRequiredItemCategoryToBlock, FGameplayTag InExclusiveToSlotCategory)
+		: Slot(InSlot), SlotToBlock(InSlotToBlock), RequiredItemCategoryToBlock(InRequiredItemCategoryToBlock), ExclusiveToSlotCategory(InExclusiveToSlotCategory) {}
+	
+	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "RIS | Equipment")
-	FGameplayTag UniversalTaggedSlot;
+	FGameplayTag Slot;
+	
+	// If this is set then the given slot will be blocked when this slot is filled, depending on the condition below
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ranc Inventory")
+	FGameplayTag SlotToBlock;
 
-	// The category that locks the item to the universal tagged slot
+	// This is a conditional item category to look for in THIS slots item to determine whether we should block SlotToBlock
+	// If it is not set and SlotToBlock is, then we will block SlotToBlock always
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ranc Inventory")
+	FGameplayTag RequiredItemCategoryToBlock;
+
+	
+	// If an item has this category then it can only enter this specific universal slot and not any other universal slots
+	// E.g. Items.Categories.TwoHanded might be exclusive to the right hand slot
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "RIS | Equipment")
-	FGameplayTag Category;
+	FGameplayTag ExclusiveToSlotCategory;
+	
+	bool IsValid() const
+	{
+		return Slot.IsValid();
+	}
 };
+
+UENUM(BlueprintType)
+enum class EPreferredSlotPolicy : uint8
+{
+	PreferGenericInventory,
+	PreferSpecializedTaggedSlot,
+	PreferAnyTaggedSlot
+};
+
 
 /* The high level idea is to NOT store where specific items are, we only store the total quantity of each item
  * A "Viewmodel" class is then responsible for displaying items in the players chosen slots. This is for network and server performance reasons.
@@ -53,11 +85,11 @@ public:
 	 * If PreferTaggedSlots is true, an item with category e.g. HelmetSlot will go into HelmetSlot first
 	 * Returns amount added, and always allows partial adding */
 	UFUNCTION(BlueprintCallable, Category = "RIS | Equipment")
-	int32 AddItemToAnySlot(TScriptInterface<IItemSource> ItemSource, const FGameplayTag& ItemId, int32 RequestedQuantity, bool PreferTaggedSlots = true);
+	int32 AddItemToAnySlot(TScriptInterface<IItemSource> ItemSource, const FGameplayTag& ItemId, int32 RequestedQuantity, EPreferredSlotPolicy PreferTaggedSlots = EPreferredSlotPolicy::PreferGenericInventory);
 	
 	// Remove up to Quantity item from a tagged slot, will return the count that was removed
 	UFUNCTION(BlueprintCallable, Category = "RIS | Equipment")
-	int32 RemoveQuantityFromTaggedSlot_IfServer(const FGameplayTag& SlotTag, int32 QuantityToRemove, EItemChangeReason Reason, bool AllowPartial = true, bool DestroyFromContainer = true);
+	int32 RemoveQuantityFromTaggedSlot_IfServer(FGameplayTag SlotTag, int32 QuantityToRemove, EItemChangeReason Reason, bool AllowPartial = true, bool DestroyFromContainer = true, bool SkipWeightUpdate = false);
 
 	// Remove up to Quantity item from any tagged slot, will return the count that was removed, always allows partial removal
 	UFUNCTION(BlueprintCallable, Category = "RIS | Equipment")
@@ -92,6 +124,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "RIS | Equipment")
 	void SetTaggedSlotBlocked(FGameplayTag Slot, bool IsBlocked);
 
+	UFUNCTION(BlueprintPure, Category = "RIS | Equipment")
+	bool IsTaggedSlotBlocked(const FGameplayTag& Slot) const;
+
 	// New events for slot equipment changes, this also gets called if an already held stackable item has its stack quantity increased
 	DECLARE_DYNAMIC_MULTICAST_DELEGATE_FiveParams(FOnItemAddedToTaggedSlot, const FGameplayTag&, SlotTag, const UItemStaticData*, ItemData, int32, Quantity, FTaggedItemBundle, PreviousItem, EItemChangeReason, Reason);
 	UPROPERTY(BlueprintAssignable, Category = "RIS | Equipment")
@@ -104,12 +139,7 @@ public:
 
 	// Which special but universal slots are available, e.g. left/right hand
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "RIS | Equipment")
-	TArray<FGameplayTag> UniversalTaggedSlots;
-
-	// Categories that make items exclusive to a universal slot, despite it being universal.
-	// E.g. Items.Categories.TwoHanded might be exclusive to the right hand
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "RIS | Equipment")
-	TArray<FUniversalSlotExclusiveCategories> UniversalTaggedExclusiveCategoriesSlots;
+	TArray<FUniversalTaggedSlot> UniversalTaggedSlots;
 	
 	/* Which specialized slots are available that hold only specific items, e.g. helmet
 	 * These are not actually different from UniversalSpecialSlots in this component but are used by e.g. SlotMapper 
@@ -175,7 +205,7 @@ public:
 	
 	
 	UFUNCTION(BlueprintCallable, Category = "RIS | Equipment")
-	void PickupItem(AWorldItem* WorldItem, bool PreferTaggedSlots = false, bool DestroyAfterPickup = true);
+	void PickupItem(AWorldItem* WorldItem, EPreferredSlotPolicy PreferTaggedSlots = EPreferredSlotPolicy::PreferGenericInventory, bool DestroyAfterPickup = true);
 	
 	UFUNCTION(BlueprintCallable, Category = "RIS")
 	int32 MoveItem(const FGameplayTag& ItemId, int32 Quantity,
@@ -190,14 +220,18 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "RIS | Equipment")
 	int32 DropFromTaggedSlot(const FGameplayTag& SlotTag, int32 Quantity, FVector RelativeDropLocation = FVector(1e+300, 0,0));
 
+	bool ContainedInUniversalSlot(const FGameplayTag& TagToFind) const;
+	
 protected:
 	void CheckAndUpdateRecipeAvailability();
 	
 	/* Attempts to pickup a world item, if successfull and fully picked up the object is destroyed
 	 * If AllowPartial is true, will only pick up as much as possible. */
 	UFUNCTION(Server, Reliable, Category = "RIS | Equipment")
-	void PickupItem_Server(AWorldItem* WorldItem, bool PreferTaggedSlots = false, bool DestroyAfterPickup = true);
+	void PickupItem_Server(AWorldItem* WorldItem, EPreferredSlotPolicy PreferTaggedSlots = EPreferredSlotPolicy::PreferGenericInventory, bool DestroyAfterPickup = true);
 
+	
+	
 	/* Do NOT call this directly
 	 * Moves items from one tagged slot to another, always allows partial moves but source must contain right amount
 	 * Leave SourceTaggedSlot as empty tag to move from container or leave TargetTaggedSlot empty to move to container */
@@ -237,6 +271,8 @@ protected:
 	int32 GetIndexForTaggedSlot(const FGameplayTag& SlotTag) const;
 
 	// Container overrides
+	virtual int32 AddItem_ServerImpl(TScriptInterface<IItemSource> ItemSource, const FGameplayTag& ItemId, int32 RequestedQuantity, bool AllowPartial,
+												 bool SuppressUpdate = false) override;
 	virtual int32 DropAllItems_ServerImpl() override;
 	virtual int32 DestroyItemImpl(const FGameplayTag& ItemId, int32 Quantity, EItemChangeReason Reason, bool AllowPartial = false, bool UpdateAfter = true, bool SendEventAfter = true) override;
 	virtual int32 GetContainerOnlyItemQuantityImpl(const FGameplayTag& ItemId) const override;
@@ -246,7 +282,9 @@ protected:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	virtual int32 ExtractItemImpl_IfServer(const FGameplayTag& ItemId, int32 Quantity, EItemChangeReason Reason, TArray<UItemInstanceData*>& StateArrayToAppendTo, bool SuppressUpdate) override;
 	int32 ExtractItemFromTaggedSlot_IfServer(const FGameplayTag& TaggedSlot, const FGameplayTag& ItemId, int32 Quantity, EItemChangeReason Reason, TArray<UItemInstanceData*>& StateArrayToAppendTo);
-	
+
+	bool WouldItemMoveIndirectlyViolateBlocking(const FGameplayTag& TaggedSlot, const UItemStaticData* ItemData) const;
+	void UpdateBlockingState(FGameplayTag SlotTag, const UItemStaticData* ItemData, bool IsEquip);
 
 
 	UPROPERTY(ReplicatedUsing=OnRep_Slots, BlueprintReadOnly, Category = "RIS")
@@ -268,7 +306,7 @@ private:
 	// The cache is a copy of Items that is not replicated, used to detect changes after replication, only used on client
 	TMap<FGameplayTag, FItemBundle> TaggedItemsCache; // Slot to quantity;
 	
-	TArray<std::tuple<FGameplayTag, int32>> GetItemDistributionPlan(const FGameplayTag& ItemId, int32 Quantity, bool PreferTaggedSlots);
+	TArray<std::tuple<FGameplayTag, int32>> GetItemDistributionPlan(const UItemStaticData* ItemData, int32 Quantity, EPreferredSlotPolicy PreferTaggedSlots);
 	
 	UFUNCTION()
 	void OnRep_Slots();

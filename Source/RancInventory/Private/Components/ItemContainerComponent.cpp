@@ -79,6 +79,14 @@ void UItemContainerComponent::OnRep_Items()
 int32 UItemContainerComponent::AddItem_IfServer(TScriptInterface<IItemSource> ItemSource, const FGameplayTag& ItemId, int32 RequestedQuantity, bool AllowPartial,
                                                  bool SuppressUpdate)
 {
+	return AddItem_ServerImpl(ItemSource, ItemId, RequestedQuantity, AllowPartial, SuppressUpdate);
+}
+
+int32 UItemContainerComponent::AddItem_ServerImpl(TScriptInterface<IItemSource> ItemSource, const FGameplayTag& ItemId, int32 RequestedQuantity, bool AllowPartial = false,
+												 bool SuppressUpdate)
+{
+	
+
 	if (GetOwnerRole() != ROLE_Authority && GetOwnerRole() != ROLE_None)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("AddItems called on non-authority!"));

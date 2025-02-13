@@ -5,6 +5,7 @@
 #include "Components/ActorComponent.h"
 #include "WeaponStaticData.h"
 #include "Components/InventoryComponent.h"
+#include "Engine/HitResult.h"
 #include "GearManagerComponent.generated.h"
 
 class UWeaponStaticData;
@@ -39,15 +40,6 @@ struct FGearSlotDefinition
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ranc Inventory")
 	bool bVisibleOnCharacter;
-
-	// If this is set then the given slot will be blocked when this slot is filled, depending on the condition below
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ranc Inventory")
-	FGameplayTag SlotToBlock;
-
-	// This is a conditional item category to look for in THIS slots item to determine whether we should block SlotToBlock
-	// If it is not set and SlotToBlock is, then we will block SlotToBlock always
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ranc Inventory")
-	FGameplayTag RequiredItemCategoryToBlock;
 	
     // Transient properties to avoid serialization and replication of the component reference
     UPROPERTY(Transient)
@@ -90,6 +82,8 @@ public:
 	// Sets default values for this component's properties
 	UGearManagerComponent();
 
+	virtual void InitializeComponent() override;
+	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ranc Inventory Weapons | Gear")
 	TArray<FGearSlotDefinition> GearSlots;
 
@@ -298,7 +292,9 @@ public:
 	void AttachWeaponToOwner(AWeaponActor* InputWeaponActor,FName SocketName);
 		
 	/* Adds the weapon to the list of weapons that can be hotswapped to with
-	 * SelectNextActiveWeapon, SelectPreviousWeapon and SelectActiveWeapon	*/
+	 * SelectNextActiveWeapon, SelectPreviousWeapon and SelectActiveWeapon
+	 * The weapon must be equipped first
+	 */
 	void AddAndSelectWeapon(const UItemStaticData* WeaponData, FGameplayTag ForcedSlot = FGameplayTag());
 
 	UFUNCTION(BlueprintCallable, Category = "Ranc Inventory Weapons | Gear")

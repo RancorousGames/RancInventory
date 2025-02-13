@@ -104,11 +104,14 @@ public:
     
 //
 private:
-    void AllItemsLoadedCallback() const;
-    void AllRecipesLoadedCallback() const;
+    void AllItemsLoadedCallback();
+    void AllRecipesLoadedCallback();
     
     TArray<UItemStaticData*> LoadRancItemData_Internal(UAssetManager* InAssetManager, const TArray<FPrimaryRISItemId>& InIDs, const TArray<FName>& InBundles, const bool bAutoUnload);
 
+    bool AllItemsLoadedBroadcasted = false;
+    bool AllRecipesLoadedBroadcasted = false;
+    
     static TMap<FGameplayTag, UItemStaticData*> AllLoadedItemsByTag;
     static TArray<FGameplayTag> AllItemIds;
     static TArray<UObjectRecipeData*> AllLoadedRecipes;

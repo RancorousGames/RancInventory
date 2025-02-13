@@ -178,7 +178,9 @@ protected:
 	UFUNCTION(Server, Reliable)
 	void UseItem_Server(const FGameplayTag& ItemId);
     
-    // virtual drop implementation for override in subclasses
+    // virtual implementations for override in subclasses
+	virtual int32 AddItem_ServerImpl(TScriptInterface<IItemSource> ItemSource, const FGameplayTag& ItemId, int32 RequestedQuantity, bool AllowPartial,
+												 bool SuppressUpdate = false);
     virtual int32 DropAllItems_ServerImpl();
 	virtual int32 GetContainerOnlyItemQuantityImpl(const FGameplayTag& ItemId) const;
 	virtual bool ContainsImpl(const FGameplayTag& ItemId, int32 Quantity = 1) const;

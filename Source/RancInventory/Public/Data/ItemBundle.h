@@ -232,4 +232,20 @@ struct FGenericItemBundle
                 if (arg) arg->ItemId = NewId;
         }, Data);
     }
+
+	bool IsBlocked() const 
+    {
+    	// Return false if bundle is FTaggedItemBundle and IsBlocked is true
+    	return std::visit([](auto&& arg) -> bool {
+			using T = std::decay_t<decltype(arg)>;
+			if constexpr (std::is_same_v<T, FTaggedItemBundle*>)
+			{
+				return arg ? arg->IsBlocked : false;
+			}
+			else
+			{
+				return false;
+			}
+		}, Data);
+    }
 };

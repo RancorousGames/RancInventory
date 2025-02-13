@@ -53,6 +53,7 @@ URISSubsystem* URISSubsystem::Get(UObject* WorldContext)
 void URISSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
 	Super::Initialize(Collection);
+	AllRecipesLoadedBroadcasted = false;
 }
 
 void URISSubsystem::PermanentlyLoadAllItemsAsync()
@@ -68,8 +69,11 @@ void URISSubsystem::PermanentlyLoadAllItemsAsync()
 }
 
 
-void URISSubsystem::AllItemsLoadedCallback() const
+void URISSubsystem::AllItemsLoadedCallback()
 {
+	if (AllItemsLoadedBroadcasted)
+		return;
+	
 	if (UAssetManager* const AssetManager = UAssetManager::GetIfInitialized())
 	{
 		TArray<UObject*> LoadedAssets;
@@ -85,6 +89,7 @@ void URISSubsystem::AllItemsLoadedCallback() const
 		// fill AllItemIds
 		AllLoadedItemsByTag.GenerateKeyArray(AllItemIds);
 
+		AllItemsLoadedBroadcasted = true;
 		OnAllItemsLoaded.Broadcast();
 	}
 }
@@ -231,8 +236,11 @@ TArray<FPrimaryAssetId> URISSubsystem::GetAllRISItemRecipeIds()
 	return AllItemRecipeIds;
 }
 
-void URISSubsystem::AllRecipesLoadedCallback() const
+void URISSubsystem::AllRecipesLoadedCallback()
 {
+	if (AllRecipesLoadedBroadcasted)
+		return;
+	
 	if (UAssetManager* const AssetManager = UAssetManager::GetIfInitialized())
 	{
 		TArray<UObject*> LoadedAssets;
@@ -245,6 +253,7 @@ void URISSubsystem::AllRecipesLoadedCallback() const
 			}
 		}
 
+		AllRecipesLoadedBroadcasted = true;
 		OnAllRecipesLoaded.Broadcast();
 	}
 }

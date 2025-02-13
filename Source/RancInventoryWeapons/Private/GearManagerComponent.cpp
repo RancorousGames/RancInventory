@@ -18,10 +18,16 @@ UGearManagerComponent::UGearManagerComponent()
 	// Set this component to be initialized when the game starts, and to be ticked every frame.  You can turn these features
 	// off to improve performance if you don't need them.
 	PrimaryComponentTick.bCanEverTick = false;
-	SetIsReplicatedByDefault(true);
+	bWantsInitializeComponent = true;
+	SetIsReplicatedByDefault(true);	
+}
 
-	// Get component
-	Owner = Cast<ACharacter>(GetOwner());
+void UGearManagerComponent::InitializeComponent()
+{
+	Super::InitializeComponent();
+
+	auto* OwningActor = GetOwner();
+	Owner = Cast<ACharacter>(OwningActor);
 	if (Owner)
 	{
 		LinkedInventoryComponent = Owner->GetComponentByClass<UInventoryComponent>();
@@ -64,9 +70,9 @@ void UGearManagerComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 void UGearManagerComponent::Initialize()
 {
 	Owner = Cast<ACharacter>(GetOwner());
-	if (!Owner)
+	if (!Owner || !LinkedInventoryComponent)
 	{
-		UE_LOG(LogRISInventory, Warning, TEXT("Owner is nullptr."))
+		UE_LOG(LogRISInventory, Error, TEXT("Owner or LinkedInventoryComponent is nullptr."))
 		return;
 	}
 
@@ -537,13 +543,6 @@ void UGearManagerComponent::EquipGear(FGameplayTag Slot, const UItemStaticData* 
     // Finally, if there was no delay then broadcast that the gear has been equipped.
     if (!DelayConfigured)
     {
-    	if (GearSlot->SlotToBlock.IsValid())
-    	{
-    		if (!GearSlot->RequiredItemCategoryToBlock.IsValid() || NewItemData->ItemCategories.HasTag(GearSlot->RequiredItemCategoryToBlock))
-			{
-				LinkedInventoryComponent->SetTaggedSlotBlocked(GearSlot->SlotToBlock, true);
-			}
-    	}
         OnGearEquipped.Broadcast(Slot, NewItemData->ItemId);
     }
 }
@@ -645,23 +644,16 @@ FGearSlotDefinition* UGearManagerComponent::FindGearSlotDefinition(FGameplayTag 
 void UGearManagerComponent::UnequipGear(FGameplayTag Slot, const UItemStaticData* ItemData, bool PlayUnequipMontage)
 {
 	bool DelayConfigured = false;
+	UWeaponDefinition* WeaponData = ItemData->GetItemDefinition<UWeaponDefinition>(UWeaponDefinition::StaticClass());
+
+	PlayUnequipMontage = PlayUnequipMontage && WeaponData->HolsterMontage.Montage.IsValid();
 	if (PlayUnequipMontage)
 	{
 		DelayConfigured = SetupDelayedGearChange(EPendingGearChangeType::Unequip, Slot, ItemData);
 	}
 	
-	if (ItemData && Slot == MainHandSlot->SlotTag || Slot == OffhandSlot->SlotTag)
+	if (ItemData && WeaponData && Slot == MainHandSlot->SlotTag || Slot == OffhandSlot->SlotTag)
 	{
-		
-		// cast to weapon data
-		UWeaponDefinition* WeaponData = ItemData->GetItemDefinition<UWeaponDefinition>(UWeaponDefinition::StaticClass());
-
-		if (!WeaponData)
-		{
-			UE_LOG(LogRISInventory, Warning, TEXT("WeaponData"))
-			return;
-		}
-
 		if (WeaponToUnequip == nullptr)
 		{
 			// Todo: Note that with this current solution, the unequip is effectively not cancelable
@@ -693,16 +685,7 @@ void UGearManagerComponent::UnequipGear(FGameplayTag Slot, const UItemStaticData
 			PlayWeaponHolsterMontage(WeaponToUnequip);
 		}
 		if (!DelayConfigured)
-		{
-			// Unblock any slots we had blocked
-			if (FGearSlotDefinition* GearSlot = FindGearSlotDefinition(Slot))
-			{
-				if (GearSlot->SlotToBlock.IsValid())
-				{
-					LinkedInventoryComponent->SetTaggedSlotBlocked(GearSlot->SlotToBlock, false);
-				}
-			}
-			
+		{			
 			WeaponToUnequip->Holster(); // TODO: Doesn't make sense to tell the weapon to holster if we are going to destroy it after. 
 			OnWeaponHolstered.Broadcast(Slot, WeaponToUnequip);
 			if (!DefaultUnarmedWeaponData || WeaponToUnequip->ItemData != DefaultUnarmedWeaponData)
