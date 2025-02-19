@@ -31,7 +31,7 @@ void FItemBundleWithInstanceData::DestroyQuantity(int32 InQuantity)
 	Quantity -= NumToDestroy;
 }
 
-int32 FItemBundleWithInstanceData::ExtractQuantity(int32 InQuantity, TArray<UItemInstanceData*> StateArrayToAppendTo)
+int32 FItemBundleWithInstanceData::ExtractQuantity(int32 InQuantity, TArray<UItemInstanceData*>& StateArrayToAppendTo)
 {
 	const int32 numToExtract = FMath::Min(InQuantity, Quantity);
    
@@ -46,8 +46,12 @@ int32 FItemBundleWithInstanceData::ExtractQuantity(int32 InQuantity, TArray<UIte
 		{
 			StateArrayToAppendTo.Append(InstanceData.GetData() + startIndex, DynamicDataCount);
 			InstanceData.RemoveAt(startIndex, DynamicDataCount);
+			Quantity = InstanceData.Num();
 		}
-		Quantity = InstanceData.Num();
+		else
+		{
+			Quantity -= numToExtract;
+		}
 	}
    
 	return numToExtract;

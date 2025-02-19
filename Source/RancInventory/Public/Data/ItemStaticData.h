@@ -106,17 +106,17 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, Category = "RIS", meta = (AssetBundles = "Data"))
 	TSubclassOf<AWorldItem> WorldItemClassOverride;
+
+	/* If this is set to a class, then dynamicitem instances will be created with this class as the instance data class
+	 * E.g. to track dynamic durability or randomized stats per item instance
+	 */
+	UPROPERTY(EditDefaultsOnly, Category = "RIS", meta = (AssetBundles = "Data"))
+	TSubclassOf<UItemInstanceData> ItemInstanceDataClass;	
 	
 	/* Allows to implement custom properties in this item data */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS",
 		meta = (DisplayName = "Custom Metadatas", AssetBundles = "Custom"))
 	TMap<FGameplayTag, FName> Metadatas;
-
-
-	/* Map containing a tag as key and a ID container as value to add relations to other items such as crafting requirements, etc. */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS",
-		meta = (DisplayName = "Item Relations", AssetBundles = "Custom"))
-	TMap<FGameplayTag, FPrimaryRISItemIdContainer> Relations;
 	
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "RIS", meta = (DeterminesOutputType = "Definition"))
 	UObject* GetItemDefinition(class TSubclassOf<UItemDefinitionBase> Definition, bool& Found)

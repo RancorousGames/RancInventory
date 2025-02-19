@@ -2,6 +2,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "ItemDurabilityTestInstanceData.h"
 #include "Engine/Engine.h"
 #include "Engine/GameInstance.h"
 #include "GameFramework/WorldSettings.h"
@@ -30,6 +31,7 @@ UE_DEFINE_GAMEPLAY_TAG(ItemIdHelmet, "Test.Gameplay.Items.IDs.Helmet");
 UE_DEFINE_GAMEPLAY_TAG(ItemIdSpecialHelmet, "Test.Gameplay.Items.IDs.SpecialHelmet");
 UE_DEFINE_GAMEPLAY_TAG(ItemIdChestArmor, "Test.Gameplay.Items.IDs.ChestArmor");
 UE_DEFINE_GAMEPLAY_TAG(ItemIdGiantBoulder, "Test.Gameplay.Items.IDs.GiantBoulder");
+UE_DEFINE_GAMEPLAY_TAG(ItemIdBrittleCopperKnife, "Test.Gameplay.Items.IDs.BrittleCopperKnife");
 
 // Macros for commonly used item bundles
 #define ONE_SPEAR ItemIdSpear, 1
@@ -62,176 +64,188 @@ FGameplayTag NoTag = FGameplayTag::EmptyTag;
 class FTestFixture
 {
 public:
-    FTestFixture(FName TestName)
-    {
-        World = CreateTestWorld(TestName);
-        Subsystem = EnsureSubsystem(World, TestName);
-    }
+	FTestFixture(FName TestName)
+	{
+		World = CreateTestWorld(TestName);
+		Subsystem = EnsureSubsystem(World, TestName);
+	}
 
-    ~FTestFixture()
-    {
-        // Clean up if needed; note that in many tests the engine will tear down the world.
-    }
+	~FTestFixture()
+	{
+		// Clean up if needed; note that in many tests the engine will tear down the world.
+	}
 
-    UWorld* GetWorld() const { return World; }
-    URISSubsystem* GetSubsystem() const { return Subsystem; }
+	UWorld* GetWorld() const { return World; }
+	URISSubsystem* GetSubsystem() const { return Subsystem; }
 
-    static bool AreGameplayTagsCorrupt()
-    {
-        // For some reason gameplaytags sometimes breaks and HasTag incorrectly returns false for tags that are present
-        auto* ChestItemData = URISSubsystem::GetItemDataById(ItemIdChestArmor);
-        if (ChestItemData->ItemCategories.HasTag(ChestSlot))
-            return false;
+	static bool AreGameplayTagsCorrupt()
+	{
+		// For some reason gameplaytags sometimes breaks and HasTag incorrectly returns false for tags that are present
+		auto* ChestItemData = URISSubsystem::GetItemDataById(ItemIdChestArmor);
+		if (ChestItemData->ItemCategories.HasTag(ChestSlot))
+			return false;
 
-        return true;
-    }
-    
-    // Helper to initialize common test items
-    void InitializeTestItems()
-    {
-        UItemStaticData* RockData = NewObject<UItemStaticData>();
-        RockData->ItemId = ItemIdRock;
-        RockData->ItemName = FName("Rock");
-        RockData->ItemDescription = FText::FromString("A sturdy rock, useful for crafting and building.");
-        RockData->ItemPrimaryType = ItemTypeResource;
-        RockData->MaxStackSize = 5;
-        RockData->ItemWeight = 1;
-        RockData->ItemCategories.AddTag(ItemTypeResource);
-        Subsystem->HardcodeItem(ItemIdRock, RockData);
+		return true;
+	}
 
-        UWeaponDefinition* MakeshiftWeaponDefinition = NewObject<UWeaponDefinition>();
-        MakeshiftWeaponDefinition->WeaponType = ItemTypeMakeshiftWeapon;
-        MakeshiftWeaponDefinition->Damage = 5;
-        MakeshiftWeaponDefinition->Range = 1;
-        MakeshiftWeaponDefinition->Cooldown = 1.0f;
-        MakeshiftWeaponDefinition->HandCompatability = EHandCompatibility::BothHands;
-        MakeshiftWeaponDefinition->IsLowPriority = true;
-        RockData->ItemDefinitions.Add(UWeaponDefinition::StaticClass(), MakeshiftWeaponDefinition);
-    
-    
+	// Helper to initialize common test items
+	void InitializeTestItems()
+	{
+		UItemStaticData* RockData = NewObject<UItemStaticData>();
+		RockData->ItemId = ItemIdRock;
+		RockData->ItemName = FName("Rock");
+		RockData->ItemDescription = FText::FromString("A sturdy rock, useful for crafting and building.");
+		RockData->ItemPrimaryType = ItemTypeResource;
+		RockData->MaxStackSize = 5;
+		RockData->ItemWeight = 1;
+		RockData->ItemCategories.AddTag(ItemTypeResource);
+		Subsystem->HardcodeItem(ItemIdRock, RockData);
 
-    UItemStaticData* SticksData = NewObject<UItemStaticData>();
-    SticksData->ItemId = ItemIdSticks;
-    SticksData->ItemName = FName("Sticks");
-    SticksData->ItemDescription = FText::FromString("Some sticks");
-    SticksData->ItemPrimaryType = ItemTypeResource;
-    SticksData->MaxStackSize = 5;
-    SticksData->ItemWeight = 1;
-    SticksData->ItemCategories.AddTag(ItemTypeResource);
-    Subsystem->HardcodeItem(ItemIdSticks, SticksData);
+		UWeaponDefinition* MakeshiftWeaponDefinition = NewObject<UWeaponDefinition>();
+		MakeshiftWeaponDefinition->WeaponType = ItemTypeMakeshiftWeapon;
+		MakeshiftWeaponDefinition->Damage = 5;
+		MakeshiftWeaponDefinition->Range = 1;
+		MakeshiftWeaponDefinition->Cooldown = 1.0f;
+		MakeshiftWeaponDefinition->HandCompatability = EHandCompatibility::BothHands;
+		MakeshiftWeaponDefinition->IsLowPriority = true;
+		RockData->ItemDefinitions.Add(UWeaponDefinition::StaticClass(), MakeshiftWeaponDefinition);
 
-    UItemStaticData* HelmetData = NewObject<UItemStaticData>();
-    HelmetData->ItemId = ItemIdHelmet;
-    HelmetData->ItemName = FName("Helmet");
-    HelmetData->ItemDescription = FText::FromString("Protective gear for the head.");
-    HelmetData->ItemPrimaryType = ItemTypeArmor;
-    HelmetData->MaxStackSize = 1;
-    HelmetData->ItemWeight = 2;
-    HelmetData->ItemCategories.AddTag(HelmetSlot);
-    Subsystem->HardcodeItem(ItemIdHelmet, HelmetData);
 
-    UItemStaticData* SpecialHelmetData = NewObject<UItemStaticData>();
-    SpecialHelmetData->ItemId = ItemIdSpecialHelmet;
-    SpecialHelmetData->ItemName = FName("SpecialHelmet");
-    SpecialHelmetData->ItemDescription = FText::FromString("Protective gear for the head.");
-    SpecialHelmetData->ItemPrimaryType = ItemTypeArmor;
-    SpecialHelmetData->MaxStackSize = 1;
-    SpecialHelmetData->ItemWeight = 2;
-    SpecialHelmetData->ItemCategories.AddTag(HelmetSlot);
-    Subsystem->HardcodeItem(ItemIdSpecialHelmet, SpecialHelmetData);
+		UItemStaticData* SticksData = NewObject<UItemStaticData>();
+		SticksData->ItemId = ItemIdSticks;
+		SticksData->ItemName = FName("Sticks");
+		SticksData->ItemDescription = FText::FromString("Some sticks");
+		SticksData->ItemPrimaryType = ItemTypeResource;
+		SticksData->MaxStackSize = 5;
+		SticksData->ItemWeight = 1;
+		SticksData->ItemCategories.AddTag(ItemTypeResource);
+		Subsystem->HardcodeItem(ItemIdSticks, SticksData);
 
-    UItemStaticData* ChestData = NewObject<UItemStaticData>();
-    ChestData->ItemId = ItemIdChestArmor;
-    ChestData->ItemName = FName("Chest Armor");
-    ChestData->ItemDescription = FText::FromString("Armor protecting the torso.");
-    ChestData->ItemPrimaryType = ItemTypeArmor;
-    ChestData->MaxStackSize = 1;
-    ChestData->ItemWeight = 5;
-    ChestData->ItemCategories.AddTag(ChestSlot);
-    Subsystem->HardcodeItem(ItemIdChestArmor, ChestData);
+		UItemStaticData* HelmetData = NewObject<UItemStaticData>();
+		HelmetData->ItemId = ItemIdHelmet;
+		HelmetData->ItemName = FName("Helmet");
+		HelmetData->ItemDescription = FText::FromString("Protective gear for the head.");
+		HelmetData->ItemPrimaryType = ItemTypeArmor;
+		HelmetData->MaxStackSize = 1;
+		HelmetData->ItemWeight = 2;
+		HelmetData->ItemCategories.AddTag(HelmetSlot);
+		Subsystem->HardcodeItem(ItemIdHelmet, HelmetData);
 
-    UItemStaticData* SpearData = NewObject<UItemStaticData>();
-    SpearData->ItemId = ItemIdSpear;
-    SpearData->ItemName = FName("Spear");
-    SpearData->ItemDescription = FText::FromString("Sharp!");
-    SpearData->ItemPrimaryType = ItemTypeTwoHanded;
-    SpearData->MaxStackSize = 1;
-    SpearData->ItemWeight = 3;
-    SpearData->ItemCategories.AddTag(ItemTypeTwoHanded);
-    SpearData->ItemCategories.AddTag(RightHandSlot); // Associate preference for right hand
+		UItemStaticData* SpecialHelmetData = NewObject<UItemStaticData>();
+		SpecialHelmetData->ItemId = ItemIdSpecialHelmet;
+		SpecialHelmetData->ItemName = FName("SpecialHelmet");
+		SpecialHelmetData->ItemDescription = FText::FromString("Protective gear for the head.");
+		SpecialHelmetData->ItemPrimaryType = ItemTypeArmor;
+		SpecialHelmetData->MaxStackSize = 1;
+		SpecialHelmetData->ItemWeight = 2;
+		SpecialHelmetData->ItemCategories.AddTag(HelmetSlot);
+		Subsystem->HardcodeItem(ItemIdSpecialHelmet, SpecialHelmetData);
 
-    // Create and add a weapondefinition to the spear
-    UWeaponDefinition* SpearWeaponDefinition = NewObject<UWeaponDefinition>();
-    SpearWeaponDefinition->WeaponType = ItemTypeTwoHanded;
-    SpearWeaponDefinition->Damage = 10;
-    SpearWeaponDefinition->Range = 2;
-    SpearWeaponDefinition->Cooldown = 1.0f;
-    SpearWeaponDefinition->HandCompatability = EHandCompatibility::TwoHanded;
-    SpearData->ItemDefinitions.Add(UWeaponDefinition::StaticClass(), SpearWeaponDefinition);
-    Subsystem->HardcodeItem(ItemIdSpear, SpearData);
-    
+		UItemStaticData* ChestData = NewObject<UItemStaticData>();
+		ChestData->ItemId = ItemIdChestArmor;
+		ChestData->ItemName = FName("Chest Armor");
+		ChestData->ItemDescription = FText::FromString("Armor protecting the torso.");
+		ChestData->ItemPrimaryType = ItemTypeArmor;
+		ChestData->MaxStackSize = 1;
+		ChestData->ItemWeight = 5;
+		ChestData->ItemCategories.AddTag(ChestSlot);
+		Subsystem->HardcodeItem(ItemIdChestArmor, ChestData);
 
-    UItemStaticData* GiantBoulderData = NewObject<UItemStaticData>();
-    GiantBoulderData->ItemId = ItemIdGiantBoulder;
-    GiantBoulderData->ItemName = FName("Giant Boulder");
-    GiantBoulderData->ItemDescription = FText::FromString("HEAVY!");
-    GiantBoulderData->ItemPrimaryType = ItemTypeResource;
-    GiantBoulderData->MaxStackSize = 1;
-    GiantBoulderData->ItemWeight = 10;
-    GiantBoulderData->ItemCategories.AddTag(ItemTypeResource);
-    Subsystem->HardcodeItem(ItemIdGiantBoulder, GiantBoulderData);
+		UItemStaticData* SpearData = NewObject<UItemStaticData>();
+		SpearData->ItemId = ItemIdSpear;
+		SpearData->ItemName = FName("Spear");
+		SpearData->ItemDescription = FText::FromString("Sharp!");
+		SpearData->ItemPrimaryType = ItemTypeTwoHanded;
+		SpearData->MaxStackSize = 1;
+		SpearData->ItemWeight = 3;
+		SpearData->ItemCategories.AddTag(ItemTypeTwoHanded);
+		SpearData->ItemCategories.AddTag(RightHandSlot); // Associate preference for right hand
 
-    }
+		// Create and add a weapondefinition to the spear
+		UWeaponDefinition* SpearWeaponDefinition = NewObject<UWeaponDefinition>();
+		SpearWeaponDefinition->WeaponType = ItemTypeTwoHanded;
+		SpearWeaponDefinition->Damage = 10;
+		SpearWeaponDefinition->Range = 2;
+		SpearWeaponDefinition->Cooldown = 1.0f;
+		SpearWeaponDefinition->HandCompatability = EHandCompatibility::TwoHanded;
+		SpearData->ItemDefinitions.Add(UWeaponDefinition::StaticClass(), SpearWeaponDefinition);
+		Subsystem->HardcodeItem(ItemIdSpear, SpearData);
+
+
+		UItemStaticData* GiantBoulderData = NewObject<UItemStaticData>();
+		GiantBoulderData->ItemId = ItemIdGiantBoulder;
+		GiantBoulderData->ItemName = FName("Giant Boulder");
+		GiantBoulderData->ItemDescription = FText::FromString("HEAVY!");
+		GiantBoulderData->ItemPrimaryType = ItemTypeResource;
+		GiantBoulderData->MaxStackSize = 1;
+		GiantBoulderData->ItemWeight = 10;
+		GiantBoulderData->ItemCategories.AddTag(ItemTypeResource);
+		Subsystem->HardcodeItem(ItemIdGiantBoulder, GiantBoulderData);
+
+		UItemStaticData* BrittleCopperKnife = NewObject<UItemStaticData>();
+		BrittleCopperKnife->ItemId = ItemIdBrittleCopperKnife;
+		BrittleCopperKnife->ItemName = FName("Brittle Copper Knife");
+		BrittleCopperKnife->ItemDescription = FText::FromString("Careful!");
+		BrittleCopperKnife->ItemPrimaryType = ItemTypeMakeshiftWeapon;
+		BrittleCopperKnife->MaxStackSize = 1;
+		BrittleCopperKnife->ItemWeight = 3;
+		BrittleCopperKnife->ItemCategories.AddTag(ItemTypeMakeshiftWeapon);
+		BrittleCopperKnife->ItemDefinitions.Add(UWeaponDefinition::StaticClass(), MakeshiftWeaponDefinition);
+		BrittleCopperKnife->ItemCategories.AddTag(LeftHandSlot);
+		BrittleCopperKnife->ItemInstanceDataClass = UItemDurabilityTestInstanceData::StaticClass();
+
+		Subsystem->HardcodeItem(ItemIdBrittleCopperKnife, BrittleCopperKnife);
+	}
 
 private:
-    static UWorld* CreateTestWorld(const FName& WorldName)
-    {
-        UWorld* TestWorld = UWorld::CreateWorld(EWorldType::Game, false, WorldName);
-        if (GEngine)
-        {
-            FWorldContext& WorldContext = GEngine->CreateNewWorldContext(EWorldType::Game);
-            WorldContext.SetCurrentWorld(TestWorld);
-        }
-        
-        AWorldSettings* WorldSettings = TestWorld->GetWorldSettings();
-        if (WorldSettings)
-        {
-            WorldSettings->SetActorTickEnabled(true);
-        }
-        
-        if (!TestWorld->bIsWorldInitialized)
-        {
-            TestWorld->InitializeNewWorld(UWorld::InitializationValues()
-                .ShouldSimulatePhysics(false)
-                .AllowAudioPlayback(false)
-                .RequiresHitProxies(false)
-                .CreatePhysicsScene(true)
-                .CreateNavigation(false)
-                .CreateAISystem(false));
-        }
+	static UWorld* CreateTestWorld(const FName& WorldName)
+	{
+		UWorld* TestWorld = UWorld::CreateWorld(EWorldType::Game, false, WorldName);
+		if (GEngine)
+		{
+			FWorldContext& WorldContext = GEngine->CreateNewWorldContext(EWorldType::Game);
+			WorldContext.SetCurrentWorld(TestWorld);
+		}
 
-        return TestWorld;
-    }
+		AWorldSettings* WorldSettings = TestWorld->GetWorldSettings();
+		if (WorldSettings)
+		{
+			WorldSettings->SetActorTickEnabled(true);
+		}
 
-    static URISSubsystem* EnsureSubsystem(UWorld* World, const FName& TestName)
-    {
-        if (!World)
-        {
-            UE_LOG(LogTemp, Warning, TEXT("World is null in EnsureSubsystem."));
-            return nullptr;
-        }
+		if (!TestWorld->bIsWorldInitialized)
+		{
+			TestWorld->InitializeNewWorld(UWorld::InitializationValues()
+			                              .ShouldSimulatePhysics(false)
+			                              .AllowAudioPlayback(false)
+			                              .RequiresHitProxies(false)
+			                              .CreatePhysicsScene(true)
+			                              .CreateNavigation(false)
+			                              .CreateAISystem(false));
+		}
 
-        UGameInstance* GameInstance = World->GetGameInstance();
-        if (!GameInstance)
-        {
-            GameInstance = NewObject<UGameInstance>(World);
-            World->SetGameInstance(GameInstance);
-            GameInstance->Init();
-        }
+		return TestWorld;
+	}
 
-        return GameInstance->GetSubsystem<URISSubsystem>();
-    }
+	static URISSubsystem* EnsureSubsystem(UWorld* World, const FName& TestName)
+	{
+		if (!World)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("World is null in EnsureSubsystem."));
+			return nullptr;
+		}
 
-    UWorld* World = nullptr;
-    URISSubsystem* Subsystem = nullptr;
+		UGameInstance* GameInstance = World->GetGameInstance();
+		if (!GameInstance)
+		{
+			GameInstance = NewObject<UGameInstance>(World);
+			World->SetGameInstance(GameInstance);
+			GameInstance->Init();
+		}
+
+		return GameInstance->GetSubsystem<URISSubsystem>();
+	}
+
+	UWorld* World = nullptr;
+	URISSubsystem* Subsystem = nullptr;
 };

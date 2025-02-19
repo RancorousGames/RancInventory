@@ -20,6 +20,7 @@ public:
 	FItemContainerTestContext(int32 MaxItems, float CarryCapacity)
 		: TestFixture(FName(*FString(TestName)))
 	{
+		URISSubsystem* Subsystem = TestFixture.GetSubsystem();
 		TempActor = TestFixture.GetWorld()->SpawnActor<AActor>();
 		ItemContainerComponent = NewObject<UItemContainerComponent>(TempActor);
 
@@ -28,6 +29,7 @@ public:
 
 		ItemContainerComponent->RegisterComponent();
 		ItemContainerComponent->InitializeComponent();
+		TestFixture.InitializeTestItems();
 	}
 
 	~FItemContainerTestContext()
@@ -363,6 +365,49 @@ public:
 
 		return Res;
 	}
+	
+	static bool TestExtractItems(FRancItemContainerComponentTest* Test)
+	{
+		FItemContainerTestContext Context(10, 50);
+		auto* Subsystem = Context.TestFixture.GetSubsystem();
+		
+		bool Res = true;
+
+		// Add 20 rocks and then extract 5, verify that we got 5 and 15 remain
+		int32 Added = Context.ItemContainerComponent->AddItem_IfServer(Subsystem, ItemIdRock, 20, false);
+		Res &= Test->TestEqual(TEXT("Should add 20 rocks"), Added, 20);
+		TArray<UItemInstanceData*> ExtractedDynamicItems = TArray<UItemInstanceData*>();
+		int ExtractedCount = Context.ItemContainerComponent->ExtractItem_IfServer(ItemIdRock, 5, EItemChangeReason::Removed, ExtractedDynamicItems);
+		Res &= Test->TestEqual(TEXT("Should extract 5 rocks"), ExtractedCount, 5);
+		Res &= Test->TestEqual(TEXT("Should have 15 rocks remaining"), Context.ItemContainerComponent->GetContainedQuantity(ItemIdRock), 15);
+		Res &= Test->TestEqual(TEXT("Should have no dynamic data as rocks dont have instance data"), ExtractedDynamicItems.Num(), 0);
+
+		// Now try to add an item with instance data and extract it
+		Context.ItemContainerComponent->AddItem_IfServer(Subsystem, ItemIdBrittleCopperKnife, 1, false);
+		// Get item state then cast it to ItemDurabilityTestInstanceData
+		TArray<UItemInstanceData*> ItemState = Context.ItemContainerComponent->GetItemState(ItemIdBrittleCopperKnife);
+		// verify we got 1 item state
+		Res &= Test->TestEqual(TEXT("Should have 1 item state"), ItemState.Num(), 1);
+		UItemDurabilityTestInstanceData* DurabilityData = Cast<UItemDurabilityTestInstanceData>(ItemState[0]);
+		// verify that the item state is of the correct type
+		Res &= Test->TestNotNull(TEXT("Item state should be of the correct type"), DurabilityData);
+		DurabilityData->Durability = 50;
+
+		// Now extract it and verify that the item state is returned
+		ExtractedDynamicItems = TArray<UItemInstanceData*>();
+		ExtractedCount = Context.ItemContainerComponent->ExtractItem_IfServer(ItemIdBrittleCopperKnife, 1, EItemChangeReason::Removed, ExtractedDynamicItems);
+		Res &= Test->TestEqual(TEXT("Should extract 1 knife"), ExtractedCount, 1);
+		Res &= Test->TestEqual(TEXT("Should have 0 knives remaining"), Context.ItemContainerComponent->GetContainedQuantity(ItemIdBrittleCopperKnife), 0);
+		Res &= Test->TestEqual(TEXT("Should have 1 extracted knife instance data"), ExtractedDynamicItems.Num(), 1);
+		if (ExtractedDynamicItems.Num() > 0)
+		{
+			UItemDurabilityTestInstanceData* ExtractedDurabilityData = Cast<UItemDurabilityTestInstanceData>(ExtractedDynamicItems[0]);
+			Res &= Test->TestNotNull(TEXT("Extracted item state should be of the correct type"), ExtractedDurabilityData);
+			Res &= Test->TestEqual(TEXT("Extracted item state should have the correct durability"), ExtractedDurabilityData->Durability, 50.f);
+		}
+
+		return Res;
+	}
 };
 
 bool FRancItemContainerComponentTest::RunTest(const FString& Parameters)
@@ -374,6 +419,7 @@ bool FRancItemContainerComponentTest::RunTest(const FString& Parameters)
 	Res &= FItemContainerTestScenarios::TestItemCountsAndPresence(this);
 	Res &= FItemContainerTestScenarios::TestMiscFunctions(this);
 	Res &= FItemContainerTestScenarios::TestSetAddItemValidationCallback(this);
+	Res &= FItemContainerTestScenarios::TestExtractItems(this);
 
 	return Res;
 }

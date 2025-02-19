@@ -16,15 +16,10 @@ class RANCINVENTORY_API UItemInstanceData : public UObject
 public:
 	// Constructor
 	UItemInstanceData(){}
+	virtual ~UItemInstanceData() override {}
 
-	/**
-	 * This allows the object to be serialized for replication.
-	 * It's required for UObject-derived classes to replicate properly.
-	 */
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 protected:
-	/** Replicated example property to demonstrate functionality */
-	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category = "ItemInstance")
-	FString InstanceID;
+
 };

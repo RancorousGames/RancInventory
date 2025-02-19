@@ -131,6 +131,14 @@ int32 UItemContainerComponent::AddItem_ServerImpl(TScriptInterface<IItemSource> 
 	AmountToAdd = Execute_ExtractItem_IfServer(ItemSourceObj, ItemId, AmountToAdd, EItemChangeReason::Transferred, ContainedItem->InstanceData);
 
 	ContainedItem->Quantity += AmountToAdd;
+	
+	if (ItemData->ItemInstanceDataClass->IsValidLowLevel())
+	{
+		for (int i = 0; i < AmountToAdd; ++i)
+		{
+			ContainedItem->InstanceData.Add(NewObject<UItemInstanceData>(this, ItemData->ItemInstanceDataClass));
+		}
+	}
 
 	if (!SuppressUpdate)
 	{

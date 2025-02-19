@@ -131,7 +131,7 @@ struct FItemBundleWithInstanceData
 
     void DestroyQuantity(int32 Quantity);
     
-    int32 ExtractQuantity(int32 InQuantity, TArray<UItemInstanceData*> StateArrayToAppendTo);
+    int32 ExtractQuantity(int32 InQuantity, TArray<UItemInstanceData*>& StateArrayToAppendTo);
 
     FItemBundleWithInstanceData(){}
     FItemBundleWithInstanceData(FItemBundle InItemInfo, const TArray<UItemInstanceData*>& InstanceData = TArray<UItemInstanceData*>())

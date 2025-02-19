@@ -110,6 +110,12 @@ FMontageData AWeaponActor::GetAttackMontage_Implementation(int32 MontageIdOverri
 
 FMontageData AWeaponActor::GetAttackMontage_Impl(int32 MontageIdOverride)
 {
+    if (WeaponData->AttackMontages.IsEmpty())
+    {
+        UE_LOG(LogTemp, Warning, TEXT("WeaponActor::GetAttackMontage_Impl: No attack montages found."));
+        return FMontageData();
+    }
+    
     if (MontageIdOverride >= 0)
     {
         MontageCycleIndex = MontageIdOverride;
