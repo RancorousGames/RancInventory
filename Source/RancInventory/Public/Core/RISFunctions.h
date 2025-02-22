@@ -58,7 +58,7 @@ public:
      * IgnoreMaxStacks will allow a target slot to go above the item datas maxstacksize (used for itemcontainer)
      * AllowPartial if enabled will allow a move to partially succeed, e.g. only move 2 of requested 3 quantity, if false moves full or nothing
      */
-    static FRISMoveResult MoveBetweenSlots(FGenericItemBundle Source, FGenericItemBundle Target, bool IgnoreMaxStacks, int32 RequestedQuantity, bool AllowPartial);
+    static FRISMoveResult MoveBetweenSlots(FGenericItemBundle Source, FGenericItemBundle Target, FGameplayTag TargetTaggedSlot, bool IgnoreMaxStacks, int32 RequestedQuantity, bool AllowPartial, bool AllowSwap = true);
     
     
     template<typename Ty>

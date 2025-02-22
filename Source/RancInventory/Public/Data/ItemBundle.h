@@ -248,4 +248,32 @@ struct FGenericItemBundle
 			}
 		}, Data);
     }
+
+	// Gets tag if bundle is FTaggedItemBundle
+	FGameplayTag GetSlotTag() const
+    {
+    	return std::visit([](auto&& arg) -> FGameplayTag {
+			using T = std::decay_t<decltype(arg)>;
+			if constexpr (std::is_same_v<T, FTaggedItemBundle*>)
+			{
+				return arg ? arg->Tag : FGameplayTag();
+			}
+			else
+			{
+				return FGameplayTag();
+			}
+		}, Data);
+    }
+
+	// Sets tag if bundle is FTaggedItemBundle
+	void SetSlotTag(const FGameplayTag& NewTag)
+    {
+    	std::visit([&NewTag](auto&& arg) {
+			using T = std::decay_t<decltype(arg)>;
+			if constexpr (std::is_same_v<T, FTaggedItemBundle*>)
+			{
+				if (arg) arg->Tag = NewTag;
+			}
+		}, Data);
+    }
 };

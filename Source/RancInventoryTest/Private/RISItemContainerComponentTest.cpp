@@ -2,11 +2,13 @@
 
 #include "RISItemContainerComponentTest.h"
 
+#include "LimitedTestItemSource.h"
 #include "NativeGameplayTags.h"
 #include "Misc/AutomationTest.h"
 #include "RISInventoryTestSetup.cpp"
-#include "TestDelegateForwardHelper.h"
 #include "Components/ItemContainerComponent.h"
+#include "Framework/DebugTestResult.h"
+#include "Framework/TestDelegateForwardHelper.h"
 
 #define TestName "GameTests.RIS.RancItemContainer"
 
@@ -28,7 +30,6 @@ public:
 		ItemContainerComponent->MaxWeight = CarryCapacity;
 
 		ItemContainerComponent->RegisterComponent();
-		ItemContainerComponent->InitializeComponent();
 		TestFixture.InitializeTestItems();
 	}
 
@@ -53,7 +54,7 @@ public:
 		FItemContainerTestContext Context(10, 10);
 		auto* Subsystem = Context.TestFixture.GetSubsystem();
 
-		bool Res = true;
+		FDebugTestResult Res = true;
 
 		// Test adding an item within weight and item count limits
 		int32 AddedQuantity = Context.ItemContainerComponent->AddItem_IfServer(
@@ -148,7 +149,7 @@ public:
 		FItemContainerTestContext Context(10, 20);
 		auto* Subsystem = Context.TestFixture.GetSubsystem();
 		
-		bool Res = true;
+		FDebugTestResult Res = true;
 
 		// Add initial items for removal tests
 		Context.ItemContainerComponent->AddItem_IfServer(Subsystem, FiveRocks, false);
@@ -201,7 +202,7 @@ public:
 		FItemContainerTestContext Context(7, 15);
 		auto* Subsystem = Context.TestFixture.GetSubsystem();
 		
-		bool Res = true;
+		FDebugTestResult Res = true;
 
 		Res &= Test->TestTrue(
 			TEXT("Container should initially be able to receive rocks"),
@@ -250,7 +251,7 @@ public:
 		FItemContainerTestContext Context(10, 20);
 		auto* Subsystem = Context.TestFixture.GetSubsystem();
 		
-		bool Res = true;
+		FDebugTestResult Res = true;
 
 		Context.ItemContainerComponent->AddItem_IfServer(Subsystem, FiveRocks, false);
 		Context.ItemContainerComponent->AddItem_IfServer(Subsystem, OneHelmet, false);
@@ -307,7 +308,7 @@ public:
 		FItemContainerTestContext Context(10, 50);
 		auto* Subsystem = Context.TestFixture.GetSubsystem();
 		
-		bool Res = true;
+		FDebugTestResult Res = true;
 
 		FItemBundleWithInstanceData RockItemInstance = Context.ItemContainerComponent->FindItemById(ItemIdRock);
 		Res &= Test->TestTrue(
@@ -339,7 +340,7 @@ public:
 		FItemContainerTestContext Context(10, 50);
 		auto* Subsystem = Context.TestFixture.GetSubsystem();
 		
-		bool Res = true;
+		FDebugTestResult Res = true;
 
 		const auto DelegateHelper = NewObject<UTestDelegateForwardHelper>();
 		UItemContainerComponent::FAddItemValidationDelegate MyDelegateInstance;
@@ -371,7 +372,7 @@ public:
 		FItemContainerTestContext Context(10, 50);
 		auto* Subsystem = Context.TestFixture.GetSubsystem();
 		
-		bool Res = true;
+		FDebugTestResult Res = true;
 
 		// Add 20 rocks and then extract 5, verify that we got 5 and 15 remain
 		int32 Added = Context.ItemContainerComponent->AddItem_IfServer(Subsystem, ItemIdRock, 20, false);
@@ -406,13 +407,29 @@ public:
 			Res &= Test->TestEqual(TEXT("Extracted item state should have the correct durability"), ExtractedDurabilityData->Durability, 50.f);
 		}
 
+		Context.ItemContainerComponent->Clear_IfServer();
+		// Now we test with a ULimitedTestItemSource to verify how much we extract
+		ULimitedTestItemSource* LimitedSource = NewObject<ULimitedTestItemSource>();
+		LimitedSource->SourceRemainder = 5;
+
+		Added = Context.ItemContainerComponent->AddItem_IfServer(LimitedSource, ItemIdRock, 10, false);
+		Res &= Test->TestEqual(TEXT("Should add 5 rocks"), Added, 5);
+		Res &= Test->TestEqual(TEXT("Should have 5 rocks"), Context.ItemContainerComponent->GetContainedQuantity(ItemIdRock), 5);
+		Res &= Test->TestEqual(TEXT("Should have exhausted the source"), LimitedSource->SourceRemainder, 0);
+		// Try to add one more which should fail
+
+		Added = Context.ItemContainerComponent->AddItem_IfServer(LimitedSource, ItemIdRock, 1, false);
+		Res &= Test->TestEqual(TEXT("Should not add a rock"), Added, 0);
+		Res &= Test->TestEqual(TEXT("Should still have 5 rocks"), Context.ItemContainerComponent->GetContainedQuantity(ItemIdRock), 5);
+		Res &= Test->TestEqual(TEXT("Should still have exhausted the source"), LimitedSource->SourceRemainder, 0);
+		
 		return Res;
 	}
 };
 
 bool FRancItemContainerComponentTest::RunTest(const FString& Parameters)
 {
-	bool Res = true;
+	FDebugTestResult Res = true;
 
 	Res &= FItemContainerTestScenarios::TestDestroyItems(this);
 	Res &= FItemContainerTestScenarios::TestCanReceiveItems(this);

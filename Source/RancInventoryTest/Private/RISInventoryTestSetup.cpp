@@ -24,14 +24,15 @@ UE_DEFINE_GAMEPLAY_TAG(ItemTypeArmor, "Test.Gameplay.Items.Types.Armor");
 UE_DEFINE_GAMEPLAY_TAG(ItemTypeTwoHanded, "Test.Gameplay.Items.Types.TwoHanded");
 UE_DEFINE_GAMEPLAY_TAG(ItemTypeMakeshiftWeapon, "Test.Gameplay.Items.Types.MakeshiftWeapon");
 
-UE_DEFINE_GAMEPLAY_TAG(ItemIdRock, "Test.Gameplay.Items.IDs.Rock");
-UE_DEFINE_GAMEPLAY_TAG(ItemIdSticks, "Test.Gameplay.Items.IDs.Sticks");
-UE_DEFINE_GAMEPLAY_TAG(ItemIdSpear, "Test.Gameplay.Items.IDs.StoneSpear");
-UE_DEFINE_GAMEPLAY_TAG(ItemIdHelmet, "Test.Gameplay.Items.IDs.Helmet");
-UE_DEFINE_GAMEPLAY_TAG(ItemIdSpecialHelmet, "Test.Gameplay.Items.IDs.SpecialHelmet");
-UE_DEFINE_GAMEPLAY_TAG(ItemIdChestArmor, "Test.Gameplay.Items.IDs.ChestArmor");
-UE_DEFINE_GAMEPLAY_TAG(ItemIdGiantBoulder, "Test.Gameplay.Items.IDs.GiantBoulder");
-UE_DEFINE_GAMEPLAY_TAG(ItemIdBrittleCopperKnife, "Test.Gameplay.Items.IDs.BrittleCopperKnife");
+UE_DEFINE_GAMEPLAY_TAG(ItemIdRock, "Test.Items.IDs.Rock");
+UE_DEFINE_GAMEPLAY_TAG(ItemIdSticks, "Test.Items.IDs.Sticks");
+UE_DEFINE_GAMEPLAY_TAG(ItemIdSpear, "Test.Items.IDs.StoneSpear");
+UE_DEFINE_GAMEPLAY_TAG(ItemIdHelmet, "Test.Items.IDs.Helmet");
+UE_DEFINE_GAMEPLAY_TAG(ItemIdSpecialHelmet, "Test.Items.IDs.SpecialHelmet");
+UE_DEFINE_GAMEPLAY_TAG(ItemIdChestArmor, "Test.Items.IDs.ChestArmor");
+UE_DEFINE_GAMEPLAY_TAG(ItemIdGiantBoulder, "Test.Items.IDs.GiantBoulder");
+UE_DEFINE_GAMEPLAY_TAG(ItemIdBlockingOneHandedItem, "Test.Items.IDs.ItemIdBlockingOneHandedItem");
+UE_DEFINE_GAMEPLAY_TAG(ItemIdBrittleCopperKnife, "Test.Items.IDs.BrittleCopperKnife");
 
 // Macros for commonly used item bundles
 #define ONE_SPEAR ItemIdSpear, 1
@@ -171,7 +172,6 @@ public:
 		SpearData->ItemDefinitions.Add(UWeaponDefinition::StaticClass(), SpearWeaponDefinition);
 		Subsystem->HardcodeItem(ItemIdSpear, SpearData);
 
-
 		UItemStaticData* GiantBoulderData = NewObject<UItemStaticData>();
 		GiantBoulderData->ItemId = ItemIdGiantBoulder;
 		GiantBoulderData->ItemName = FName("Giant Boulder");
@@ -193,6 +193,16 @@ public:
 		BrittleCopperKnife->ItemDefinitions.Add(UWeaponDefinition::StaticClass(), MakeshiftWeaponDefinition);
 		BrittleCopperKnife->ItemCategories.AddTag(LeftHandSlot);
 		BrittleCopperKnife->ItemInstanceDataClass = UItemDurabilityTestInstanceData::StaticClass();
+
+		//UItemStaticData* BlockingOneHandedItem = NewObject<UItemStaticData>();
+		//BlockingOneHandedItem->ItemId = ItemIdBlockingOneHandedItem;
+		//BlockingOneHandedItem->ItemName = FName("BlockingOneHandedItem");
+		//BlockingOneHandedItem->ItemDescription = FText::FromString("An item that blocks offhand but does not require two hands");
+		//BlockingOneHandedItem->ItemPrimaryType = ItemTypeResource;
+		//BlockingOneHandedItem->MaxStackSize = 1;
+		//BlockingOneHandedItem->ItemWeight = 1;
+		//BlockingOneHandedItem->ItemCategories.AddTag(ItemIdBlockingOneHandedItem);
+		//Subsystem->HardcodeItem(ItemIdBlockingOneHandedItem, BlockingOneHandedItem);
 
 		Subsystem->HardcodeItem(ItemIdBrittleCopperKnife, BrittleCopperKnife);
 	}
@@ -223,6 +233,8 @@ private:
 			                              .CreateNavigation(false)
 			                              .CreateAISystem(false));
 		}
+
+		TestWorld->InitializeActorsForPlay(FURL());
 
 		return TestWorld;
 	}

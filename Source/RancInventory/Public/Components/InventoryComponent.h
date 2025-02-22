@@ -13,12 +13,12 @@ struct FUniversalTaggedSlot
 {
 	GENERATED_BODY()
 
-	FUniversalTaggedSlot() : Slot(FGameplayTag::EmptyTag), SlotToBlock(FGameplayTag::EmptyTag), RequiredItemCategoryToBlock(FGameplayTag::EmptyTag) {}
-	FUniversalTaggedSlot(FGameplayTag InSlot) : Slot(InSlot), SlotToBlock(FGameplayTag::EmptyTag), RequiredItemCategoryToBlock(FGameplayTag::EmptyTag) {}
+	FUniversalTaggedSlot() : Slot(FGameplayTag::EmptyTag), UniversalSlotToBlock(FGameplayTag::EmptyTag), RequiredItemCategoryToBlock(FGameplayTag::EmptyTag) {}
+	FUniversalTaggedSlot(FGameplayTag InSlot) : Slot(InSlot), UniversalSlotToBlock(FGameplayTag::EmptyTag), RequiredItemCategoryToBlock(FGameplayTag::EmptyTag) {}
 	FUniversalTaggedSlot(FGameplayTag InSlot, FGameplayTag InSlotToBlock, FGameplayTag InRequiredItemCategoryToBlock)
-		: Slot(InSlot), SlotToBlock(InSlotToBlock), RequiredItemCategoryToBlock(InRequiredItemCategoryToBlock) {}
+		: Slot(InSlot), UniversalSlotToBlock(InSlotToBlock), RequiredItemCategoryToBlock(InRequiredItemCategoryToBlock) {}
 	FUniversalTaggedSlot(FGameplayTag InSlot, FGameplayTag InSlotToBlock, FGameplayTag InRequiredItemCategoryToBlock, FGameplayTag InExclusiveToSlotCategory)
-		: Slot(InSlot), SlotToBlock(InSlotToBlock), RequiredItemCategoryToBlock(InRequiredItemCategoryToBlock), ExclusiveToSlotCategory(InExclusiveToSlotCategory) {}
+		: Slot(InSlot), UniversalSlotToBlock(InSlotToBlock), RequiredItemCategoryToBlock(InRequiredItemCategoryToBlock), ExclusiveToSlotCategory(InExclusiveToSlotCategory) {}
 	
 	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "RIS | Equipment")
@@ -26,7 +26,7 @@ struct FUniversalTaggedSlot
 	
 	// If this is set then the given slot will be blocked when this slot is filled, depending on the condition below
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ranc Inventory")
-	FGameplayTag SlotToBlock;
+	FGameplayTag UniversalSlotToBlock;
 
 	// This is a conditional item category to look for in THIS slots item to determine whether we should block SlotToBlock
 	// If it is not set and SlotToBlock is, then we will block SlotToBlock always
@@ -124,6 +124,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "RIS | Equipment")
 	void SetTaggedSlotBlocked(FGameplayTag Slot, bool IsBlocked);
 
+	UFUNCTION(BlueprintCallable, Category = "RIS | Equipment")
+	bool CanItemBeEquippedInUniversalSlot(const FGameplayTag& ItemId, const FUniversalTaggedSlot& Slot, bool IgnoreBlocking = false) const;
+
 	UFUNCTION(BlueprintPure, Category = "RIS | Equipment")
 	bool IsTaggedSlotBlocked(const FGameplayTag& Slot) const;
 
@@ -137,7 +140,8 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "RIS | Equipment")
 	FOnItemRemovedFromTaggedSlot OnItemRemovedFromTaggedSlot;
 
-	// Which special but universal slots are available, e.g. left/right hand
+	// Which tagged but universal slots are available, e.g. left/right hand
+	// These can be configured to block other universal slots, e.g. a two handed weapon in mainhand might block offhand
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "RIS | Equipment")
 	TArray<FUniversalTaggedSlot> UniversalTaggedSlots;
 	
@@ -213,6 +217,13 @@ public:
 					const FGameplayTag& TargetTaggedSlot = FGameplayTag(),
 					const FGameplayTag& SwapItemId = FGameplayTag(), int32 SwapQuantity = 0);
 
+
+	// Runs the code of MoveItem but does not actually move the item, useful for validations pre-move
+	int32 ValidateMoveItem(const FGameplayTag& ItemId, int32 Quantity,
+					const FGameplayTag& SourceTaggedSlot = FGameplayTag(),
+					const FGameplayTag& TargetTaggedSlot = FGameplayTag(),
+					const FGameplayTag& SwapItemId = FGameplayTag(), int32 SwapQuantity = 0);
+
 	/* Attempts to drop the item from the inventory, attempting to spawn an Item object in the world
 	 * Specify DropItemClass and DropDistance properties to customize the drop
 	 * Called on client it will request the drop on the server
@@ -221,7 +232,10 @@ public:
 	int32 DropFromTaggedSlot(const FGameplayTag& SlotTag, int32 Quantity, FVector RelativeDropLocation = FVector(1e+300, 0,0));
 
 	bool ContainedInUniversalSlot(const FGameplayTag& TagToFind) const;
-	
+
+	// Returns null if no blocking or returns the slot causing the block if blocking is occuring
+	const FUniversalTaggedSlot* WouldItemMoveIndirectlyViolateBlocking(const FGameplayTag& TaggedSlot, const UItemStaticData* ItemData) const;
+
 protected:
 	void CheckAndUpdateRecipeAvailability();
 	
@@ -258,7 +272,8 @@ protected:
 							   const FGameplayTag& SourceTaggedSlot = FGameplayTag(),
 							   const FGameplayTag& TargetTaggedSlot = FGameplayTag(),
 							   bool AllowAutomaticSwapping = true,
-							   const FGameplayTag& SwapItemId = FGameplayTag(), int32 SwapQuantity = 0, bool SuppressUpdate = false);
+							   const FGameplayTag& SwapItemId = FGameplayTag(), int32 SwapQuantity = 0,
+							   bool SuppressUpdate = false, bool SimulateMoveOnly = false);
 	
 	UFUNCTION(Server, Reliable)
 	void DropFromTaggedSlot_Server(const FGameplayTag& SlotTag, int32 Quantity, FVector RelativeDropLocation = FVector(1e+300, 0,0));
@@ -283,7 +298,6 @@ protected:
 	virtual int32 ExtractItemImpl_IfServer(const FGameplayTag& ItemId, int32 Quantity, EItemChangeReason Reason, TArray<UItemInstanceData*>& StateArrayToAppendTo, bool SuppressUpdate) override;
 	int32 ExtractItemFromTaggedSlot_IfServer(const FGameplayTag& TaggedSlot, const FGameplayTag& ItemId, int32 Quantity, EItemChangeReason Reason, TArray<UItemInstanceData*>& StateArrayToAppendTo);
 
-	bool WouldItemMoveIndirectlyViolateBlocking(const FGameplayTag& TaggedSlot, const UItemStaticData* ItemData) const;
 	void UpdateBlockingState(FGameplayTag SlotTag, const UItemStaticData* ItemData, bool IsEquip);
 
 
@@ -307,6 +321,8 @@ private:
 	TMap<FGameplayTag, FItemBundle> TaggedItemsCache; // Slot to quantity;
 	
 	TArray<std::tuple<FGameplayTag, int32>> GetItemDistributionPlan(const UItemStaticData* ItemData, int32 Quantity, EPreferredSlotPolicy PreferTaggedSlots);
+
+	void SortUniversalTaggedSlots();
 	
 	UFUNCTION()
 	void OnRep_Slots();

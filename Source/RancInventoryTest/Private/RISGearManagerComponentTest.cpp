@@ -6,6 +6,7 @@
 #include "Misc/AutomationTest.h"
 #include "RISInventoryTestSetup.cpp" // Include for test item and tag definitions
 #include "WeaponActor.h"
+#include "Framework/DebugTestResult.h"
 #include "GameFramework/Character.h"
 
 #define TestName "GameTests.RIS.RancGearManager"
@@ -31,7 +32,6 @@ public:
 		InventoryComponent->MaxContainerSlotCount = NumSlots;
 		InventoryComponent->MaxWeight = CarryCapacity;
 		InventoryComponent->RegisterComponent();
-		InventoryComponent->InitializeComponent();
 
 		GearManager = NewObject<UGearManagerComponent>(TempActor);
 		TempActor->AddInstanceComponent(GearManager);
@@ -51,7 +51,6 @@ public:
 		OffHandSlotDef.bVisibleOnCharacter = true;
 		GearManager->GearSlots.Add(OffHandSlotDef);
 
-		GearManager->InitializeComponent();
 		GearManager->Initialize();
 		TestFixture.InitializeTestItems(); // Initialize test items
 	}
@@ -87,7 +86,7 @@ public:
 		GearManagerComponentTestContext Context(100, 9); // No blocking for this test
 		auto* GearManager = Context.GearManager;
 		auto* Subsystem = Context.TestFixture.GetSubsystem();
-		bool Res = true;
+		FDebugTestResult Res = true;
 
 		UItemStaticData* SpearData = Subsystem->GetItemDataById(ItemIdSpear);
 		Res &= Test->TestTrue(TEXT("Spear item data should be valid"), SpearData != nullptr);
@@ -112,7 +111,7 @@ public:
 		auto* InventoryComponent = Context.InventoryComponent;
 		auto* GearManager = Context.GearManager;
 		auto* Subsystem = Context.TestFixture.GetSubsystem();
-		bool Res = true;
+		FDebugTestResult Res = true;
 
 		UItemStaticData* SpearData = Subsystem->GetItemDataById(ItemIdSpear);
 		Res &= Test->TestTrue(TEXT("Spear item data should be valid"), SpearData != nullptr);
@@ -137,7 +136,7 @@ public:
 		auto* InventoryComponent = Context.InventoryComponent;
 		auto* GearManager = Context.GearManager;
 		auto* Subsystem = Context.TestFixture.GetSubsystem();
-		bool Res = true;
+		FDebugTestResult Res = true;
 
 		UItemStaticData* SpearData = Subsystem->GetItemDataById(ItemIdSpear);
 		Res &= Test->TestTrue(TEXT("Spear item data should be valid"), SpearData != nullptr);
@@ -160,7 +159,7 @@ public:
 	{
 		GearManagerComponentTestContext Context(100, 9);
 		auto* GearManager = Context.GearManager;
-		bool Res = true;
+		FDebugTestResult Res = true;
 
 		const int32 InvalidIndex = 999;
 		GearManager->SelectActiveWeapon(InvalidIndex, false, nullptr);
@@ -181,7 +180,7 @@ public:
 	    auto* InventoryComponent = Context.InventoryComponent;
 	    auto* GearManager = Context.GearManager;
 	    auto* Subsystem = Context.TestFixture.GetSubsystem();
-	    bool Res = true;
+	    FDebugTestResult Res = true;
 
 	    // ***********************************************
 	    // Step 0: Verify initial state: both weapon slots are empty.
@@ -277,8 +276,9 @@ public:
 	        GearManager->OffhandSlotWeapon->ItemData->ItemId == RockData->ItemId);
 
 	    // ***********************************************
-	    // Step 13: MOVE Spear into mainhand; this should clear offhand.
+	    // Step 13: clear offhand, then MOVE Spear into mainhand;
 	    // ***********************************************
+		InventoryComponent->RemoveQuantityFromTaggedSlot_IfServer(LeftHandSlot, 999, EItemChangeReason::Removed, true, true);
 		AmountAdded = InventoryComponent->AddItemToAnySlot(Subsystem, ItemIdSpear, 1, EPreferredSlotPolicy::PreferGenericInventory);
 		int32 MoveResult = InventoryComponent->MoveItem(SpearData->ItemId, 1, FGameplayTag::EmptyTag, RightHandSlot, FGameplayTag::EmptyTag, 1);
 	    Res &= Test->TestTrue(TEXT("Step 13: Adding Spear to RightHandSlot should succeed"), AmountAdded > 0);
@@ -366,7 +366,7 @@ public:
 
 bool FRancGearManagerComponentTest::RunTest(const FString& Parameters)
 {
-	bool Res = true;
+	FDebugTestResult Res = true;
 	GearManagerTestScenarios TestScenarios(this);
 	Res &= TestScenarios.TestEquippingWeapon();
 	Res &= TestScenarios.TestBlockedSlotBehavior();

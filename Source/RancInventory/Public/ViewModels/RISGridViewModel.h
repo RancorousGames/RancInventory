@@ -47,7 +47,7 @@ public:
 	
 	UFUNCTION(BlueprintCallable, Category=RIS)
 	int32 UseItem(FGameplayTag TaggedSlot, int32 SlotIndex);
-	
+
     UFUNCTION(BlueprintCallable, Category=RIS)
     FTaggedItemBundle& GetItemForTaggedSlot(const FGameplayTag& SlotTag) const;
     
@@ -86,7 +86,10 @@ public:
     
     UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category=RIS)
     bool CanTaggedSlotReceiveItem(const FGameplayTag& ItemId, int32 Quantity, const FGameplayTag& SlotTag, bool CheckContainerLimits = true) const;
-    
+
+	// This function will validate that the viewmodel is settled and not expecting any more operations. Intended to be used for tests
+	bool AssertViewModelSettled() const;
+	
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category=RIS)
     int32 NumberOfSlots;
     
@@ -108,6 +111,7 @@ public:
 protected:
     FGameplayTag FindTaggedSlotForItem(const FGameplayTag& ItemId, int32 Quanitity) const;
 
+	// Finds a slot that is appropriate for the given item and quantity
     UFUNCTION(BlueprintNativeEvent , Category = RIS)
     int32 FindSlotIndexForItem(const FGameplayTag& ItemId, int32 Quantity);
     
@@ -122,6 +126,10 @@ protected:
     
     UFUNCTION(BlueprintNativeEvent , Category = RIS)
     void ForceFullUpdate();
+
+    bool TryUnblockingMove(FGameplayTag TargetTaggedSlot, FGameplayTag ItemId);
+	bool MoveItem_Impl(FGameplayTag SourceTaggedSlot, int32 SourceSlotIndex, FGameplayTag TargetTaggedSlot,
+                       int32 TargetSlotIndex, int32 InQuantity, bool IsSplit);
 	
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category=RIS)
     TArray<FItemBundle> ViewableGridSlots;
