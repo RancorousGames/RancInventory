@@ -53,7 +53,7 @@ void AWeaponActor::Initialize_Impl(bool InitializeWeaponData, bool InitializeSta
         if (InitializeStaticMesh)
         {
             GetStaticMeshComponent()->SetStaticMesh(ItemData->ItemWorldMesh);
-            GetStaticMeshComponent()->SetWorldScale3D(ItemData->ItemWorldScale);
+            SetActorScale3D(ItemData->ItemWorldScale); // This is overwritten when attaching, see GetAttachTransform_Impl
             GetStaticMeshComponent()->SetSimulatePhysics(false);
             GetStaticMeshComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
             GetStaticMeshComponent()->SetCollisionProfileName(TEXT("NoCollision"));
@@ -97,10 +97,11 @@ FTransform AWeaponActor::GetAttachTransform_Impl(FName SocketName)
     {
         if (const auto* Socket = Mesh->GetSocketByName(SocketName))
         {
-            return FTransform(Socket->RelativeRotation, Socket->RelativeLocation, Socket->RelativeScale);
+            return FTransform(Socket->RelativeRotation, Socket->RelativeLocation, ItemData->ItemWorldScale);
         }
     }
-    return FTransform();
+    auto Transform = FTransform(FRotator::ZeroRotator, FVector::ZeroVector, ItemData->ItemWorldScale);
+    return Transform;
 }
 
 FMontageData AWeaponActor::GetAttackMontage_Implementation(int32 MontageIdOverride)

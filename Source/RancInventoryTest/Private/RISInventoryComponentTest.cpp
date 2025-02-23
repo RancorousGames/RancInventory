@@ -887,7 +887,167 @@ public:
 		return Res;
 	}
 
-	bool TestAddItem_IfServer()
+	bool TestAddStackableItems() const
+	{
+	    InventoryComponentTestContext Context(100); // Setup with sufficient capacity
+	    auto* InventoryComponent = Context.InventoryComponent;
+	    auto* Subsystem = Context.TestFixture.GetSubsystem();
+	    FDebugTestResult Res = true;
+		
+	    // **Test 1: Add stackable items to generic inventory**
+	    // Add 20 rocks, which should fit entirely in generic slots (9 slots, 5 per slot = 45 max)
+	    int32 Added = InventoryComponent->AddItem_IfServer(Subsystem, ItemIdRock, 20, true);
+	    Res &= Test->TestEqual(TEXT("Should add 20 rocks"), Added, 20);
+	    int32 GenericRockCount = InventoryComponent->GetContainerOnlyItemQuantity(ItemIdRock);
+	    Res &= Test->TestEqual(TEXT("Generic inventory should have 20 rocks"), GenericRockCount, 20);
+
+	    // **Test 2: Add more rocks to fill generic inventory**
+	    // Add 25 more rocks, filling the remaining generic capacity (45 - 20 = 25)
+	    Added = InventoryComponent->AddItem_IfServer(Subsystem, ItemIdRock, 25, true);
+	    Res &= Test->TestEqual(TEXT("Should add 25 more rocks"), Added, 25);
+	    GenericRockCount = InventoryComponent->GetContainerOnlyItemQuantity(ItemIdRock);
+	    Res &= Test->TestEqual(TEXT("Generic inventory should have 45 rocks"), GenericRockCount, 45);
+
+	    // **Test 3: Add rocks that spill over to universal tagged slots**
+	    // Add 10 rocks, which should go to LeftHandSlot (5) and RightHandSlot (5)
+	    Added = InventoryComponent->AddItem_IfServer(Subsystem, ItemIdRock, 10, true);
+	    Res &= Test->TestEqual(TEXT("Should add 10 rocks to tagged slots"), Added, 10);
+	    FTaggedItemBundle LeftHand = InventoryComponent->GetItemForTaggedSlot(LeftHandSlot);
+	    FTaggedItemBundle RightHand = InventoryComponent->GetItemForTaggedSlot(RightHandSlot);
+	    Res &= Test->TestEqual(TEXT("Left hand should have 5 rocks"), LeftHand.Quantity, 5);
+	    Res &= Test->TestEqual(TEXT("Right hand should have 5 rocks"), RightHand.Quantity, 5);
+
+	    // **Test 4: Try to add more rocks when all slots are full**
+	    // Total capacity is 55 (9*5 + 5 + 5), so adding 5 more should fail
+	    Added = InventoryComponent->AddItem_IfServer(Subsystem, ItemIdRock, 5, true);
+	    Res &= Test->TestEqual(TEXT("Should not add any more rocks"), Added, 0);
+
+	    // **Test 5: Add to a specific tagged slot incrementally**
+	    InventoryComponent->Clear_IfServer();
+	    Added = InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, RightHandSlot, ItemIdRock, 3, true);
+	    Res &= Test->TestEqual(TEXT("Should add 3 rocks to right hand"), Added, 3);
+	    RightHand = InventoryComponent->GetItemForTaggedSlot(RightHandSlot);
+	    Res &= Test->TestEqual(TEXT("Right hand should have 3 rocks"), RightHand.Quantity, 3);
+
+	    // Add more to the same slot, up to the stack limit
+	    Added = InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, RightHandSlot, ItemIdRock, 2, true);
+	    Res &= Test->TestEqual(TEXT("Should add 2 more rocks to right hand"), Added, 2);
+	    RightHand = InventoryComponent->GetItemForTaggedSlot(RightHandSlot);
+	    Res &= Test->TestEqual(TEXT("Right hand should have 5 rocks"), RightHand.Quantity, 5);
+
+	    // Try to exceed the stack limit
+	    Added = InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, RightHandSlot, ItemIdRock, 1, true);
+	    Res &= Test->TestEqual(TEXT("Should not add more rocks to right hand"), Added, 0);
+
+	    // **Test 6: Try to add stackable item to a specialized slot that doesn't accept it**
+	    Added = InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, HelmetSlot, ItemIdRock, 1, true);
+	    Res &= Test->TestEqual(TEXT("Should not add rock to helmet slot"), Added, 0);
+	    FTaggedItemBundle HelmetSlotItem = InventoryComponent->GetItemForTaggedSlot(HelmetSlot);
+	    Res &= Test->TestFalse(TEXT("Helmet slot should be empty"), HelmetSlotItem.IsValid());
+
+	    // **Test 7: Add items with AllowPartial = false**
+	    InventoryComponent->Clear_IfServer();
+	    // Try to add 60 rocks (exceeds total capacity of 55) with AllowPartial = false
+	    Added = InventoryComponent->AddItem_IfServer(Subsystem, ItemIdRock, 60, false);
+	    Res &= Test->TestEqual(TEXT("Should not add any rocks since 60 > 55"), Added, 0);
+	    GenericRockCount = InventoryComponent->GetContainerOnlyItemQuantity(ItemIdRock);
+	    LeftHand = InventoryComponent->GetItemForTaggedSlot(LeftHandSlot);
+	    RightHand = InventoryComponent->GetItemForTaggedSlot(RightHandSlot);
+	    Res &= Test->TestEqual(TEXT("Generic inventory should have 0 rocks"), GenericRockCount, 0);
+	    Res &= Test->TestFalse(TEXT("Left hand should be empty"), LeftHand.IsValid());
+	    Res &= Test->TestFalse(TEXT("Right hand should be empty"), RightHand.IsValid());
+
+	    // **Test 8: Add different stackable items**
+	    InventoryComponent->Clear_IfServer();
+	    Added = InventoryComponent->AddItem_IfServer(Subsystem, ItemIdRock, 5, true);
+	    Res &= Test->TestEqual(TEXT("Should add 5 rocks"), Added, 5);
+	    Added = InventoryComponent->AddItem_IfServer(Subsystem, ItemIdSticks, 5, true);
+	    Res &= Test->TestEqual(TEXT("Should add 5 sticks"), Added, 5);
+	    int32 RockCount = InventoryComponent->GetItemQuantityTotal(ItemIdRock);
+	    int32 StickCount = InventoryComponent->GetItemQuantityTotal(ItemIdSticks);
+	    Res &= Test->TestEqual(TEXT("Total rocks should be 5"), RockCount, 5);
+	    Res &= Test->TestEqual(TEXT("Total sticks should be 5"), StickCount, 5);
+
+	    // **Test 9: Fill partial stack in universal tagged slot before adding to generic inventory**
+	    InventoryComponent->Clear_IfServer();
+	    // Add 3 sticks to LeftHandSlot (partial stack)
+	    InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, LeftHandSlot, ItemIdSticks, 3, true);
+	    // Add 5 sticks with preference for generic inventory
+	    Added = InventoryComponent->AddItemToAnySlot(Subsystem, ItemIdSticks, 5, EPreferredSlotPolicy::PreferGenericInventory);
+	    Res &= Test->TestEqual(TEXT("Should add 5 sticks, filling LeftHandSlot first"), Added, 5);
+	    // Check LeftHandSlot: should be filled to 5
+	    LeftHand = InventoryComponent->GetItemForTaggedSlot(LeftHandSlot);
+	    Res &= Test->TestEqual(TEXT("Left hand should have 5 sticks"), LeftHand.Quantity, 5);
+	    // Check generic inventory: should have 3 sticks in one slot
+	    int32 GenericStickCount = InventoryComponent->GetContainerOnlyItemQuantity(ItemIdSticks);
+	    Res &= Test->TestEqual(TEXT("Generic inventory should have 3 sticks"), GenericStickCount, 3);
+
+	    // **Test 10: Fill partial stack in generic inventory before adding to new slots**
+	    InventoryComponent->Clear_IfServer();
+	    // Add 2 sticks to a generic slot (partial stack)
+	    InventoryComponent->AddItem_IfServer(Subsystem, ItemIdSticks, 2, true);
+	    // Add 5 sticks
+	    Added = InventoryComponent->AddItem_IfServer(Subsystem, ItemIdSticks, 5, true);
+	    Res &= Test->TestEqual(TEXT("Should add 5 sticks, filling existing stack first"), Added, 5);
+	    // Check generic inventory: should have one stack of 5 and another of 2
+	    GenericStickCount = InventoryComponent->GetContainerOnlyItemQuantity(ItemIdSticks);
+	    Res &= Test->TestEqual(TEXT("Generic inventory should have 7 sticks"), GenericStickCount, 7);
+	    // Assuming the system fills the existing stack first, then creates a new stack
+	    // Need to check the individual slot quantities if possible
+	    // For now, assume total quantity is correct
+
+	    // **Test 11: Fill multiple partial stacks**
+	    InventoryComponent->Clear_IfServer();
+	    // Add 2 sticks to LeftHandSlot
+	    InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, LeftHandSlot, ItemIdSticks, 2, true);
+	    // Add 3 sticks to a generic slot
+	    InventoryComponent->AddItem_IfServer(Subsystem, ItemIdSticks, 3, true);
+	    // Add 10 sticks
+	    Added = InventoryComponent->AddItem_IfServer(Subsystem, ItemIdSticks, 10, true);
+	    Res &= Test->TestEqual(TEXT("Should add 10 sticks, filling partial stacks first"), Added, 10);
+	    // Check LeftHandSlot: should be filled to 5 (added 3)
+	    LeftHand = InventoryComponent->GetItemForTaggedSlot(LeftHandSlot);
+	    Res &= Test->TestEqual(TEXT("Left hand should have 5 sticks"), LeftHand.Quantity, 5);
+	    // Check generic inventory: existing stack filled to 5 (added 2), and new stack of 5
+	    GenericStickCount = InventoryComponent->GetContainerOnlyItemQuantity(ItemIdSticks);
+	    Res &= Test->TestEqual(TEXT("Generic inventory should have 10 sticks"), GenericStickCount, 10);
+	    // Again, assuming the system fills existing stacks first
+
+	    // **Test 12: Respect stack limits and slot capacities**
+	    InventoryComponent->Clear_IfServer();
+	    // Fill LeftHandSlot with 5 sticks
+	    InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, LeftHandSlot, ItemIdSticks, 5, true);
+	    // Fill RightHandSlot with 5 sticks
+	    InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, RightHandSlot, ItemIdSticks, 5, true);
+	    // Fill generic slots with full stacks of sticks (9 slots * 5 = 45)
+	    for (int i = 0; i < 9; ++i)
+	    {
+	        InventoryComponent->AddItem_IfServer(Subsystem, ItemIdSticks, 5, true);
+	    }
+	    // Try to add 1 more stick
+	    Added = InventoryComponent->AddItem_IfServer(Subsystem, ItemIdSticks, 1, true);
+	    Res &= Test->TestEqual(TEXT("Should not add any more sticks"), Added, 0);
+
+	    // **Test 13: Add items when partial stacks are in different slot types**
+	    InventoryComponent->Clear_IfServer();
+	    // Add 2 sticks to LeftHandSlot
+	    InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, LeftHandSlot, ItemIdSticks, 2, true);
+	    // Add 2 sticks to a generic slot
+	    InventoryComponent->AddItem_IfServer(Subsystem, ItemIdSticks, 2, true);
+	    // Add 6 sticks
+	    Added = InventoryComponent->AddItem_IfServer(Subsystem, ItemIdSticks, 6, true);
+	    Res &= Test->TestEqual(TEXT("Should add 6 sticks, filling partial stacks"), Added, 6);
+	    // Check LeftHandSlot: should be filled to 5 (added 3)
+	    LeftHand = InventoryComponent->GetItemForTaggedSlot(LeftHandSlot);
+	    Res &= Test->TestEqual(TEXT("Left hand should have 5 sticks"), LeftHand.Quantity, 5);
+	    // Check generic inventory: existing stack filled to 5 (added 3), no new stacks
+	    GenericStickCount = InventoryComponent->GetContainerOnlyItemQuantity(ItemIdSticks);
+	    Res &= Test->TestEqual(TEXT("Generic inventory should have 5 sticks"), GenericStickCount, 5);
+
+	    return Res;
+	}
+
+	bool TestAddItem()
 	{
 		// Inventory component overrides the AddItem_IfServer function to handle item addition logic relating to tagged slots.
 		InventoryComponentTestContext Context(100);
@@ -1167,8 +1327,17 @@ public:
 
 
 		InventoryComponent->Clear_IfServer();
-		// Now we want to test a tricky situation where we add a blocking item and a conflict-with-blocking item at the same time
-		
+		InventoryComponent->AddItemToAnySlot(Subsystem, OneSpear, EPreferredSlotPolicy::PreferAnyTaggedSlot);
+		InventoryComponent->AddItemToAnySlot(Subsystem, OneRock, EPreferredSlotPolicy::PreferGenericInventory);
+		// Remove spear and verify unblock
+		InventoryComponent->RemoveQuantityFromTaggedSlot_IfServer(RightHandSlot, 1, EItemChangeReason::ForceDestroyed);
+		Res &= Test->TestFalse(TEXT("Right hand should be empty"), InventoryComponent->GetItemForTaggedSlot(RightHandSlot).IsValid());
+		Res &= Test->TestFalse(TEXT("Left hand should be unblocked"), InventoryComponent->IsTaggedSlotBlocked(LeftHandSlot));
+		// Re-add spear and test again when moving spear instead of removing
+		InventoryComponent->AddItemToAnySlot(Subsystem, OneSpear, EPreferredSlotPolicy::PreferAnyTaggedSlot);
+		InventoryComponent->MoveItem(ItemIdSpear, 1, RightHandSlot, FGameplayTag::EmptyTag);
+		Res &= Test->TestFalse(TEXT("Right hand should be empty"), InventoryComponent->GetItemForTaggedSlot(RightHandSlot).IsValid());
+		Res &= Test->TestFalse(TEXT("Left hand should be unblocked"), InventoryComponent->IsTaggedSlotBlocked(LeftHandSlot));
 		
 		return Res;
 	}
@@ -1356,8 +1525,9 @@ bool FRancInventoryComponentTest::RunTest(const FString& Parameters)
 	FDebugTestResult Res = true;
 	FInventoryComponentTestScenarios TestScenarios(this);
 	Res &= TestScenarios.TestAddingTaggedSlotItems();
-	Res &= TestScenarios.TestAddItem_IfServer();
+	Res &= TestScenarios.TestAddItem();
 	Res &= TestScenarios.TestAddItemToAnySlots();
+	Res &= TestScenarios.TestAddStackableItems();
 	Res &= TestScenarios.TestRemovingTaggedSlotItems();
 	Res &= TestScenarios.TestMoveTaggedSlotItems();
 	Res &= TestScenarios.TestMoveOperationsWithSwapback();

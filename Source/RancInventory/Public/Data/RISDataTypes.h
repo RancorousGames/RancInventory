@@ -43,9 +43,9 @@ struct FRISMoveResult
     FRISMoveResult(int32 Quantity, bool Swapped) : QuantityMoved(Quantity), WereItemsSwapped(Swapped) {};
 
     UPROPERTY()
-    int32 QuantityMoved;
+    int32 QuantityMoved = 0;
     UPROPERTY()
-    bool WereItemsSwapped;
+    bool WereItemsSwapped = false;
 };
 
 
@@ -128,19 +128,19 @@ struct FInitialItem
 
     FInitialItem() = default;
 
-    explicit FInitialItem(FPrimaryRISItemId InItemId) : ItemId(InItemId)
+    explicit FInitialItem(FPrimaryRISItemId InItemId) : ItemId(InItemId), ItemData(nullptr), Quantity(1)
     {
     }
 
-    explicit FInitialItem(FPrimaryRISItemId InItemId, const int32& InQuant) : ItemId(InItemId), Quantity(InQuant)
+    explicit FInitialItem(FPrimaryRISItemId InItemId, const int32& InQuant) : ItemId(InItemId), ItemData(nullptr), Quantity(InQuant)
     {
     }
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RIS")
-    FPrimaryRISItemId ItemId;
+    FPrimaryRISItemId ItemId = FPrimaryRISItemId();
     
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RIS")
-    UItemStaticData* ItemData;
+    UItemStaticData* ItemData = nullptr;
     
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RIS")
     int32 Quantity = 1;
@@ -153,7 +153,7 @@ struct FRandomItemSelection
     GENERATED_BODY()
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ranc Inventory")
-    UItemStaticData* ItemData;
+    UItemStaticData* ItemData = nullptr;
 
     
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ranc Inventory")

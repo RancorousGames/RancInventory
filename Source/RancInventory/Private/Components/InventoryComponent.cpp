@@ -258,7 +258,7 @@ int32 UInventoryComponent::AddItemToTaggedSlot_IfServer(TScriptInterface<IItemSo
 }
 
 int32 UInventoryComponent::AddItemToAnySlot(TScriptInterface<IItemSource> ItemSource, const FGameplayTag& ItemId,
-                                            int32 RequestedQuantity, EPreferredSlotPolicy PreferTaggedSlots)
+                                            int32 RequestedQuantity, EPreferredSlotPolicy PreferTaggedSlots, bool AllowPartial)
 {
 	const auto* ItemData = URISSubsystem::GetItemDataById(ItemId);
 	if (!ItemData)
@@ -271,14 +271,14 @@ int32 UInventoryComponent::AddItemToAnySlot(TScriptInterface<IItemSource> ItemSo
 
 	const int32 QuantityToAdd = FMath::Min(AcceptableQuantity, RequestedQuantity);
 
-	if (QuantityToAdd <= 0)
+	if (QuantityToAdd <= 0 || (!AllowPartial && QuantityToAdd < RequestedQuantity))
 		return 0;
 
 	// Distribution plan should not try to add to left hand as left hand already has sticks!
 	TArray<std::tuple<FGameplayTag, int32>> DistributionPlan = GetItemDistributionPlan(
 		ItemData, QuantityToAdd, PreferTaggedSlots);
 
-	const int32 ActualAdded = Super::AddItem_ServerImpl(ItemSource, ItemId, QuantityToAdd, true, true);
+	const int32 ActualAdded = Super::AddItem_ServerImpl(ItemSource, ItemId, QuantityToAdd, AllowPartial, true);
 
 	if (GetOwnerRole() >= ROLE_Authority || GetOwnerRole() == ROLE_None)
 		ensureMsgf(ActualAdded == QuantityToAdd, TEXT("Failed to add all items to container despite quantity calculated"));
@@ -652,7 +652,7 @@ int32 UInventoryComponent::MoveItem_ServerImpl(const FGameplayTag& ItemId, int32
 			}
 		}
 
-		UpdateBlockingState(SourceTaggedSlot, TargetItemData, true);
+		UpdateBlockingState(SourceTaggedSlot, TargetItemData, SwapBackRequested);
 		if (!SuppressUpdate)
 		{
 			OnItemRemovedFromTaggedSlot.Broadcast(SourceTaggedSlot, SourceItemData, MovedQuantity,
@@ -986,7 +986,7 @@ int32 UInventoryComponent::GetIndexForTaggedSlot(const FGameplayTag& SlotTag) co
 int32 UInventoryComponent::AddItem_ServerImpl(TScriptInterface<IItemSource> ItemSource, const FGameplayTag& ItemId,
                                               int32 RequestedQuantity, bool AllowPartial, bool SuppressUpdate)
 {
-	return AddItemToAnySlot(ItemSource, ItemId, RequestedQuantity, EPreferredSlotPolicy::PreferSpecializedTaggedSlot);
+	return AddItemToAnySlot(ItemSource, ItemId, RequestedQuantity, EPreferredSlotPolicy::PreferSpecializedTaggedSlot, AllowPartial);
 }
 
 TArray<FTaggedItemBundle> UInventoryComponent::GetAllTaggedItems() const
@@ -1120,12 +1120,47 @@ TArray<std::tuple<FGameplayTag, int32>> UInventoryComponent::GetItemDistribution
 	int32 TotalQuantityDistributed = 0;
 	int32 QuantityDistributedToGenericSlots = 0;
 
-	// Adjust the flow based on PreferTaggedSlots flag
+	TArray<FGameplayTag> TaggedSlotsToExclude = TArray<FGameplayTag>(); // We dont want to add to the same tagged slot twice
+	if (ItemData->MaxStackSize > 1)
+	{
+		// First we need to check for any partially filled slots that we can top off first
+		for (FTaggedItemBundle& Item : TaggedSlotItemInstances)
+		{
+			if (TotalQuantityDistributed >= QuantityToAdd) break;
+			if (Item.ItemId == ItemId && !Item.IsBlocked)
+			{
+				int32 QuantityToAddToSlot = FMath::Min(QuantityToAdd, ItemData->MaxStackSize - Item.Quantity);
+				if (QuantityToAddToSlot > 0 && QuantityToAddToSlot < ItemData->MaxStackSize)
+				{
+					TaggedSlotsToExclude.Add(Item.Tag);
+					DistributionPlan.Add(std::make_tuple(Item.Tag, QuantityToAddToSlot));
+					TotalQuantityDistributed += QuantityToAddToSlot;
+				}
+			}
+		}
+
+		for (FItemBundleWithInstanceData& Item : ItemsVer.Items)
+		{
+			if (TotalQuantityDistributed >= QuantityToAdd) break;
+			if (Item.ItemId == ItemId)
+			{
+				int32 Remainder = Item.Quantity % ItemData->MaxStackSize;
+				int32 NeededToFill = (Remainder == 0) ? 0 : (ItemData->MaxStackSize - Remainder);
+				int32 QuantityToAddToGeneric = FMath::Min(NeededToFill, QuantityToAdd - TotalQuantityDistributed);
+				if (QuantityToAddToGeneric > 0)
+				{
+					DistributionPlan.Add(std::make_tuple(FGameplayTag::EmptyTag, QuantityToAddToGeneric));
+					TotalQuantityDistributed += QuantityToAddToGeneric;
+				}
+			}
+		}
+	}
+	
 	if (PreferTaggedSlots == EPreferredSlotPolicy::PreferGenericInventory)
 	{
 		const int32 QuantityContainersGenericSlotsCanReceive = Super::GetReceivableQuantityImpl(ItemId);
 		// Try adding to generic slots first if not preferring tagged slots
-		QuantityDistributedToGenericSlots += FMath::Min(QuantityToAdd, QuantityContainersGenericSlotsCanReceive);
+		QuantityDistributedToGenericSlots += FMath::Min(QuantityToAdd - TotalQuantityDistributed, QuantityContainersGenericSlotsCanReceive);
 		TotalQuantityDistributed += QuantityDistributedToGenericSlots;
 	}
 
@@ -1136,6 +1171,7 @@ TArray<std::tuple<FGameplayTag, int32>> UInventoryComponent::GetItemDistribution
 		for (const FGameplayTag& SlotTag : SpecializedTaggedSlots)
 		{
 			if (TotalQuantityDistributed >= QuantityToAdd) break;
+			if (TaggedSlotsToExclude.Contains(SlotTag)) continue;
 
 			int32 AddedToTaggedSlot = FMath::Min(QuantityToAdd - TotalQuantityDistributed,
 			                                     GetQuantityOfItemTaggedSlotCanReceive(ItemId, SlotTag));
@@ -1204,11 +1240,15 @@ TArray<std::tuple<FGameplayTag, int32>> UInventoryComponent::GetItemDistribution
 	}
 
 	// Any remaining quantity must be added to generic slots
-	QuantityDistributedToGenericSlots += QuantityToAdd - TotalQuantityDistributed;
-
+	int32 FinalAddedtoGenericSlots = QuantityToAdd - TotalQuantityDistributed;
+	QuantityDistributedToGenericSlots += FinalAddedtoGenericSlots;
+	TotalQuantityDistributed += FinalAddedtoGenericSlots;
+	
 	if (QuantityDistributedToGenericSlots > 0)
 		DistributionPlan.Add(std::make_tuple(FGameplayTag::EmptyTag, QuantityDistributedToGenericSlots));
 
+	ensureMsgf(TotalQuantityDistributed == QuantityToAdd, TEXT("Quantity distributed does not match requested quantity"));
+	
 	return DistributionPlan;
 }
 

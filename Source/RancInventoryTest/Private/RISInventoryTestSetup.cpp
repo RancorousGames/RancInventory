@@ -92,6 +92,8 @@ public:
 	// Helper to initialize common test items
 	void InitializeTestItems()
 	{
+		if (Subsystem->AreAllItemsLoaded()) return;
+		
 		UItemStaticData* RockData = NewObject<UItemStaticData>();
 		RockData->ItemId = ItemIdRock;
 		RockData->ItemName = FName("Rock");

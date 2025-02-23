@@ -85,7 +85,7 @@ public:
 	 * If PreferTaggedSlots is true, an item with category e.g. HelmetSlot will go into HelmetSlot first
 	 * Returns amount added, and always allows partial adding */
 	UFUNCTION(BlueprintCallable, Category = "RIS | Equipment")
-	int32 AddItemToAnySlot(TScriptInterface<IItemSource> ItemSource, const FGameplayTag& ItemId, int32 RequestedQuantity, EPreferredSlotPolicy PreferTaggedSlots = EPreferredSlotPolicy::PreferGenericInventory);
+	int32 AddItemToAnySlot(TScriptInterface<IItemSource> ItemSource, const FGameplayTag& ItemId, int32 RequestedQuantity, EPreferredSlotPolicy PreferTaggedSlots = EPreferredSlotPolicy::PreferGenericInventory, bool AllowPartial = false);
 	
 	// Remove up to Quantity item from a tagged slot, will return the count that was removed
 	UFUNCTION(BlueprintCallable, Category = "RIS | Equipment")

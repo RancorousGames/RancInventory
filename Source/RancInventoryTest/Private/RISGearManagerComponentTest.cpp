@@ -362,6 +362,34 @@ public:
 
 	    return Res;
 	}
+
+	bool TestUnequippingPartially()
+	{
+		// Setup a test context with enough capacity and slots.
+		GearManagerComponentTestContext Context(100, 9);
+		auto* InventoryComponent = Context.InventoryComponent;
+		auto* GearManager = Context.GearManager;
+		auto* Subsystem = Context.TestFixture.GetSubsystem();
+		FDebugTestResult Res = true;
+
+		// Equip 3 rocks to right hand, verify we get it back when asking for active weapon, them remove just one rock anmd verify we still have weapon
+		InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, RightHandSlot, ItemIdRock, 3, false);
+		AWeaponActor* ActiveWeapon = GearManager->GetActiveWeapon();
+		Res &= Test->TestTrue(TEXT("Active weapon should be valid after equipping 3 rocks"), ActiveWeapon != nullptr);
+
+		for (int i = 0; i < 2; i++)
+		{
+			InventoryComponent->RemoveQuantityFromTaggedSlot_IfServer(RightHandSlot, 1, EItemChangeReason::Removed, true);
+			ActiveWeapon = GearManager->GetActiveWeapon();
+			Res &= Test->TestTrue(TEXT("Active weapon should still be valid after removing 1 rock"), ActiveWeapon != nullptr);
+		}
+
+		InventoryComponent->RemoveQuantityFromTaggedSlot_IfServer(RightHandSlot, 1, EItemChangeReason::Removed, true);
+		ActiveWeapon = GearManager->GetActiveWeapon();
+		Res &= Test->TestTrue(TEXT("Active weapon should be null after removing all rocks"), ActiveWeapon == nullptr);		
+		
+		return Res;
+	}
 };
 
 bool FRancGearManagerComponentTest::RunTest(const FString& Parameters)
@@ -373,6 +401,7 @@ bool FRancGearManagerComponentTest::RunTest(const FString& Parameters)
 	Res &= TestScenarios.TestUnequippingWeapon();
 	Res &= TestScenarios.TestInvalidWeaponSelection();
 	Res &= TestScenarios.TestWeaponSelectionDeselectSequences();
+	Res &= TestScenarios.TestUnequippingPartially();
 
 	return Res;
 }

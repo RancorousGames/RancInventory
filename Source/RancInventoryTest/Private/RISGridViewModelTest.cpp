@@ -418,24 +418,28 @@ public:
 
 	    // Exceeding max stack size
 	    InventoryComponent->AddItem_IfServer(Subsystem, ItemIdRock, 8); // Add more rocks to force a stack size check
-	    ViewModel->SplitItem(NoTag, 2, NoTag, 1, 2); // Attempt to overflow slot 1 with rocks
-	    Res &= Test->TestEqual(TEXT("Splitting that exceeds max stack size should fail"), ViewModel->GetItem(1).Quantity, 5); 
+		// First as a sanity check try to split from an empty slot
+		Res &= !ViewModel->SplitItem(NoTag, 2, NoTag, 1, 2); // Attempt to overflow slot 1 with rocks
+	    // Now try to split from a slot with items but would overflow
+		ViewModel->SplitItem(NoTag, 1, NoTag, 0, 2); // Attempt to overflow slot 1 with rocks
+	    Res &= Test->TestEqual(TEXT("Splitting that exceeds max stack size should fail"), ViewModel->GetItem(0).Quantity, 5); 
+	    Res &= Test->TestEqual(TEXT("Splitting that exceeds max stack size should fail"), ViewModel->GetItem(1).Quantity, 3); 
 	    // Attempt split from tagged to generic slot with valid quantities
 		InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, LeftHandSlot, FiveRocks);
-	    ViewModel->SplitItem(LeftHandSlot, -1, NoTag, 2, 1); // Splitting 1 rock to a new generic slot
-	    FItemBundle NewGenericSlotItem = ViewModel->GetItem(2);
-	    Res &= Test->TestEqual(TEXT("After splitting from tagged to generic, new slot should contain 3 rocks total"), NewGenericSlotItem.Quantity, 3);
+	    ViewModel->SplitItem(LeftHandSlot, -1, NoTag, 1, 1); // Splitting 1 rock to a new generic slot
+	    FItemBundle NewGenericSlotItem = ViewModel->GetItem(1);
+	    Res &= Test->TestEqual(TEXT("After splitting from tagged to generic, new slot should contain 4 rocks total"), NewGenericSlotItem.Quantity, 4);
 		FTaggedItemBundle LeftHandItem = ViewModel->GetItemForTaggedSlot(LeftHandSlot);
 		Res &= Test->TestEqual(TEXT("LeftHandSlot should now contain 4 rocks"), LeftHandItem.Quantity, 4);
 		Res &= ViewModel->AssertViewModelSettled();
 		
 	    // split from generic to tagged slot
-	    ViewModel->SplitItem(NoTag, 2, LeftHandSlot, -1, 1); // Attempt to add another helmet to HelmetSlot
+	    ViewModel->SplitItem(NoTag, 1, LeftHandSlot, -1, 1); // Attempt to add another helmet to HelmetSlot
 	    FTaggedItemBundle ItemInLeftHandAfterSplit = ViewModel->GetItemForTaggedSlot(LeftHandSlot);
 		Res &= Test->TestEqual(TEXT("LeftHandSlot should now contain 5 rocks"), ItemInLeftHandAfterSplit.Quantity, 5);
-		Res &= Test->TestEqual(TEXT("Slot 2 should now contain 2 rocks"), ViewModel->GetItem(2).Quantity, 2);
+		Res &= Test->TestEqual(TEXT("Slot 1 should now contain 3 rocks"), ViewModel->GetItem(1).Quantity, 3);
 		
-		// Status: lefthand 5 rocks, right hand 1 rock, slots 0 and 1, 5 rocks, slot 2 2 rocks, helmetSlot 1 helmet
+		// Status: lefthand 5 rocks, right hand 1 rock, slots 0, 5 rocks, slot 1 3 rocks, helmetSlot 1 helmet
 		
 	    // Split with empty/invalid indices and tags
 		ViewModel->SplitItem(NoTag, 5, NoTag, 6, 1); // Invalid indices
@@ -447,7 +451,7 @@ public:
 	    Res &= Test->TestTrue(TEXT("Invalid source tag should result in no changes"), ViewModel->IsTaggedSlotEmpty(ChestSlot));
 
 	    // Attempt to split into a slot with a different item type
-		InventoryComponent->RemoveQuantityFromTaggedSlot_IfServer(RightHandSlot, 1, EItemChangeReason::Removed);
+		InventoryComponent->RemoveQuantityFromTaggedSlot_IfServer(RightHandSlot, 99, EItemChangeReason::Removed, true);
 	    InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, RightHandSlot, OneStick); // Adding spear to RightHandSlot
 	    ViewModel->SplitItem(NoTag, 0, RightHandSlot, -1, 1); // Attempt to split rock into RightHandSlot containing a stick
 	    RightHandItem = ViewModel->GetItemForTaggedSlot(RightHandSlot);

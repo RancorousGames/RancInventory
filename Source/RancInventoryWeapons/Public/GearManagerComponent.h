@@ -8,6 +8,7 @@
 #include "Engine/HitResult.h"
 #include "GearManagerComponent.generated.h"
 
+class UWeaponDefinition;
 class UWeaponStaticData;
 class AWeaponActor;
 class ACharacter;
@@ -29,6 +30,8 @@ struct FGearSlotDefinition
 {
     GENERATED_BODY()
 
+	FGearSlotDefinition() : SlotTag(FGameplayTag::EmptyTag), AttachSocketName(NAME_None), SlotType(EGearSlotType::MainHand), bVisibleOnCharacter(true) {}
+
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ranc Inventory")
     FGameplayTag SlotTag;
 
@@ -36,10 +39,10 @@ struct FGearSlotDefinition
     FName AttachSocketName;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ranc Inventory")
-    EGearSlotType SlotType;
+    EGearSlotType SlotType = EGearSlotType::MainHand;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ranc Inventory")
-	bool bVisibleOnCharacter;
+	bool bVisibleOnCharacter = true;
 	
     // Transient properties to avoid serialization and replication of the component reference
     UPROPERTY(Transient)
@@ -84,7 +87,7 @@ public:
 
 	virtual void InitializeComponent() override;
 	
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ranc Inventory Weapons | Gear")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ranc Inventory Weapons|Gear")
 	TArray<FGearSlotDefinition> GearSlots;
 
 // not using this as i dont want a mirror when i have gearslotdefinition as mutable due to mesh
@@ -95,19 +98,19 @@ public:
 	const FGearSlotDefinition* MainHandSlot;
 	const FGearSlotDefinition* OffhandSlot;
 
-	UPROPERTY(BlueprintAssignable, Category = "Ranc Inventory Weapons | Gear")
+	UPROPERTY(BlueprintAssignable, Category = "Ranc Inventory Weapons|Gear")
 	FWeaponEvent OnEquippedWeaponsChange;
 
-	UPROPERTY(BlueprintAssignable, Category = "Ranc Inventory Weapons | Gear")
+	UPROPERTY(BlueprintAssignable, Category = "Ranc Inventory Weapons|Gear")
 	FWeaponState OnWeaponSelected;
 	
-	UPROPERTY(BlueprintAssignable, Category = "Ranc Inventory Weapons | Gear")
+	UPROPERTY(BlueprintAssignable, Category = "Ranc Inventory Weapons|Gear")
 	FWeaponState OnWeaponHolstered;
 
-	UPROPERTY(BlueprintAssignable, Category = "Ranc Inventory Weapons | Gear")
+	UPROPERTY(BlueprintAssignable, Category = "Ranc Inventory Weapons|Gear")
 	FGearUpdated OnGearEquipped;
 	
-	UPROPERTY(BlueprintAssignable, Category = "Ranc Inventory Weapons | Gear")
+	UPROPERTY(BlueprintAssignable, Category = "Ranc Inventory Weapons|Gear")
 	FGearUpdated OnGearUnequipped;
 	
 	/*
@@ -117,55 +120,55 @@ public:
 	FWeaponEvent OnFinishSpawningWeapons;
 
 	DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnHitDetected, AActor*, HitActor, FHitResult, HitResult);
-	UPROPERTY(BlueprintAssignable, Category = "Ranc Inventory Weapons |Gear")
+	UPROPERTY(BlueprintAssignable, Category = "Ranc Inventory Weapons|Gear")
 	FOnHitDetected OnHitDetected;
 	
 	DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnAttackPerformed, FMontageData, MontageData);
-	UPROPERTY(BlueprintAssignable, Category = "Ranc Inventory Weapons |Gear")
+	UPROPERTY(BlueprintAssignable, Category = "Ranc Inventory Weapons|Gear")
 	FOnAttackPerformed OnAttackPerformed;
 
 
 	// Called when a trace replay has ended i think
 	DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnAttackAnimNotifyEndEvent);
-	UPROPERTY(BlueprintAssignable, Category = "Ranc Inventory Weapons |Gear")
+	UPROPERTY(BlueprintAssignable, Category = "Ranc Inventory Weapons|Gear")
 	FOnAttackAnimNotifyEndEvent OnAttackAnimNotifyEndEvent;
 	
 	
 	// Called every frame
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
-	UPROPERTY(EditAnywhere,BlueprintReadOnly, Category = "Ranc Inventory Weapons |Gear| Configuration")
+	UPROPERTY(EditAnywhere,BlueprintReadOnly, Category = "Ranc Inventory Weapons|Gear|Configuration")
 	bool bMakeHolsteredWeaponInvisible = true;
 	
 	/*
 	If true, we will resize the weapon to it's original world scale after attaching
 	*/	
-	UPROPERTY(EditAnywhere,BlueprintReadWrite, Category = "Ranc Inventory Weapons | Gear | Configuration")
+	UPROPERTY(EditAnywhere,BlueprintReadWrite, Category = "Ranc Inventory Weapons|Gear|Configuration")
 	bool bUseWeaponScaleInsteadOfSocketScale = false;
 	
 	/* Max number of weapons to be at the ready	*/
-	UPROPERTY(EditAnywhere,BlueprintReadWrite, Category = "Ranc Inventory Weapons | Gear | Configuration")
+	UPROPERTY(EditAnywhere,BlueprintReadWrite, Category = "Ranc Inventory Weapons|Gear|Configuration")
 	int32 MaxSelectableWeaponCount = 1;
 	
 	/* If true, the actor will automatically rotate smoothly in the given direction of attack	*/
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ranc Inventory Weapons | Gear | Configuration")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ranc Inventory Weapons|Gear|Configuration")
 	bool bRotateToAttackDirection = false;
 
 	/* Rotation speed in degrees per second	*/
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ranc Inventory Weapons | Gear | Configuration")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ranc Inventory Weapons|Gear|Configuration")
 	float RotateToAttackDirectionSpeed = 12.0f;
 	
-	UPROPERTY(EditAnywhere,BlueprintReadWrite, Category = "Ranc Inventory Weapons | Gear | Configuration")
+	UPROPERTY(EditAnywhere,BlueprintReadWrite, Category = "Ranc Inventory Weapons|Gear|Configuration")
 	FMontageData DefaultEquipMontage = FMontageData();
 
-	UPROPERTY(EditAnywhere,BlueprintReadWrite, Category = "Ranc Inventory Weapons | Gear | Configuration")
-	UAnimMontage* DefaultUnequipMontage = nullptr;
+	UPROPERTY(EditAnywhere,BlueprintReadWrite, Category = "Ranc Inventory Weapons|Gear|Configuration")
+	FMontageData DefaultUnequipMontage = FMontageData();
 	
-	UPROPERTY(EditAnywhere,BlueprintReadWrite, Category = "Ranc Inventory Weapons | Gear | Configuration")
+	UPROPERTY(EditAnywhere,BlueprintReadWrite, Category = "Ranc Inventory Weapons|Gear|Configuration")
 	float DefaultUnequipMontagePlayRate = 1.0f;
 
 	/* The data definition for unarmed attacks */
-	UPROPERTY(EditAnywhere,BlueprintReadWrite, Category = "Ranc Inventory Weapons | Gear | Configuration")
+	UPROPERTY(EditAnywhere,BlueprintReadWrite, Category = "Ranc Inventory Weapons|Gear|Configuration")
 	UItemStaticData* DefaultUnarmedWeaponData = nullptr;
 	
 	/*
@@ -175,56 +178,56 @@ public:
 	 * For a multiplayer pvp game you preferably dont use notify as the server shouldn't play animations and we dont want to trust client
 	 * If you want to manually control the timing of the equipment change, then call the equip again with bPlayEquipMontage = false
 	 */
-	UPROPERTY(EditAnywhere,BlueprintReadWrite, Category = "Ranc Inventory Weapons | Gear | Configuration")
+	UPROPERTY(EditAnywhere,BlueprintReadWrite, Category = "Ranc Inventory Weapons|Gear|Configuration")
 	FName GearChangeCommitAnimNotifyName = FName();
 
 	/*
 	 * Delay before gear equip actually applies (to give a chance for the animation to play partially first)
 	 * If this and GearChangeCommitAnimNotifyName are not set then the equipment change will happen immediately
 	 */
-	UPROPERTY(EditAnywhere,BlueprintReadWrite, Category = "Ranc Inventory Weapons | Gear | Configuration")
+	UPROPERTY(EditAnywhere,BlueprintReadWrite, Category = "Ranc Inventory Weapons|Gear|Configuration")
 	float EquipDelay = 0.0f;
 
 	/*
 	 * Delay before gear unequip actually applies (to give a chance for the animation to play partially first)
 	 * If this and GearChangeCommitAnimNotifyName are not set then the equipment change will happen immediately
 	 */
-	UPROPERTY(EditAnywhere,BlueprintReadWrite, Category = "Ranc Inventory Weapons | Gear | Configuration")
+	UPROPERTY(EditAnywhere,BlueprintReadWrite, Category = "Ranc Inventory Weapons|Gear|Configuration")
 	float UnequipDelay = 0.0f;
 
 	/*
 	 * Delay before gear weapon select actually applies (to give a chance for the animation to play partially first)
 	 * If this and GearChangeCommitAnimNotifyName are not set then the equipment change will happen immediately
 	 */
-	UPROPERTY(EditAnywhere,BlueprintReadWrite, Category = "Ranc Inventory Weapons | Gear | Configuration")
+	UPROPERTY(EditAnywhere,BlueprintReadWrite, Category = "Ranc Inventory Weapons|Gear|Configuration")
 	float WeaponSelectDelay = 0.0f;
 
 	/* When replacing an item and playing both an unequip and equip montage, this determine how long until the equip starts blending in
 	 * This might have unintended consequences when used with anim notify */
-	UPROPERTY(EditAnywhere,BlueprintReadWrite, Category = "Ranc Inventory Weapons | Gear | Configuration")
+	UPROPERTY(EditAnywhere,BlueprintReadWrite, Category = "Ranc Inventory Weapons|Gear|Configuration")
 	float EquipUnequipAnimBlendDelay = 0.5f;
 	
-	UPROPERTY(ReplicatedUsing = OnRep_ActiveWeaponSlot,VisibleAnywhere,BlueprintReadOnly, Category = "Ranc Inventory Weapons | Gear | State")
+	UPROPERTY(ReplicatedUsing = OnRep_ActiveWeaponSlot,VisibleAnywhere,BlueprintReadOnly, Category = "Ranc Inventory Weapons|Gear|State")
 	int32 ActiveWeaponIndex = 0;;
 	
-	UPROPERTY(VisibleAnywhere,BlueprintReadOnly, Category = "Ranc Inventory Weapons | Gear | State")
+	UPROPERTY(VisibleAnywhere,BlueprintReadOnly, Category = "Ranc Inventory Weapons|Gear|State")
 	AWeaponActor* MainhandSlotWeapon = nullptr;
 
-	UPROPERTY(VisibleAnywhere,BlueprintReadOnly, Category = "Ranc Inventory Weapons | Gear | State")
+	UPROPERTY(VisibleAnywhere,BlueprintReadOnly, Category = "Ranc Inventory Weapons|Gear|State")
 	AWeaponActor* OffhandSlotWeapon = nullptr;
 	
-	UPROPERTY(VisibleAnywhere,BlueprintReadOnly, Category = "Ranc Inventory Weapons | Gear | Internal")
+	UPROPERTY(VisibleAnywhere,BlueprintReadOnly, Category = "Ranc Inventory Weapons|Gear|Internal")
 	ACharacter* Owner = nullptr;
 
-	UPROPERTY(EditAnywhere,BlueprintReadWrite, Category = "Ranc Inventory Weapons | Gear | Internal")
+	UPROPERTY(EditAnywhere,BlueprintReadWrite, Category = "Ranc Inventory Weapons|Gear|Internal")
 	TArray<const UItemStaticData*> SelectableWeaponsData;
 	
-	UPROPERTY(VisibleAnywhere,BlueprintReadOnly, Category = "Ranc Inventory Weapons | Gear | Internal")
+	UPROPERTY(VisibleAnywhere,BlueprintReadOnly, Category = "Ranc Inventory Weapons|Gear|Internal")
 	AWeaponActor* UnarmedWeaponActor = nullptr;
 	
 	// Delayed gear change state. Note that the delayed change is triggered by the client as we dont rely on the server playing animations
 	
-	UPROPERTY(VisibleAnywhere,BlueprintReadOnly, Category = "Ranc Inventory Weapons | Gear | Internal")
+	UPROPERTY(VisibleAnywhere,BlueprintReadOnly, Category = "Ranc Inventory Weapons|Gear|Internal")
 	EPendingGearChangeType PendingGearChangeType = EPendingGearChangeType::NoChange;
 
 	UPROPERTY()
@@ -235,11 +238,16 @@ public:
 
 	UPROPERTY()
 	const UItemStaticData* DelayedGearChangeItemData = nullptr;
+	UPROPERTY()
+	const UItemStaticData* DelayedEquipWaitingForUnequipItemData = nullptr;
+	
+	UPROPERTY()
+	FGameplayTag DelayedEquipWaitingForUnequipSlot = FGameplayTag::EmptyTag;
 	
 	UPROPERTY()
 	FTaggedItemBundle DelayedPreviousItem;
 	
-	UPROPERTY(VisibleAnywhere,BlueprintReadOnly, Category = "Ranc Inventory Weapons | Gear | Internal")
+	UPROPERTY(VisibleAnywhere,BlueprintReadOnly, Category = "Ranc Inventory Weapons|Gear|Internal")
 	FMontageData EquipMontageToBlendInto = FMontageData();
 	
 	
@@ -249,22 +257,22 @@ public:
 	*/
 
 	/*	Initialized variables. Called from Begin play	*/
-	UFUNCTION(BlueprintCallable, Category = "Ranc Inventory Weapons | Gear")
+	UFUNCTION(BlueprintCallable, Category = "Ranc Inventory Weapons|Gear")
 	void Initialize();
 
 
 	/* Returns the weapon currently equipped, if two weapons are equipped, returns the mainhand weapon	*/
-	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Ranc Inventory Weapons | Gear")
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Ranc Inventory Weapons|Gear")
 	AWeaponActor* GetActiveWeapon();
 	
 	/* Convenience function to get the mainhand weapons data.
 	 * Equivalent to WeaponPerSlot[MainHandSlot]*/
-	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Ranc Inventory Weapons | Gear")
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Ranc Inventory Weapons|Gear")
 	const UWeaponDefinition* GetMainhandWeaponSlotData();
 
 	/* Convenience function to get the Offhand weapons data.
 	 * Equivalent to WeaponPerSlot[OffhandSlot] */
-	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Ranc Inventory Weapons | Gear")
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Ranc Inventory Weapons|Gear")
 	const UWeaponDefinition* GetOffhandWeaponData();
 
 	
@@ -280,10 +288,10 @@ public:
 	 * @Param MontageIdOverride - If >= 0, we will use this montage id instead of cycling
 	 * Multicasts the attack to all clients
 	 */
-	UFUNCTION(Reliable, Server, BlueprintCallable, Category = "Ranc Inventory Weapons | Gear")
+	UFUNCTION(Reliable, Server, BlueprintCallable, Category = "Ranc Inventory Weapons|Gear")
 	void TryAttack_Server(FVector AimLocation = FVector(0,0,0), bool ForceOffHand = false, int32 MontageIdOverride = -1);
 
-	UFUNCTION(Reliable, NetMulticast, BlueprintCallable, Category = "Ranc Inventory Weapons | Gear")
+	UFUNCTION(Reliable, NetMulticast, BlueprintCallable, Category = "Ranc Inventory Weapons|Gear")
 	void Attack_Multicast(FVector AimLocation, bool UseOffhand = false, int32 MontageIdOverride = -1);
 
 	/*
@@ -297,29 +305,29 @@ public:
 	 */
 	void AddAndSelectWeapon(const UItemStaticData* WeaponData, FGameplayTag ForcedSlot = FGameplayTag());
 
-	UFUNCTION(BlueprintCallable, Category = "Ranc Inventory Weapons | Gear")
+	UFUNCTION(BlueprintCallable, Category = "Ranc Inventory Weapons|Gear")
 	void SelectNextActiveWeapon(bool bPlayMontage = true);
 
 	UFUNCTION(Server,Reliable)
 	void SelectNextActiveWeaponServer(bool bPlayMontage = true);
 
-	UFUNCTION(BlueprintCallable, Category = "Ranc Inventory Weapons | Gear")
+	UFUNCTION(BlueprintCallable, Category = "Ranc Inventory Weapons|Gear")
 	void SelectPreviousWeapon(bool bPlayMontage = true);
 
 	UFUNCTION(Server,Reliable)
 	void SelectPreviousActiveWeaponServer(bool bPlayMontage = true);
 	
-	UFUNCTION(BlueprintCallable, Category = "Ranc Inventory Weapons | Gear")
+	UFUNCTION(BlueprintCallable, Category = "Ranc Inventory Weapons|Gear")
 	void SelectActiveWeapon(int32 WeaponIndex, bool bPlayEquipMontage, AWeaponActor* AlreadySpawnedWeapon = nullptr);
 
 	/*
 	If bPlayEquipMontage is false then the swap will happen immediately
 	Otherwise the swap time will depend on configuration of GearChangeCommitAnimNotifyName
 	*/
-	UFUNCTION(Reliable, Server, BlueprintCallable, Category = "Ranc Inventory Weapons | Gear")
+	UFUNCTION(Reliable, Server, BlueprintCallable, Category = "Ranc Inventory Weapons|Gear")
 	void SelectActiveWeapon_Server(int32 WeaponIndex, bool bPlayEquipMontage, FGameplayTag ForcedSlot = FGameplayTag(), AWeaponActor* AlreadySpawnedWeapon = nullptr);
 
-	UFUNCTION(Reliable, Server, BlueprintCallable, Category = "Ranc Inventory Weapons | Gear")
+	UFUNCTION(Reliable, Server, BlueprintCallable, Category = "Ranc Inventory Weapons|Gear")
 	void SelectUnarmed_Server();
 
 	/*
@@ -329,14 +337,14 @@ public:
 	void EquipGear(FGameplayTag Slot, const UItemStaticData* NewItemData, FTaggedItemBundle PreviousItem, bool PlayEquipMontage, bool bPlayHolsterMontage = false);
 
 	FGearSlotDefinition* FindGearSlotDefinition(FGameplayTag SlotTag);
-	
+
 	/*
 	* If PlayUnequipMontage is false then the swap will happen immediately
 	* This is called internally by HandleItemRemovedFromSlot
 	*/
 	void UnequipGear(FGameplayTag Slot, const UItemStaticData* ItemData, bool PlayUnequipMontage);
 
-	UFUNCTION(BlueprintCallable, Category = "Ranc Inventory Weapons | Gear")
+	UFUNCTION(BlueprintCallable, Category = "Ranc Inventory Weapons|Gear")
 	void CancelGearChange();
 
 	/* Asks the linked inventory to drop the item, converting it to a WorldItem */
@@ -370,7 +378,7 @@ public:
 	I didn't bother exposing it because ESpawnActorCollisionHandlingMethod::AlwaysSpawn, and  
 	the spawned actor is immediately passed to AddWeaponToArray(NewWeaponActor)
 	*/
-	UFUNCTION(BlueprintCallable, Category = "Ranc Inventory Weapons | Gear")
+	UFUNCTION(BlueprintCallable, Category = "Ranc Inventory Weapons|Gear")
 	AWeaponActor* SpawnWeapon_IfServer(const UItemStaticData* ItemData, const UWeaponDefinition* WeaponType);
 
 protected:
@@ -413,6 +421,9 @@ protected:
 	void StartAttackReplay();
 	void StopAttackReplay();
 
+	FMontageData GetEquipMontage(const UWeaponDefinition* WeaponData) const;
+	FMontageData GetUnequipMontage(const UWeaponDefinition* WeaponData) const;
+	
 	UInventoryComponent* LinkedInventoryComponent = nullptr;
 
 	// Last attack time
