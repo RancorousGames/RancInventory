@@ -1167,8 +1167,17 @@ public:
 
 
 		InventoryComponent->Clear_IfServer();
-		// Now we want to test a tricky situation where we add a blocking item and a conflict-with-blocking item at the same time
-		
+		InventoryComponent->AddItemToAnySlot(Subsystem, OneSpear, EPreferredSlotPolicy::PreferAnyTaggedSlot);
+		InventoryComponent->AddItemToAnySlot(Subsystem, OneRock, EPreferredSlotPolicy::PreferGenericInventory);
+		// Remove spear and verify unblock
+		InventoryComponent->RemoveQuantityFromTaggedSlot_IfServer(RightHandSlot, 1, EItemChangeReason::ForceDestroyed);
+		Res &= Test->TestFalse(TEXT("Right hand should be empty"), InventoryComponent->GetItemForTaggedSlot(RightHandSlot).IsValid());
+		Res &= Test->TestFalse(TEXT("Left hand should be unblocked"), InventoryComponent->IsTaggedSlotBlocked(LeftHandSlot));
+		// Re-add spear and test again when moving spear instead of removing
+		InventoryComponent->AddItemToAnySlot(Subsystem, OneSpear, EPreferredSlotPolicy::PreferAnyTaggedSlot);
+		InventoryComponent->MoveItem(ItemIdSpear, 1, RightHandSlot, FGameplayTag::EmptyTag);
+		Res &= Test->TestFalse(TEXT("Right hand should be empty"), InventoryComponent->GetItemForTaggedSlot(RightHandSlot).IsValid());
+		Res &= Test->TestFalse(TEXT("Left hand should be unblocked"), InventoryComponent->IsTaggedSlotBlocked(LeftHandSlot));
 		
 		return Res;
 	}

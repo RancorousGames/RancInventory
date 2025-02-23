@@ -411,7 +411,7 @@ void UGearManagerComponent::SelectActiveWeapon_Server_Implementation(int32 Weapo
 	{
 		if (bPlayEquipMontage)
 		{
-			EquipMontageToBlendInto = WeaponData->EquipMontage;
+			EquipMontageToBlendInto = GetEquipMontage(WeaponData);
 			GetWorld()->GetTimerManager().SetTimer(TimerHandle_UnequipEquipBlendDelay, this, &UGearManagerComponent::PlayBlendInEquipMontage, EquipUnequipAnimBlendDelay, false);
 		}
 
@@ -489,19 +489,15 @@ void UGearManagerComponent::EquipGear(FGameplayTag Slot, const UItemStaticData* 
             return;
         }
 
+    	DelayedEquipWaitingForUnequipItemData = NewItemData;
+    	DelayedEquipWaitingForUnequipSlot = Slot;
+    	
         // Play the unequip montage for the existing item.
         UnequipGear(Slot, PreviousItemData, PlayUnequipMontage);
 
         // Return immediately. After the montage has played (or the delay expires),
-        // the function is expected to be called again to proceed with equipping.
+        // the function will be called again by the final Unequip call
         return;
-    }
-
-    // No existing item in the slot – proceed with equipping the new item.
-    // Hide the slot’s mesh so that the new item’s mesh can be set or the montage can blend in.
-    if (GearSlot->MeshComponent)
-    {
-        GearSlot->MeshComponent->SetVisibility(false);
     }
 
     // Configure a delay if an equip montage is to be played.
@@ -510,6 +506,14 @@ void UGearManagerComponent::EquipGear(FGameplayTag Slot, const UItemStaticData* 
     {
         DelayConfigured = SetupDelayedGearChange(EPendingGearChangeType::Equip, Slot, NewItemData, 0, PreviousItem);
     }
+
+	// DONT KNOW WHY THIS IS NEEDED
+	// // No existing item in the slot – proceed with equipping the new item.
+	// // Hide the slot’s mesh so that the new item’s mesh can be set or the montage can blend in.
+	// if (DelayConfigured && GearSlot->MeshComponent)
+	// {
+	// 	GearSlot->MeshComponent->SetVisibility(false);
+	// }
 
     // Determine if this is a weapon item or a non-weapon item.
     UWeaponDefinition* WeaponData = NewItemData->GetItemDefinition<UWeaponDefinition>(UWeaponDefinition::StaticClass());
@@ -529,10 +533,11 @@ void UGearManagerComponent::EquipGear(FGameplayTag Slot, const UItemStaticData* 
     else
     {
         // Non-weapon item: if using delays, update the slot mesh.
-        if (DelayConfigured)
+        if (!DelayConfigured)
         {
             GearSlot->MeshComponent->SetStaticMesh(NewItemData->ItemWorldMesh);
             GearSlot->MeshComponent->SetWorldScale3D(NewItemData->ItemWorldScale);
+			GearSlot->MeshComponent->SetVisibility(true);
         }
         if (!EquipMontageToBlendInto.IsValid())
         {
@@ -646,7 +651,7 @@ void UGearManagerComponent::UnequipGear(FGameplayTag Slot, const UItemStaticData
 	bool DelayConfigured = false;
 	UWeaponDefinition* WeaponData = ItemData->GetItemDefinition<UWeaponDefinition>(UWeaponDefinition::StaticClass());
 
-	PlayUnequipMontage = PlayUnequipMontage && WeaponData->HolsterMontage.Montage.IsValid();
+	PlayUnequipMontage = PlayUnequipMontage && GetUnequipMontage(WeaponData).Montage.Get();
 	if (PlayUnequipMontage)
 	{
 		DelayConfigured = SetupDelayedGearChange(EPendingGearChangeType::Unequip, Slot, ItemData);
@@ -700,15 +705,21 @@ void UGearManagerComponent::UnequipGear(FGameplayTag Slot, const UItemStaticData
 			OnEquippedWeaponsChange.Broadcast();
 		}
 	}
-	else if (!DelayConfigured)
+	else 
 	{
-		FGearSlotDefinition* GearSlot = FindGearSlotDefinition(Slot);
-
-		if (GearSlot->MeshComponent && GearSlot->MeshComponent->GetStaticMesh() != nullptr)
+		if (PlayUnequipMontage)
 		{
-			GearSlot->MeshComponent->SetStaticMesh(nullptr);
+			PlayMontage(Owner, DefaultUnequipMontage.Montage.Get(), DefaultUnequipMontage.PlayRate, FName(""));
+		}
+		if (!DelayConfigured)
+		{
+			FGearSlotDefinition* GearSlot = FindGearSlotDefinition(Slot);
 
-			PlayMontage(Owner, DefaultUnequipMontage, 1.0f, FName(""));
+			if (GearSlot->MeshComponent && GearSlot->MeshComponent->GetStaticMesh() != nullptr)
+			{
+				GearSlot->MeshComponent->SetVisibility(false);
+				GearSlot->MeshComponent->SetStaticMesh(nullptr);
+			}
 		}
 	}
 
@@ -722,6 +733,13 @@ void UGearManagerComponent::UnequipGear(FGameplayTag Slot, const UItemStaticData
 	{
 		UE_LOG(LogRISInventory, Warning, TEXT("OnGearUnequipped.Broadcast slot %s, item %s"), *Slot.ToString(), *ItemData->ItemId.ToString())
 		OnGearUnequipped.Broadcast(Slot, ItemData->ItemId);
+	}
+
+	if (!DelayConfigured && DelayedEquipWaitingForUnequipItemData)
+	{
+		EquipGear(DelayedEquipWaitingForUnequipSlot, DelayedEquipWaitingForUnequipItemData, FTaggedItemBundle(), true);
+		DelayedEquipWaitingForUnequipItemData = nullptr;
+		DelayedEquipWaitingForUnequipSlot = FGameplayTag();
 	}
 }
 
@@ -778,8 +796,8 @@ bool UGearManagerComponent::PlayEquipMontage(AWeaponActor* WeaponActor)
 		return false;
 	}
 
-	UAnimMontage* EquipMontage = WeaponActor->WeaponData->EquipMontage.Montage.Get();
-	const float PlayLength = PlayMontage(Owner, EquipMontage, WeaponActor->WeaponData->EquipMontage.PlayRate, FName(""));
+	UAnimMontage* EquipMontage = GetEquipMontage(WeaponActor->WeaponData).Montage.Get();
+	const float PlayLength = PlayMontage(Owner, EquipMontage, GetEquipMontage(WeaponActor->WeaponData).PlayRate, FName(""));
 
 	if (PlayLength == 0.0f)
 	{
@@ -1003,4 +1021,18 @@ void UGearManagerComponent::StopAttackReplay()
     bReplayInitialOwnerPositionSaved = false;
 	OnAttackAnimNotifyEndEvent.Broadcast();
     UE_LOG(LogTemp, Log, TEXT("Attack replay stopped."));
+}
+
+FMontageData UGearManagerComponent::GetUnequipMontage(const UWeaponDefinition* WeaponData) const
+{
+	if (!WeaponData || !WeaponData->HolsterMontage.Montage.IsValid())
+		return DefaultUnequipMontage;
+	return WeaponData->HolsterMontage;
+}
+
+FMontageData UGearManagerComponent::GetEquipMontage(const UWeaponDefinition* WeaponData) const
+{
+	if (!WeaponData || !WeaponData->EquipMontage.Montage.IsValid())
+		return DefaultEquipMontage;
+	return WeaponData->EquipMontage;
 }

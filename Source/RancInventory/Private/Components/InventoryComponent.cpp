@@ -652,7 +652,7 @@ int32 UInventoryComponent::MoveItem_ServerImpl(const FGameplayTag& ItemId, int32
 			}
 		}
 
-		UpdateBlockingState(SourceTaggedSlot, TargetItemData, true);
+		UpdateBlockingState(SourceTaggedSlot, TargetItemData, SwapBackRequested);
 		if (!SuppressUpdate)
 		{
 			OnItemRemovedFromTaggedSlot.Broadcast(SourceTaggedSlot, SourceItemData, MovedQuantity,
