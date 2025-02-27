@@ -133,7 +133,7 @@ protected:
 	
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category=RIS)
     TArray<FItemBundle> ViewableGridSlots;
-    
+public:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category=RIS)
     TMap<FGameplayTag, FTaggedItemBundle> ViewableTaggedSlots;
 

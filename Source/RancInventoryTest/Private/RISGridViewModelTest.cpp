@@ -225,6 +225,39 @@ public:
 		return Res;
 	}
 
+	bool TestAddItemsToPartialStacks()
+	{
+		GridViewModelTestContext Context(99.0f, 9, false);
+		auto* InventoryComponent = Context.InventoryComponent;
+		auto* ViewModel = Context.ViewModel;
+		auto* Subsystem = Context.TestFixture.GetSubsystem();
+		
+		FDebugTestResult Res = true;
+
+		// Add 5 sticks to slot 0, 3 sticks to slot 5 and 4 sticks to slot 8
+		InventoryComponent->AddItemToAnySlot(Subsystem, ItemIdSticks, 12, EPreferredSlotPolicy::PreferGenericInventory);
+		ViewModel->MoveItem(NoTag, 1, NoTag, 5);
+		ViewModel->MoveItem(NoTag, 2, NoTag, 8);
+		ViewModel->SplitItem(NoTag, 5, NoTag, 8, 2);
+		// Now add sticks one at a time and ensure that they fill up in the order slot: 5, 8, 1
+		InventoryComponent->AddItem_IfServer(Subsystem, OneStick);
+		Res &= Test->TestTrue(TEXT("Slot 5 should have 4 sticks after adding 1 stick"), ViewModel->GetItem(5).Quantity == 4);
+		InventoryComponent->AddItem_IfServer(Subsystem, OneStick);
+		Res &= Test->TestTrue(TEXT("Slot 5 should have 5 sticks after adding 1 stick"), ViewModel->GetItem(5).Quantity == 5);
+		Res &= Test->TestTrue(TEXT("Slot 0 should have 5 sticks unchanged"), ViewModel->GetItem(0).Quantity == 5);
+		Res &= Test->TestTrue(TEXT("Slot 1 should have 0 unchanged"), ViewModel->GetItem(1).Quantity == 0);
+		InventoryComponent->AddItem_IfServer(Subsystem, OneStick);
+		Res &= Test->TestTrue(TEXT("Slot 8 should have 5 sticks after adding 1 stick"), ViewModel->GetItem(8).Quantity == 5);
+		Res &= Test->TestTrue(TEXT("Slot 1 should have 0 unchanged"), ViewModel->GetItem(1).Quantity == 0);
+		for (int i = 0; i < 5; i++)
+		{
+			InventoryComponent->AddItem_IfServer(Subsystem, OneStick);
+			Res &= Test->TestTrue(TEXT("Slot 1 should have") + FString::FromInt(i + 1) + TEXT("sticks after adding 1 stick"), ViewModel->GetItem(1).Quantity == i + 1);
+		}
+		
+		return Res;
+	}
+
 	bool TestMoveAndSwap()
 	{
 		GridViewModelTestContext Context(20.0f, 9, false);
@@ -517,10 +550,10 @@ public:
 	    InventoryComponent->AddItem_IfServer(Subsystem, OneRock); // Add another rock
 	    Res &= Test->TestFalse(TEXT("Attempt to move extra rock to should fail as no slots are available"), ViewModel->MoveItemToAnyTaggedSlot(NoTag, 4));
 		
-	    InventoryComponent->AddItem_IfServer(Subsystem, OneSpecialHelmet); // goes to slot 1
-	    Res &= Test->TestTrue(TEXT("A different helmet should swap into the helmet slot"), ViewModel->MoveItemToAnyTaggedSlot(NoTag, 1));
+	    InventoryComponent->AddItem_IfServer(Subsystem, OneSpecialHelmet); // goes to slot 0
+	    Res &= Test->TestTrue(TEXT("A different helmet should swap into the helmet slot"), ViewModel->MoveItemToAnyTaggedSlot(NoTag, 0));
 		Res &= Test->TestTrue(TEXT("Special helmet should be in HelmetSlot"), ViewModel->GetItemForTaggedSlot(HelmetSlot).ItemId == ItemIdSpecialHelmet);
-		Res &= Test->TestTrue(TEXT("Helmet should be in generic slot 0"), ViewModel->GetItem(1).ItemId == ItemIdHelmet);
+		Res &= Test->TestTrue(TEXT("Helmet should be in generic slot 0"), ViewModel->GetItem(0).ItemId == ItemIdHelmet);
 
 	    // Attempt to move an item to a tagged slot when the source index is invalid
 	    Res &= Test->TestFalse(TEXT("Attempting to move item from invalid source index should fail"), ViewModel->MoveItemToAnyTaggedSlot(NoTag, 100));
@@ -574,6 +607,18 @@ public:
 		Res &= Test->TestTrue(TEXT("Rock should be in generic slot 0 or 1"), ViewModel->GetItem(0).ItemId == ItemIdRock);
 		Res &= Test->TestTrue(TEXT("Spear should be in right hand"), ViewModel->GetItemForTaggedSlot(RightHandSlot).ItemId == ItemIdSpear);
 		Res &= Test->TestTrue(TEXT("Left hand should be empty"), ViewModel->IsTaggedSlotEmpty(LeftHandSlot));
+
+		// Test a previous duplication issue. Add spear to right hand and 2 sticks to generic inventory, then move sticks to right hand then to left hand
+		InventoryComponent->Clear_IfServer();
+		InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, RightHandSlot, OneSpear);
+		InventoryComponent->AddItem_IfServer(Subsystem, ItemIdSticks, 2);
+		Res &= ViewModel->MoveItem(NoTag, 0, RightHandSlot, -1);
+		Res &= Test->TestTrue(TEXT("Sticks should be in right hand"), ViewModel->GetItemForTaggedSlot(RightHandSlot).ItemId == ItemIdSticks && ViewModel->GetItemForTaggedSlot(RightHandSlot).Quantity == 2);
+		Res &= Test->TestTrue(TEXT("Spear should be in slot 0"), ViewModel->GetItem(0).ItemId == ItemIdSpear);
+		Res &= ViewModel->MoveItem(RightHandSlot, -1, LeftHandSlot, -1);
+		Res &= Test->TestTrue(TEXT("Sticks should be in left hand"), ViewModel->GetItemForTaggedSlot(LeftHandSlot).ItemId == ItemIdSticks && ViewModel->GetItemForTaggedSlot(LeftHandSlot).Quantity == 2);
+		Res &= Test->TestTrue(TEXT("Spear should be in slot 0"), ViewModel->GetItem(0).ItemId == ItemIdSpear);
+		Res &= Test->TestTrue(TEXT("Right hand should be empty"), ViewModel->IsTaggedSlotEmpty(RightHandSlot));
 		
 	    return Res;
 	}
@@ -654,6 +699,7 @@ bool FRISGridViewModelTest::RunTest(const FString& Parameters)
 	Res &= TestScenarios.TestInitializeViewModel();
 	Res &= TestScenarios.TestReactionToInventoryEvents();
 	Res &= TestScenarios.TestAddItemsToViewModel();
+	Res &= TestScenarios.TestAddItemsToPartialStacks();
 	Res &= TestScenarios.TestMoveAndSwap();
 	Res &= TestScenarios.TestSwappingMoves();
 	Res &= TestScenarios.TestSplitItems();

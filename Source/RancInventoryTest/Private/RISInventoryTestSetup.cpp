@@ -55,6 +55,7 @@ UE_DEFINE_GAMEPLAY_TAG(ItemIdBrittleCopperKnife, "Test.Items.IDs.BrittleCopperKn
 #define FiveRocks ItemIdRock, 5
 #define OneStick ItemIdSticks, 1
 #define ThreeSticks ItemIdSticks, 3
+#define FiveSticks ItemIdSticks, 5
 #define OneHelmet ItemIdHelmet, 1
 #define OneSpecialHelmet ItemIdSpecialHelmet, 1
 #define OneChestArmor ItemIdChestArmor, 1

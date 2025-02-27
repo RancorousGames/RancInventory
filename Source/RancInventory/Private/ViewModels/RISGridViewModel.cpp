@@ -259,18 +259,6 @@ bool URISGridViewModel::MoveItem_Impl(FGameplayTag SourceTaggedSlot,
         }
 
         TargetItem = ViewableTaggedSlots.Find(TargetTaggedSlot);
-        if (!TargetItem.IsValid())
-        {
-            if (!LinkedInventoryComponent->ContainedInUniversalSlot(TargetTaggedSlot) &&
-                !LinkedInventoryComponent->SpecializedTaggedSlots.Contains(TargetTaggedSlot))
-            {
-                UE_LOG(LogTemp, Warning, TEXT("Target tagged slot does not exist"));
-                return false;
-            }
-
-            ViewableTaggedSlots.Add(TargetTaggedSlot, FTaggedItemBundle(TargetTaggedSlot, FGameplayTag(), 0));
-            TargetItem = ViewableTaggedSlots.Find(TargetTaggedSlot);
-        }
     }
     else
     {
@@ -313,12 +301,12 @@ bool URISGridViewModel::MoveItem_Impl(FGameplayTag SourceTaggedSlot,
     FRISMoveResult MoveResult;
     if (IsSplit)
     {
-        MoveResult = URISFunctions::MoveBetweenSlots(SourceItem, TargetItem, TargetTaggedSlot, false,
+        MoveResult = URISFunctions::MoveBetweenSlots(SourceItem, TargetItem, false,
                                                      QuantityToMove, false, false);
     }
     else
     {
-        MoveResult = URISFunctions::MoveBetweenSlots(SourceItem, TargetItem, TargetTaggedSlot, false,
+        MoveResult = URISFunctions::MoveBetweenSlots(SourceItem, TargetItem, false,
                                                      QuantityToMove, true);
     }
 
@@ -683,13 +671,15 @@ void URISGridViewModel::PickupItem(AWorldItem* WorldItem, EPreferredSlotPolicy P
 int32 URISGridViewModel::FindSlotIndexForItem_Implementation(const FGameplayTag& ItemId, int32 Quantity)
 {
 	const UItemStaticData* ItemData = URISSubsystem::GetItemDataById(ItemId);
+
+	int32 FirstEmptySlot = -1;
 	for (int32 Index = 0; Index < ViewableGridSlots.Num(); ++Index)
 	{
 		const FItemBundle& ExistingItem = ViewableGridSlots[Index];
 
-		if (!ExistingItem.ItemId.IsValid())
+		if (!ExistingItem.ItemId.IsValid() && FirstEmptySlot == -1)
 		{
-			return Index;
+			FirstEmptySlot = Index;
 		}
 		if (ExistingItem.ItemId == ItemId)
 		{
@@ -700,7 +690,7 @@ int32 URISGridViewModel::FindSlotIndexForItem_Implementation(const FGameplayTag&
 		}
 	}
 
-	return -1;
+	return FirstEmptySlot;
 }
 
 FGameplayTag URISGridViewModel::FindTaggedSlotForItem(const FGameplayTag& ItemId, int32 Quanitity) const

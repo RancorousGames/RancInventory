@@ -1365,154 +1365,116 @@ public:
 		
 		return Res;
 	}
-
-	bool TestGlobalEventListenerIntegration()
+	
+	bool TestEventBroadcasting()
 	{
-	    // Set up the test context with a limited capacity.
 	    InventoryComponentTestContext Context(20);
 	    auto* InventoryComponent = Context.InventoryComponent;
 	    auto* Subsystem = Context.TestFixture.GetSubsystem();
-	    InventoryComponent->MaxContainerSlotCount = 2; // restrict generic slots
-
+	    InventoryComponent->MaxContainerSlotCount = 2;
 	    FDebugTestResult Res = true;
-
-	    // Create the global listener and have it subscribe to the component's events.
 	    UGlobalInventoryEventListener* Listener = NewObject<UGlobalInventoryEventListener>();
 	    Listener->SubscribeToInventoryComponent(InventoryComponent);
 
-	    // -------------------------------------------------------------------
-	    // 1. Add Rocks with PreferTaggedSlots = true (should go to a tagged slot).
-	    // -------------------------------------------------------------------
 	    int32 Added = InventoryComponent->AddItemToAnySlot(Subsystem, ItemIdRock, 5, EPreferredSlotPolicy::PreferAnyTaggedSlot);
 	    Res &= Test->TestEqual(TEXT("Should add 5 rocks to a tagged slot"), Added, 5);
-
-	    // Verify that the OnItemAddedToTaggedSlot event was fired.
 	    Res &= Test->TestTrue(TEXT("OnItemAdded event should trigger for rock addition"), Listener->bItemAddedToTaggedTriggered);
-	    // Reset flag for subsequent operations.
+	    Res &= Test->TestTrue(TEXT("Previous item should be empty"),
+	        (!Listener->AddedToTaggedPreviousItem.IsValid() ||
+	         (Listener->AddedToTaggedPreviousItem.ItemId == FGameplayTag::EmptyTag && Listener->AddedToTaggedPreviousItem.Quantity == 0)));
 	    Listener->bItemAddedTriggered = false;
 
-	    // -------------------------------------------------------------------
-	    // 2. Remove the Rocks from tagged slot.
-	    // -------------------------------------------------------------------
 	    InventoryComponent->RemoveItemFromAnyTaggedSlots_IfServer(ItemIdRock, 5, EItemChangeReason::Removed);
-	    Res &= Test->TestFalse(
-	        TEXT("Right hand slot should be empty after removal"), 
-	        InventoryComponent->GetItemForTaggedSlot(RightHandSlot).IsValid());
-
-	    // Verify that the OnItemRemoved event fired.
+	    Res &= Test->TestFalse(TEXT("Right hand slot should be empty after removal"),
+	                           InventoryComponent->GetItemForTaggedSlot(RightHandSlot).IsValid());
 	    Res &= Test->TestTrue(TEXT("OnItemRemoved event should trigger for rock removal"), Listener->bItemRemovedFromTaggedTriggered);
 	    Listener->bItemRemovedTriggered = false;
 
-	    // Add Rocks with PreferTaggedSlots = false (should go to generic slots).
 	    Added = InventoryComponent->AddItemToAnySlot(Subsystem, ItemIdRock, 5, EPreferredSlotPolicy::PreferGenericInventory);
 	    Res &= Test->TestEqual(TEXT("Should add 5 rocks to generic slots"), Added, 5);
-	    Res &= Test->TestFalse(
-	        TEXT("Right hand slot should remain empty"),
-	        InventoryComponent->GetItemForTaggedSlot(RightHandSlot).IsValid());
-	    Res &= Test->TestFalse(
-	        TEXT("Left hand slot should remain empty"),
-	        InventoryComponent->GetItemForTaggedSlot(LeftHandSlot).IsValid());
+	    Res &= Test->TestFalse(TEXT("Right hand slot should remain empty"),
+	                           InventoryComponent->GetItemForTaggedSlot(RightHandSlot).IsValid());
+	    Res &= Test->TestFalse(TEXT("Left hand slot should remain empty"),
+	                           InventoryComponent->GetItemForTaggedSlot(LeftHandSlot).IsValid());
+	    Res &= Test->TestTrue(TEXT("OnItemAdded event should trigger for rock addition"), Listener->bItemAddedTriggered);
 
-		Res &= Test->TestTrue(TEXT("OnItemAdded event should trigger for rock addition"), Listener->bItemAddedTriggered);
-
-	    // Fill generic slots and then add Sticks so items spill over to a tagged slot.
-	    // Fill the remaining generic slot.
 	    InventoryComponent->AddItemToAnySlot(Subsystem, ItemIdRock, 5, EPreferredSlotPolicy::PreferGenericInventory);
-	    // Now add sticks.
 	    Added = InventoryComponent->AddItemToAnySlot(Subsystem, ItemIdSticks, 2, EPreferredSlotPolicy::PreferGenericInventory);
-	    Res &= Test->TestEqual(
-	        TEXT("Should add 2 sticks after generic slots are full"), 
-	        Added, 2);
-	    Res &= Test->TestEqual(
-	        TEXT("First universal tagged slot (left hand) should contain 2 sticks"),
-	        InventoryComponent->GetItemForTaggedSlot(InventoryComponent->UniversalTaggedSlots[0].Slot).Quantity, 2);
+	    Res &= Test->TestEqual(TEXT("Should add 2 sticks after generic slots are full"), Added, 2);
+	    Res &= Test->TestEqual(TEXT("First universal tagged slot (left hand) should contain 2 sticks"),
+	                           InventoryComponent->GetItemForTaggedSlot(InventoryComponent->UniversalTaggedSlots[0].Slot).Quantity, 2);
+	    Res &= Test->TestTrue(TEXT("OnItemAddedToTaggedSlot event should trigger for spilled sticks"), Listener->bItemAddedToTaggedTriggered);
+	    Res &= Test->TestTrue(TEXT("Previous item for spilled sticks should be empty"),
+	        (!Listener->AddedToTaggedPreviousItem.IsValid() ||
+	         (Listener->AddedToTaggedPreviousItem.ItemId == FGameplayTag::EmptyTag && Listener->AddedToTaggedPreviousItem.Quantity == 0)));
 
-	    // 5. Increase weight capacity and move some Rocks into RightHandSlot.
-	    InventoryComponent->MaxWeight = 25; // Increase capacity for heavy items.
+	    InventoryComponent->MaxWeight = 25;
 	    InventoryComponent->MoveItem(ItemIdRock, 5, FGameplayTag::EmptyTag, RightHandSlot);
-	    // (Assuming MoveItem triggers an event—if so, you could verify it similarly.)
 
-	    // (Optionally, further operations can be added to test OnCraftConfirmed or OnAvailableRecipesUpdated.)
+	    InventoryComponent->Clear_IfServer();
+	    Listener->Clear();
 
-		InventoryComponent->Clear_IfServer();
-		Listener->Clear();
-
-		// Test move items
-		// Add some items to generic slots
 	    Added = InventoryComponent->AddItemToAnySlot(Subsystem, ItemIdRock, 5, EPreferredSlotPolicy::PreferGenericInventory);
 	    Res &= Test->TestEqual(TEXT("Should add rocks to generic inventory"), Added, 5);
-
 	    Added = InventoryComponent->AddItemToAnySlot(Subsystem, ItemIdSticks, 3, EPreferredSlotPolicy::PreferGenericInventory);
 	    Res &= Test->TestEqual(TEXT("Should add sticks to generic inventory"), Added, 3);
-
-	    // Add an item to a tagged slot
 	    InventoryComponent->MoveItem(ItemIdRock, 3, FGameplayTag(), RightHandSlot);
-	    Res &= Test->TestTrue(TEXT("Right hand slot should contain rocks"), InventoryComponent->GetItemForTaggedSlot(RightHandSlot).IsValid());
+	    Res &= Test->TestTrue(TEXT("Right hand slot should contain rocks"),
+	                           InventoryComponent->GetItemForTaggedSlot(RightHandSlot).IsValid());
 
-	    // --- Test Case 1: Move from generic inventory to an empty tagged slot ---
 	    Listener->Clear();
 	    InventoryComponent->MoveItem(ItemIdSticks, 2, FGameplayTag(), LeftHandSlot);
-
 	    Res &= Test->TestTrue(TEXT("Event should fire for adding to tagged slot"), Listener->bItemAddedToTaggedTriggered);
 	    Res &= Test->TestTrue(TEXT("Left hand slot should have received sticks"), Listener->AddedSlotTag == LeftHandSlot);
 	    Res &= Test->TestTrue(TEXT("Added item should be sticks"), Listener->AddedToTaggedItemStaticData->ItemId == ItemIdSticks);
 	    Res &= Test->TestEqual(TEXT("Correct quantity moved"), Listener->AddedToTaggedQuantity, 2);
-	    Res &= Test->TestEqual(TEXT("Previous item should be empty"), Listener->AddedToTaggedPreviousItem.Quantity, 0);
+	    Res &= Test->TestTrue(TEXT("Previous item should be empty"),
+	        !Listener->AddedToTaggedPreviousItem.IsValid());
 
-	    // --- Test Case 2: Move from a tagged slot to generic inventory ---
 	    Listener->Clear();
 	    InventoryComponent->MoveItem(ItemIdRock, 3, RightHandSlot, FGameplayTag());
-
 	    Res &= Test->TestTrue(TEXT("Event should fire for removing from tagged slot"), Listener->bItemRemovedFromTaggedTriggered);
 	    Res &= Test->TestTrue(TEXT("Removed slot should be RightHandSlot"), Listener->RemovedSlotTag == RightHandSlot);
 	    Res &= Test->TestTrue(TEXT("Removed item should be rocks"), Listener->RemovedFromTaggedItemStaticData->ItemId == ItemIdRock);
 	    Res &= Test->TestEqual(TEXT("Correct quantity removed"), Listener->RemovedFromTaggedQuantity, 3);
-
 	    Res &= Test->TestTrue(TEXT("Event should fire for adding to generic slots"), Listener->bItemAddedTriggered);
 	    Res &= Test->TestTrue(TEXT("Added item should be rocks"), Listener->AddedItemStaticData->ItemId == ItemIdRock);
 	    Res &= Test->TestEqual(TEXT("Correct quantity added to generic slots"), Listener->AddedQuantity, 3);
 
-	    // --- Test Case 3: Move to an occupied tagged slot (should swap) ---
 	    Listener->Clear();
 	    InventoryComponent->MoveItem(ItemIdRock, 2, FGameplayTag(), LeftHandSlot, ItemIdSticks, 2);
-
 	    Res &= Test->TestTrue(TEXT("Swap should trigger remove event for previous item in LeftHandSlot"), Listener->bItemRemovedFromTaggedTriggered);
 	    Res &= Test->TestTrue(TEXT("Correct slot affected"), Listener->RemovedSlotTag == LeftHandSlot);
 	    Res &= Test->TestTrue(TEXT("Correct item removed (sticks)"), Listener->RemovedFromTaggedItemStaticData->ItemId == ItemIdSticks);
 	    Res &= Test->TestEqual(TEXT("Correct quantity removed"), Listener->RemovedFromTaggedQuantity, 2);
-
 	    Res &= Test->TestTrue(TEXT("Event should fire for adding swapped item"), Listener->bItemAddedToTaggedTriggered);
 	    Res &= Test->TestTrue(TEXT("Added slot should be LeftHandSlot"), Listener->AddedSlotTag == LeftHandSlot);
 	    Res &= Test->TestTrue(TEXT("Added item should be rocks"), Listener->AddedToTaggedItemStaticData->ItemId == ItemIdRock);
 	    Res &= Test->TestEqual(TEXT("Correct quantity moved"), Listener->AddedToTaggedQuantity, 2);
-	    Res &= Test->TestTrue(TEXT("Previous item should be sticks"), Listener->AddedToTaggedPreviousItem.ItemId == ItemIdSticks);
-	    Res &= Test->TestEqual(TEXT("Previous item quantity should be 2"), Listener->AddedToTaggedPreviousItem.Quantity, 2);
+	    Res &= Test->TestTrue(TEXT("Previous item should be sticks"),
+	        (Listener->AddedToTaggedPreviousItem.ItemId == ItemIdSticks && Listener->AddedToTaggedPreviousItem.Quantity == 2));
 
-	    // --- Test Case 4: Move all items out of a tagged slot (slot should be empty) ---
 	    Listener->Clear();
 	    InventoryComponent->MoveItem(ItemIdRock, 2, LeftHandSlot, FGameplayTag());
-
 	    Res &= Test->TestTrue(TEXT("Event should fire for removing item from tagged slot"), Listener->bItemRemovedFromTaggedTriggered);
 	    Res &= Test->TestTrue(TEXT("Left hand slot should be affected"), Listener->RemovedSlotTag == LeftHandSlot);
 	    Res &= Test->TestTrue(TEXT("Removed item should be rocks"), Listener->RemovedFromTaggedItemStaticData->ItemId == ItemIdRock);
 	    Res &= Test->TestEqual(TEXT("Correct quantity removed"), Listener->RemovedFromTaggedQuantity, 2);
+	    Res &= Test->TestFalse(TEXT("Left hand slot should now be empty"),
+	                           InventoryComponent->GetItemForTaggedSlot(LeftHandSlot).IsValid());
 
-	    Res &= Test->TestFalse(TEXT("Left hand slot should now be empty"), InventoryComponent->GetItemForTaggedSlot(LeftHandSlot).IsValid());
-
-	    // Attempt invalid move (should not trigger events) 
-		InventoryComponent->Clear_IfServer();
+	    InventoryComponent->Clear_IfServer();
 	    Listener->Clear();
-	    int32 Moved = InventoryComponent->MoveItem(ItemIdHelmet, 1, FGameplayTag(), RightHandSlot); // Not contained
-
+	    int32 Moved = InventoryComponent->MoveItem(ItemIdHelmet, 1, FGameplayTag(), RightHandSlot);
 	    Res &= Test->TestEqual(TEXT("Should not move"), Moved, 0);
 	    Res &= Test->TestFalse(TEXT("No events should fire"), Listener->bItemAddedTriggered || Listener->bItemRemovedTriggered);
 
-		// Partial move from generic inventory to tagged slot
-		InventoryComponent->AddItem_IfServer(Subsystem, ItemIdRock, 5);
-		int PartialMove = InventoryComponent->MoveItem(ItemIdRock, 99, FGameplayTag::EmptyTag, RightHandSlot);  // more than available
-		Res &= Test->TestEqual(TEXT("Should move only available quantity"), PartialMove, 5);
-		Res &= Test->TestTrue(TEXT("event should fire for adding to tagged slot"), Listener->bItemAddedToTaggedTriggered);
-		
+	    InventoryComponent->AddItem_IfServer(Subsystem, ItemIdRock, 5);
+	    int PartialMove = InventoryComponent->MoveItem(ItemIdRock, 99, FGameplayTag::EmptyTag, RightHandSlot);
+	    Res &= Test->TestEqual(TEXT("Should move only available quantity"), PartialMove, 5);
+	    Res &= Test->TestTrue(TEXT("Event should fire for adding to tagged slot"), Listener->bItemAddedToTaggedTriggered);
+	    Res &= Test->TestTrue(TEXT("Previous item for partial move should be empty"), !Listener->AddedToTaggedPreviousItem.IsValid());
+
 	    return Res;
 	}
 };
@@ -1538,7 +1500,7 @@ bool FRancInventoryComponentTest::RunTest(const FString& Parameters)
 	Res &= TestScenarios.TestExclusiveUniversalSlots();
 	Res &= TestScenarios.TestBlockingSlots();
 	Res &= TestScenarios.TestReceivableQuantity();
-	Res &= TestScenarios.TestGlobalEventListenerIntegration();
+	Res &= TestScenarios.TestEventBroadcasting();
 
 	return Res;
 }

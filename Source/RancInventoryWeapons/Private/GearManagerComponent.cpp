@@ -542,7 +542,7 @@ void UGearManagerComponent::EquipGear(FGameplayTag Slot, const UItemStaticData* 
             GearSlot->MeshComponent->SetWorldScale3D(NewItemData->ItemWorldScale);
 			GearSlot->MeshComponent->SetVisibility(true);
         }
-        if (!EquipMontageToBlendInto.IsValid())
+        if (PlayEquipMontage && !EquipMontageToBlendInto.IsValid())
         {
             PlayMontage(Owner, DefaultEquipMontage.Montage.Get(), DefaultEquipMontage.PlayRate, FName(""));
         }
@@ -566,11 +566,12 @@ void UGearManagerComponent::PlayBlendInEquipMontage()
 
 bool UGearManagerComponent::SetupDelayedGearChange(EPendingGearChangeType InPendingGearChangeType, const FGameplayTag& GearChangeSlot, const UItemStaticData* ItemData, int32 WeaponSelectionIndex, FTaggedItemBundle PreviousItem)
 {
+	should these really be before the PendingGearChangeType assignment?
 	bool DelayUntilNotify = GearChangeCommitAnimNotifyName != NAME_None;
 	bool NeedsEquipDelay = PendingGearChangeType == EPendingGearChangeType::Equip && EquipDelay > 0;
 	bool NeedsUnequipDelay = PendingGearChangeType == EPendingGearChangeType::Unequip && UnequipDelay > 0;
 	bool NeedsWeaponSelectDelay = PendingGearChangeType == EPendingGearChangeType::WeaponSelect && WeaponSelectDelay > 0;
-	
+	this can get called unequip->equip in one frame and just gets overriden
 	PendingGearChangeType = InPendingGearChangeType;
 	if (DelayUntilNotify || NeedsEquipDelay || NeedsUnequipDelay || NeedsWeaponSelectDelay)
 	{
@@ -660,7 +661,7 @@ void UGearManagerComponent::UnequipGear(FGameplayTag Slot, const UItemStaticData
 		DelayConfigured = SetupDelayedGearChange(EPendingGearChangeType::Unequip, Slot, ItemData);
 	}
 	
-	if (ItemData && WeaponData && Slot == MainHandSlot->SlotTag || Slot == OffhandSlot->SlotTag)
+	if (ItemData && WeaponData != nullptr && (Slot == MainHandSlot->SlotTag || Slot == OffhandSlot->SlotTag))
 	{
 		if (WeaponToUnequip == nullptr)
 		{
@@ -904,6 +905,22 @@ void UGearManagerComponent::RotateToAimLocation(FVector AimLocation)
 	}
 }
 
+
+FMontageData UGearManagerComponent::GetUnequipMontage(const UWeaponDefinition* WeaponData) const
+{
+	if (!WeaponData || !WeaponData->HolsterMontage.Montage.IsValid())
+		return DefaultUnequipMontage;
+	return WeaponData->HolsterMontage;
+}
+
+FMontageData UGearManagerComponent::GetEquipMontage(const UWeaponDefinition* WeaponData) const
+{
+	if (!WeaponData || !WeaponData->EquipMontage.Montage.IsValid())
+		return DefaultEquipMontage;
+	return WeaponData->EquipMontage;
+}
+
+
 void UGearManagerComponent::UpdateRotation()
 {
 	if (!Owner)
@@ -1024,18 +1041,4 @@ void UGearManagerComponent::StopAttackReplay()
     bReplayInitialOwnerPositionSaved = false;
 	OnAttackAnimNotifyEndEvent.Broadcast();
     UE_LOG(LogTemp, Log, TEXT("Attack replay stopped."));
-}
-
-FMontageData UGearManagerComponent::GetUnequipMontage(const UWeaponDefinition* WeaponData) const
-{
-	if (!WeaponData || !WeaponData->HolsterMontage.Montage.IsValid())
-		return DefaultUnequipMontage;
-	return WeaponData->HolsterMontage;
-}
-
-FMontageData UGearManagerComponent::GetEquipMontage(const UWeaponDefinition* WeaponData) const
-{
-	if (!WeaponData || !WeaponData->EquipMontage.Montage.IsValid())
-		return DefaultEquipMontage;
-	return WeaponData->EquipMontage;
 }

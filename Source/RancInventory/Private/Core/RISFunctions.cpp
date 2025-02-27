@@ -185,7 +185,7 @@ bool URISFunctions::ShouldItemsBeSwapped(const FGameplayTag& Source, const FGame
 	return false;
 }
 
-FRISMoveResult URISFunctions::MoveBetweenSlots(FGenericItemBundle Source, FGenericItemBundle Target, FGameplayTag TargetTaggedSlot, bool IgnoreMaxStacks, int32 RequestedQuantity, bool AllowPartial, bool AllowSwap)
+FRISMoveResult URISFunctions::MoveBetweenSlots(FGenericItemBundle& Source, FGenericItemBundle& Target, bool IgnoreMaxStacks, int32 RequestedQuantity, bool AllowPartial, bool AllowSwap)
 {
 	const UItemStaticData* SourceItemData = URISSubsystem::GetItemDataById(Source.GetItemId());
 	if (!SourceItemData)
@@ -240,20 +240,16 @@ FRISMoveResult URISFunctions::MoveBetweenSlots(FGenericItemBundle Source, FGener
 	{
 		const FGameplayTag TempId = Source.GetItemId();
 		const int32 TempQuantity = Source.GetQuantity();
-		const FGameplayTag TempSlotTag = Source.GetSlotTag();
 		Source.SetItemId(Target.GetItemId());  // Target might be invalid but that's fine
 		Source.SetQuantity(Target.GetQuantity());
-	//	Source.SetSlotTag(Target.GetSlotTag());
 		Target.SetItemId(TempId);
 		Target.SetQuantity(TempQuantity);
-	//	Target.SetSlotTag(TargetTaggedSlot);
 		
 		return FRISMoveResult(TransferAmount, Source.IsValid());
 	}
 
 	Target.SetItemId(Source.GetItemId());
 	Target.SetQuantity(Target.GetQuantity() + TransferAmount);
-//	Target.SetSlotTag(TargetTaggedSlot);
 	Source.SetQuantity(Source.GetQuantity() - TransferAmount);
 	if (Source.GetQuantity() <= 0)
 	{

@@ -50,6 +50,7 @@ void UInventoryComponent::UpdateWeightAndSlots()
 	// then subtract the slots of the tagged items
 	for (const FTaggedItemBundle& TaggedInstance : TaggedSlotItemInstances)
 	{
+		if (!TaggedInstance.IsValid()) continue;
 		if (const UItemStaticData* const ItemData = URISSubsystem::GetItemDataById(
 			TaggedInstance.ItemId))
 		{
@@ -569,7 +570,12 @@ int32 UInventoryComponent::MoveItem_ServerImpl(const FGameplayTag& ItemId, int32
 
 
 	const auto SourceItemData = URISSubsystem::GetItemDataById(SourceItem.GetItemId());
-
+	if (!SourceItemData)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Source item data not found"));
+		return 0;	
+	}
+	
 	if (TargetItem.GetItemId().IsValid())
 	{
 		const bool ShouldStack = SourceItemData->MaxStackSize > 1 && SourceItem.GetItemId() == TargetItem.GetItemId();
@@ -597,6 +603,10 @@ int32 UInventoryComponent::MoveItem_ServerImpl(const FGameplayTag& ItemId, int32
 
 	// Now execute the move
 	int32 MovedQuantity = FMath::Min(RequestedQuantity, SourceItem.GetQuantity());
+	int32 SourceQuantity = SourceItem.GetQuantity();
+	const FGameplayTag& SourceItemId = SourceItem.GetItemId();
+	int32 TargetQuantity = TargetItem.GetQuantity();
+	const FGameplayTag& TargetItemId = TargetItem.GetItemId();
 
 	if (SimulateMoveOnly) return MovedQuantity;
 
@@ -605,8 +615,7 @@ int32 UInventoryComponent::MoveItem_ServerImpl(const FGameplayTag& ItemId, int32
 
 	if (SourceIsTaggedSlot && TargetIsTaggedSlot)
 	{
-		const FRISMoveResult MoveResult = URISFunctions::MoveBetweenSlots(
-			SourceItem, TargetItem, TargetTaggedSlot,  false, RequestedQuantity, true);
+		const FRISMoveResult MoveResult = URISFunctions::MoveBetweenSlots(SourceItem, TargetItem,  false, RequestedQuantity, true);
 
 		// SourceItem and TargetItem are now swapped in content
 
@@ -625,13 +634,13 @@ int32 UInventoryComponent::MoveItem_ServerImpl(const FGameplayTag& ItemId, int32
 				OnItemRemovedFromTaggedSlot.Broadcast(TargetTaggedSlot, TargetItemData, SourceItem.GetQuantity(),
 				                                      EItemChangeReason::Moved);
 				OnItemAddedToTaggedSlot.Broadcast(SourceTaggedSlot, TargetItemData, SourceItem.GetQuantity(),
-				                                  FTaggedItemBundle(TargetTaggedSlot, TargetItem.GetItemId(),
-				                                                    SourceItem.GetQuantity()),
+				                                  FTaggedItemBundle(TargetTaggedSlot, SourceItemId,
+				                                                   SourceQuantity),
 				                                  EItemChangeReason::Moved);
 			}
 			OnItemAddedToTaggedSlot.Broadcast(TargetTaggedSlot, SourceItemData, MovedQuantity,
-			                                  FTaggedItemBundle(TargetTaggedSlot, SourceItem.GetItemId(),
-			                                                    MovedQuantity), EItemChangeReason::Moved);
+			                                  FTaggedItemBundle(TargetTaggedSlot, TargetItemId,
+			                                                    TargetQuantity), EItemChangeReason::Moved);
 		}
 	}
 	else if (SourceIsTaggedSlot)
@@ -661,8 +670,8 @@ int32 UInventoryComponent::MoveItem_ServerImpl(const FGameplayTag& ItemId, int32
 
 			if (SwapBackRequested)
 				OnItemAddedToTaggedSlot.Broadcast(SourceTaggedSlot, TargetItemData, SwapQuantity,
-				                                  FTaggedItemBundle(SourceTaggedSlot, TargetItem.GetItemId(),
-				                                                    SwapQuantity), EItemChangeReason::Moved);
+				                                  FTaggedItemBundle(SourceTaggedSlot, SourceItemId,
+				                                                    SourceQuantity), EItemChangeReason::Moved);
 		}
 	}
 	else // TargetIsTaggedSlot
@@ -680,7 +689,7 @@ int32 UInventoryComponent::MoveItem_ServerImpl(const FGameplayTag& ItemId, int32
 			OnItemAddedToContainer.Broadcast(TargetItemData, SwapQuantity, EItemChangeReason::Moved);
 		}
 
-		auto PreviousItem = FTaggedItemBundle(TargetTaggedSlot, TargetItem.GetItemId(), TargetItem.GetQuantity());
+		auto PreviousItem = FTaggedItemBundle(TargetTaggedSlot, TargetItemId, TargetQuantity);
 		if (TargetItem.GetItemId() != ItemId) // If we are swapping or filling a newly added tagged slot
 		{
 			TargetItem.SetItemId(ItemId);
