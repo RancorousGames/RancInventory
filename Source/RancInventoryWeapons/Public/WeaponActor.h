@@ -5,7 +5,6 @@
 #include "CoreMinimal.h"
 #include "WeaponDefinition.h"
 #include "Templates/SharedPointer.h"
-#include "WeaponStaticData.h"
 #include "Actors/WorldItem.h"
 #include "Engine/StreamableManager.h"
 #include "Templates/SharedPointer.h"

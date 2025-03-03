@@ -259,7 +259,7 @@ int32 UItemContainerComponent::UseItem(const FGameplayTag& ItemId)
 		return 0;
 	}
 
-	const UUsableItemDefinition* UsableItem = ItemData->GetItemDefinition<UUsableItemDefinition>(UUsableItemDefinition::StaticClass());
+	const UUsableItemDefinition* UsableItem = ItemData->GetItemDefinition<UUsableItemDefinition>();
 
 	if (!UsableItem)
 	{
@@ -284,7 +284,7 @@ void UItemContainerComponent::UseItem_Server_Implementation(const FGameplayTag& 
 		return;
 	}
 	
-	UUsableItemDefinition* UsableItem = ItemData->GetItemDefinition<UUsableItemDefinition>(UUsableItemDefinition::StaticClass());
+	UUsableItemDefinition* UsableItem = ItemData->GetItemDefinition<UUsableItemDefinition>();
 
 	if (!UsableItem)
 	{

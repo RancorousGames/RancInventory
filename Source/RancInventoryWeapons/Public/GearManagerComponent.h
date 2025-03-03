@@ -3,8 +3,9 @@
 #pragma once
 
 #include "Components/ActorComponent.h"
-#include "WeaponStaticData.h"
 #include "Components/InventoryComponent.h"
+#include "GearDefinition.h"
+#include "RISWeaponsDataTypes.h"
 #include "Engine/HitResult.h"
 #include "GearManagerComponent.generated.h"
 
@@ -49,8 +50,6 @@ struct FGearSlotDefinition
     UStaticMeshComponent* MeshComponent = nullptr;
 };
 
-
-// enum
 UENUM(BlueprintType)
 enum class EPendingGearChangeType : uint8
 {
@@ -59,6 +58,29 @@ enum class EPendingGearChangeType : uint8
 	Unequip,
 	WeaponSelect
 };
+
+USTRUCT()
+struct FGearChangeTransaction
+{
+	GENERATED_BODY()
+	
+	EPendingGearChangeType ChangeType;
+	EGearChangeStep NextStep;
+	FGameplayTag Slot;
+	const UItemStaticData* NewItemData;
+	const UItemStaticData* OldItemData;
+	FTaggedItemBundle PreviousItem;
+	bool bRequiresUnequipFirst = false;
+};
+
+UENUM(BlueprintType)
+enum class EGearChangeStep : uint8
+{
+	Request,
+	PlayAnim,
+	Apply,
+};
+
 
 /*
 A replicated component that manages the inventory of AWeaponActor's. 
@@ -226,36 +248,26 @@ public:
 	AWeaponActor* UnarmedWeaponActor = nullptr;
 	
 	// Delayed gear change state. Note that the delayed change is triggered by the client as we dont rely on the server playing animations
-	
-	UPROPERTY(VisibleAnywhere,BlueprintReadOnly, Category = "Ranc Inventory Weapons|Gear|Internal")
-	EPendingGearChangeType PendingGearChangeType = EPendingGearChangeType::NoChange;
+
 
 	UPROPERTY()
-	FGameplayTag DelayedGearChangeSlot = FGameplayTag::EmptyTag;
+	TArray<FGearChangeTransaction> PendingGearChanges;
+
+	FGearChangeTransaction* ActiveGearChange = nullptr;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Ranc Inventory Weapons|Gear|Internal", meta = (AllowPrivateAccess = "true"))
+	bool bHasActiveTransaction;
 
 	UPROPERTY()
-	int32 DelayedWeaponSelectionIndex = 0;
+	FTimerHandle GearChangeCommitHandle;
 
 	UPROPERTY()
-	const UItemStaticData* DelayedGearChangeItemData = nullptr;
-	UPROPERTY()
-	const UItemStaticData* DelayedEquipWaitingForUnequipItemData = nullptr;
-	
-	UPROPERTY()
-	FGameplayTag DelayedEquipWaitingForUnequipSlot = FGameplayTag::EmptyTag;
-	
-	UPROPERTY()
-	FTaggedItemBundle DelayedPreviousItem;
-	
-	UPROPERTY(VisibleAnywhere,BlueprintReadOnly, Category = "Ranc Inventory Weapons|Gear|Internal")
-	FMontageData EquipMontageToBlendInto = FMontageData();
-	
-	
-	/*
-	FUNCTIONS. Note Initialize is not in alphabetical order because its important.
-	PlayMontage is also out of order because it is the only static function here.
-	*/
+	bool bIsInterrupted;
 
+	void ProcessNextGearChange();
+	void QueueGearChange(const FGearChangeTransaction& Transaction);
+	void HandleInterruption();
+	
 	/*	Initialized variables. Called from Begin play	*/
 	UFUNCTION(BlueprintCallable, Category = "Ranc Inventory Weapons|Gear")
 	void Initialize();
@@ -294,17 +306,6 @@ public:
 	UFUNCTION(Reliable, NetMulticast, BlueprintCallable, Category = "Ranc Inventory Weapons|Gear")
 	void Attack_Multicast(FVector AimLocation, bool UseOffhand = false, int32 MontageIdOverride = -1);
 
-	/*
-	Attaches the given weapon to the owner mesh at the desired socket.
-	*/
-	void AttachWeaponToOwner(AWeaponActor* InputWeaponActor,FName SocketName);
-		
-	/* Adds the weapon to the list of weapons that can be hotswapped to with
-	 * SelectNextActiveWeapon, SelectPreviousWeapon and SelectActiveWeapon
-	 * The weapon must be equipped first
-	 */
-	void AddAndSelectWeapon(const UItemStaticData* WeaponData, FGameplayTag ForcedSlot = FGameplayTag());
-
 	UFUNCTION(BlueprintCallable, Category = "Ranc Inventory Weapons|Gear")
 	void SelectNextActiveWeapon(bool bPlayMontage = true);
 
@@ -325,7 +326,7 @@ public:
 	Otherwise the swap time will depend on configuration of GearChangeCommitAnimNotifyName
 	*/
 	UFUNCTION(Reliable, Server, BlueprintCallable, Category = "Ranc Inventory Weapons|Gear")
-	void SelectActiveWeapon_Server(int32 WeaponIndex, bool bPlayEquipMontage, FGameplayTag ForcedSlot = FGameplayTag(), AWeaponActor* AlreadySpawnedWeapon = nullptr);
+	void SelectActiveWeapon_Server(int32 WeaponIndex, FGameplayTag ForcedSlot = FGameplayTag(), AWeaponActor* AlreadySpawnedWeapon = nullptr, EGearChangeStep Step = EGearChangeStep::Request);
 
 	UFUNCTION(Reliable, Server, BlueprintCallable, Category = "Ranc Inventory Weapons|Gear")
 	void SelectUnarmed_Server();
@@ -334,7 +335,7 @@ public:
 	 * If PlayEquipMontage is false then the swap will happen immediately
 	 * This is called internally by HandleItemAddedToSlot
 	 */ 
-	void EquipGear(FGameplayTag Slot, const UItemStaticData* NewItemData, FTaggedItemBundle PreviousItem, bool PlayEquipMontage, bool bPlayHolsterMontage = false);
+	void EquipGear(FGameplayTag Slot, const UItemStaticData* NewItemData, FTaggedItemBundle PreviousItem, bool SkipAnim, EGearChangeStep Step);
 
 	FGearSlotDefinition* FindGearSlotDefinition(FGameplayTag SlotTag);
 
@@ -342,15 +343,11 @@ public:
 	* If PlayUnequipMontage is false then the swap will happen immediately
 	* This is called internally by HandleItemRemovedFromSlot
 	*/
-	void UnequipGear(FGameplayTag Slot, const UItemStaticData* ItemData, bool PlayUnequipMontage);
+	void UnequipGear(FGameplayTag Slot, const UItemStaticData* ItemData, bool SkipAnim = false, EGearChangeStep Step = EGearChangeStep::Request);
 
 	UFUNCTION(BlueprintCallable, Category = "Ranc Inventory Weapons|Gear")
 	void CancelGearChange();
 
-	/* Asks the linked inventory to drop the item, converting it to a WorldItem */
-	void DropGearFromSlot(FGameplayTag Slot) const;
-
-	
 	/*
 	returns false if WeaponActor || Owner is a nullptr
 	Returns true if pointers are valid
@@ -366,9 +363,6 @@ public:
 	void OnRep_ActiveWeapon();
 	
 	bool PlayEquipMontage(AWeaponActor* WeaponActor);
-	
-	bool PlayWeaponHolsterMontage(AWeaponActor* InputWeaponActor);
-	void PlayBlendInEquipMontage();
 	
 	/*
 	Spawns the weapon on the server, and tries to add it to the array.
@@ -408,12 +402,16 @@ protected:
 	void UpdateRotation();
 
 	const FGearSlotDefinition* GetHandSlotToUse(const UWeaponDefinition* WeaponData) const;
-	const AWeaponActor* GetWeaponForSlot(const FGearSlotDefinition* Slot) const;
+	AWeaponActor* GetWeaponForSlot(const FGearSlotDefinition* Slot) const;
 	
-	bool SetupDelayedGearChange(EPendingGearChangeType InPendingGearChangeType, const FGameplayTag& GearChangeSlot, const UItemStaticData* ItemData, int32 WeaponSelectionIndex = 0, FTaggedItemBundle PreviousItem = FTaggedItemBundle());
-	UFUNCTION()
-	void DelayedGearChangeTriggered();
-
+	/*
+	Attaches the given weapon to the owner mesh at the desired socket.
+	*/
+	void AttachWeaponToOwner(AWeaponActor* InputWeaponActor,FName SocketName);
+		
+	/* Adds the weapon to the list of weapons that can be hotswapped to with */
+	void AddAndSetSelectedWeapon(const UItemStaticData* WeaponData, FGameplayTag ForcedSlot = FGameplayTag());
+	
 	
 	virtual void GetLifetimeReplicatedProps(TArray < class FLifetimeProperty > & OutLifetimeProps) const override;
 
@@ -421,8 +419,8 @@ protected:
 	void StartAttackReplay();
 	void StopAttackReplay();
 
-	FMontageData GetEquipMontage(const UWeaponDefinition* WeaponData) const;
-	FMontageData GetUnequipMontage(const UWeaponDefinition* WeaponData) const;
+	FMontageData GetEquipMontage(const UGearDefinition* WeaponData) const;
+	FMontageData GetUnequipMontage(const UGearDefinition* WeaponData) const;
 	
 	UInventoryComponent* LinkedInventoryComponent = nullptr;
 
@@ -430,9 +428,6 @@ protected:
 	float LastAttackTime = 0.0f;
 	
 	bool UseOffhandNext = false;
-	
-	// ReSharper disable once CppUE4ProbableMemoryIssuesWithUObject
-	AWeaponActor* WeaponToUnequip;
 
 	// Trace replays
 	int ReplayCurrentIndex;

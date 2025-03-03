@@ -22,6 +22,7 @@ public:
 	{
 		URISSubsystem* Subsystem = TestFixture.GetSubsystem();
 		World = TestFixture.GetWorld();
+		TimerManager = &World->GetTimerManager();
 		TempActor = World->SpawnActor<ACharacter>();
 		InventoryComponent = NewObject<UInventoryComponent>(TempActor);
 		TempActor->AddInstanceComponent(InventoryComponent);
@@ -34,8 +35,6 @@ public:
 		InventoryComponent->RegisterComponent();
 
 		GearManager = NewObject<UGearManagerComponent>(TempActor);
-		TempActor->AddInstanceComponent(GearManager);
-		GearManager->RegisterComponent();
 
 		FGearSlotDefinition MainHandSlotDef;
 		MainHandSlotDef.SlotTag = RightHandSlot;
@@ -51,6 +50,11 @@ public:
 		OffHandSlotDef.bVisibleOnCharacter = true;
 		GearManager->GearSlots.Add(OffHandSlotDef);
 
+		GearManager->EquipDelay = 1.0f;
+		GearManager->UnequipDelay = 1.0f;
+
+		TempActor->AddInstanceComponent(GearManager);
+		GearManager->RegisterComponent();
 		GearManager->Initialize();
 		TestFixture.InitializeTestItems(); // Initialize test items
 	}
@@ -63,8 +67,15 @@ public:
 		}
 	}
 
+	void TickTime(double Time) const
+	{
+		GFrameCounter++;
+		TimerManager->Tick(Time + 0.001);
+	}
+
 	FTestFixture TestFixture;
 	UWorld* World;
+	FTimerManager* TimerManager;
 	AActor* TempActor;
 	UInventoryComponent* InventoryComponent;
 	UGearManagerComponent* GearManager;
@@ -85,23 +96,57 @@ public:
 	{
 		GearManagerComponentTestContext Context(100, 9); // No blocking for this test
 		auto* GearManager = Context.GearManager;
+		auto* Inventory = Context.InventoryComponent;
 		auto* Subsystem = Context.TestFixture.GetSubsystem();
 		FDebugTestResult Res = true;
-
-		UItemStaticData* SpearData = Subsystem->GetItemDataById(ItemIdSpear);
-		Res &= Test->TestTrue(TEXT("Spear item data should be valid"), SpearData != nullptr);
 
 		Res &= Test->TestTrue(
 			TEXT("MainhandSlotWeapon should be null initially"), GearManager->MainhandSlotWeapon == nullptr);
 		Res &= Test->TestTrue(
 			TEXT("OffhandSlotWeapon should be null initially"), GearManager->OffhandSlotWeapon == nullptr);
 
-		GearManager->AddAndSelectWeapon(SpearData, FGameplayTag());
+		Inventory->AddItemToTaggedSlot_IfServer(Subsystem, RightHandSlot, ItemIdSpear, 1, false);
+		Context.TickTime(0); // Necessary first call to activate pending timers
 
+		
 		Res &= Test->TestTrue(
-			TEXT("MainhandSlotWeapon should be valid after equipping the spear"),
-			GearManager->MainhandSlotWeapon != nullptr);
+			TEXT("MainhandSlotWeapon should not yet be valid after adding the spear"), GearManager->MainhandSlotWeapon == nullptr);
 
+		Context.TickTime(GearManager->EquipDelay);
+		
+		Res &= Test->TestTrue(
+			TEXT("MainhandSlotWeapon should be valid after equipping the spear"),GearManager->MainhandSlotWeapon != nullptr);
+		Res &= Test->TestTrue(
+			TEXT("OffhandSlotWeapon should still be null after equipping the spear"), GearManager->OffhandSlotWeapon == nullptr);
+
+		// Remove spear and add two daggers
+		Inventory->RemoveQuantityFromTaggedSlot_IfServer(RightHandSlot, 999, EItemChangeReason::Removed, true);
+		Inventory->AddItemToTaggedSlot_IfServer(Subsystem, RightHandSlot, ItemIdBrittleCopperKnife, 1, false);
+		Inventory->AddItemToTaggedSlot_IfServer(Subsystem, LeftHandSlot, ItemIdBrittleCopperKnife, 1, false);
+
+		// This should have queued up unequip > equip > equip
+		
+		Res &= Test->TestTrue(
+			TEXT("MainhandSlotWeapon should still be spear"),GearManager->MainhandSlotWeapon != nullptr && GearManager->MainhandSlotWeapon->ItemData->ItemId == ItemIdSpear);
+
+		Context.TickTime(GearManager->UnequipDelay);
+		Res &= Test->TestTrue(
+			TEXT("MainhandSlotWeapon should be null after removing the spear"), GearManager->MainhandSlotWeapon == nullptr);
+		Res &= Test->TestTrue(
+					TEXT("OffhandSlotWeapon should still be null after removing the spear"), GearManager->OffhandSlotWeapon == nullptr);
+
+		Context.TickTime(GearManager->EquipDelay);
+		Res &= Test->TestTrue(
+			TEXT("MainhandSlotWeapon should be valid after equipping the  first dagger"), GearManager->MainhandSlotWeapon != nullptr);
+		Res &= Test->TestTrue(
+			TEXT("OffhandSlotWeapon should still be null after equipping the first dagger"), GearManager->OffhandSlotWeapon == nullptr);
+
+		Context.TickTime(GearManager->EquipDelay);
+		Res &= Test->TestTrue(
+			TEXT("MainhandSlotWeapon should be valid after equipping the second dagger"), GearManager->MainhandSlotWeapon != nullptr);
+		Res &= Test->TestTrue(
+			TEXT("OffhandSlotWeapon should be valid after equipping the second dagger"), GearManager->OffhandSlotWeapon != nullptr);
+		
 		return Res;
 	}
 
@@ -143,11 +188,16 @@ public:
 
 		InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, RightHandSlot, SpearData->ItemId, 1, false);
 
+		Context.TickTime(0);
+		Context.TickTime(GearManager->EquipDelay);
+		
 		Res &= Test->TestTrue(
 			TEXT("Weapon should be equipped before unequipping"), GearManager->MainhandSlotWeapon != nullptr);
 
 		InventoryComponent->RemoveQuantityFromTaggedSlot_IfServer(RightHandSlot, 999, EItemChangeReason::Removed, true);
 
+		Context.TickTime(GearManager->UnequipDelay);
+		
 		Res &= Test->TestTrue(
 			TEXT("MainhandSlotWeapon should be null after dropping the weapon"),
 			GearManager->MainhandSlotWeapon == nullptr);
@@ -194,7 +244,9 @@ public:
 	    UItemStaticData* SpearData = Subsystem->GetItemDataById(ItemIdSpear);
 	    Res &= Test->TestTrue(TEXT("Step 1: Spear item data should be valid"), SpearData != nullptr);
 	    int32 AmountAdded = InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, RightHandSlot, SpearData->ItemId, 1, false);
-	    Res &= Test->TestTrue(TEXT("Step 1: Adding Spear to RightHandSlot should succeed"), AmountAdded > 0);
+		Context.TickTime(0); // Necessary first call to activate pending timers
+		Context.TickTime(GearManager->EquipDelay);
+		Res &= Test->TestTrue(TEXT("Step 1: Adding Spear to RightHandSlot should succeed"), AmountAdded > 0);
 	    Res &= Test->TestTrue(TEXT("Step 1: MainhandSlotWeapon should be valid after equipping Spear"), GearManager->MainhandSlotWeapon != nullptr);
 	    Res &= Test->TestTrue(TEXT("Step 1: MainhandSlotWeapon has correct ItemData (Spear)"),
 	        GearManager->MainhandSlotWeapon->ItemData &&
@@ -207,27 +259,33 @@ public:
 	    UItemStaticData* RockData = Subsystem->GetItemDataById(ItemIdRock);
 	    Res &= Test->TestTrue(TEXT("Step 2: Rock item data should be valid"), RockData != nullptr);
 	    AmountAdded = InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, LeftHandSlot, RockData->ItemId, 1, false);
-	    Res &= Test->TestTrue(TEXT("Step 2: Adding Rock to LeftHandSlot should fail due to two-handed spear"), AmountAdded == 0);
+		Context.TickTime(GearManager->UnequipDelay);
+		Context.TickTime(GearManager->EquipDelay);
+		Res &= Test->TestTrue(TEXT("Step 2: Adding Rock to LeftHandSlot should fail due to two-handed spear"), AmountAdded == 0);
 	    Res &= Test->TestTrue(TEXT("Step 2: OffhandSlotWeapon should remain null"), GearManager->OffhandSlotWeapon == nullptr);
 
 	    // ***********************************************
 	    // Step 3: Attempt to equip another Spear into offhand; expect failure.
 	    // ***********************************************
 	    AmountAdded = InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, LeftHandSlot, SpearData->ItemId, 1, false);
-	    Res &= Test->TestTrue(TEXT("Step 3: Adding Spear to LeftHandSlot should fail due to two-handed restriction"), AmountAdded == 0);
+		Context.TickTime(GearManager->UnequipDelay);
+		Context.TickTime(GearManager->EquipDelay);
+		Res &= Test->TestTrue(TEXT("Step 3: Adding Spear to LeftHandSlot should fail due to two-handed restriction"), AmountAdded == 0);
 	    Res &= Test->TestTrue(TEXT("Step 3: OffhandSlotWeapon should still be null"), GearManager->OffhandSlotWeapon == nullptr);
 
 	    // ***********************************************
 	    // Step 4: Remove the Spear from mainhand.
 	    // ***********************************************
 	    AmountAdded = InventoryComponent->RemoveQuantityFromTaggedSlot_IfServer(RightHandSlot, 999, EItemChangeReason::Removed, true, true);
-	    Res &= Test->TestTrue(TEXT("Step 4: After removal, MainhandSlotWeapon should be null"), GearManager->MainhandSlotWeapon == nullptr);
+		Context.TickTime(GearManager->UnequipDelay);
+		Res &= Test->TestTrue(TEXT("Step 4: After removal, MainhandSlotWeapon should be null"), GearManager->MainhandSlotWeapon == nullptr);
 
 	    // ***********************************************
 	    // Step 5: With no two-handed weapon, equip Rock into offhand.
 	    // ***********************************************
 	    AmountAdded = InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, LeftHandSlot, RockData->ItemId, 1, false);
-	    Res &= Test->TestTrue(TEXT("Step 5: Adding Rock to LeftHandSlot should succeed"), AmountAdded > 0);
+		Context.TickTime(GearManager->EquipDelay);
+		Res &= Test->TestTrue(TEXT("Step 5: Adding Rock to LeftHandSlot should succeed"), AmountAdded > 0);
 	    Res &= Test->TestTrue(TEXT("Step 5: OffhandSlotWeapon should be valid after equipping Rock"),
 	        GearManager->OffhandSlotWeapon &&
 	        GearManager->OffhandSlotWeapon->ItemData &&
@@ -238,27 +296,32 @@ public:
 	    // Expect success with rock moved to generic inventory
 	    // ***********************************************
 	    AmountAdded = InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, RightHandSlot, SpearData->ItemId, 1, false);
-	    Res &= Test->TestTrue(TEXT("Step 6: Adding Spear to RightHandSlot should succeed even with offhand occupied"), AmountAdded == 1);
+		Context.TickTime(GearManager->UnequipDelay);
+		Context.TickTime(GearManager->EquipDelay);
+		Res &= Test->TestTrue(TEXT("Step 6: Adding Spear to RightHandSlot should succeed even with offhand occupied"), AmountAdded == 1);
 	    Res &= Test->TestTrue(TEXT("Step 6: MainhandSlotWeapon is now valid"), GearManager->MainhandSlotWeapon != nullptr);
 
 	    // ***********************************************
 	    // Step 9: Attempt to equip Rock into offhand while spear is equipped. Expect failure.
 	    // ***********************************************
 	    AmountAdded = InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, LeftHandSlot, RockData->ItemId, 1, false);
-	    Res &= Test->TestTrue(TEXT("Step 9: Adding Rock to LeftHandSlot should fail with spear equipped"), AmountAdded == 0);
+		Context.TickTime(GearManager->EquipDelay);
+		Res &= Test->TestTrue(TEXT("Step 9: Adding Rock to LeftHandSlot should fail with spear equipped"), AmountAdded == 0);
 	    Res &= Test->TestTrue(TEXT("Step 9: OffhandSlotWeapon remains null"), GearManager->OffhandSlotWeapon == nullptr);
 
 	    // ***********************************************
 	    // Step 10: Remove Spear from mainhand.
 	    // ***********************************************
 	    AmountAdded = InventoryComponent->RemoveQuantityFromTaggedSlot_IfServer(RightHandSlot, 999, EItemChangeReason::Removed, true, true);
-	    Res &= Test->TestTrue(TEXT("Step 10: After removal, MainhandSlotWeapon should be null"), GearManager->MainhandSlotWeapon == nullptr);
+		Context.TickTime(GearManager->UnequipDelay);
+		Res &= Test->TestTrue(TEXT("Step 10: After removal, MainhandSlotWeapon should be null"), GearManager->MainhandSlotWeapon == nullptr);
 
 	    // ***********************************************
 	    // Step 11: Equip Rock into offhand.
 	    // ***********************************************
 	    AmountAdded = InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, LeftHandSlot, RockData->ItemId, 1, false);
-	    Res &= Test->TestTrue(TEXT("Step 11: Adding Rock to LeftHandSlot should succeed"), AmountAdded > 0);
+		Context.TickTime(GearManager->EquipDelay);
+		Res &= Test->TestTrue(TEXT("Step 11: Adding Rock to LeftHandSlot should succeed"), AmountAdded > 0);
 	    Res &= Test->TestTrue(TEXT("Step 11: OffhandSlotWeapon should hold Rock"),
 	        GearManager->OffhandSlotWeapon &&
 	        GearManager->OffhandSlotWeapon->ItemData &&
@@ -269,7 +332,8 @@ public:
 	    // A two-handed weapon should never be allowed in offhand even if mainhand is empty.
 	    // ***********************************************
 	    AmountAdded = InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, LeftHandSlot, SpearData->ItemId, 1, false);
-	    Res &= Test->TestTrue(TEXT("Step 12: Adding Spear to LeftHandSlot should fail"), AmountAdded == 0);
+		Context.TickTime(GearManager->EquipDelay);
+		Res &= Test->TestTrue(TEXT("Step 12: Adding Spear to LeftHandSlot should fail"), AmountAdded == 0);
 	    Res &= Test->TestTrue(TEXT("Step 12: OffhandSlotWeapon remains holding Rock"),
 	        GearManager->OffhandSlotWeapon &&
 	        GearManager->OffhandSlotWeapon->ItemData &&
@@ -281,7 +345,9 @@ public:
 		InventoryComponent->RemoveQuantityFromTaggedSlot_IfServer(LeftHandSlot, 999, EItemChangeReason::Removed, true, true);
 		AmountAdded = InventoryComponent->AddItemToAnySlot(Subsystem, ItemIdSpear, 1, EPreferredSlotPolicy::PreferGenericInventory);
 		int32 MoveResult = InventoryComponent->MoveItem(SpearData->ItemId, 1, FGameplayTag::EmptyTag, RightHandSlot, FGameplayTag::EmptyTag, 1);
-	    Res &= Test->TestTrue(TEXT("Step 13: Adding Spear to RightHandSlot should succeed"), AmountAdded > 0);
+		Context.TickTime(GearManager->UnequipDelay);
+		Context.TickTime(GearManager->EquipDelay);
+		Res &= Test->TestTrue(TEXT("Step 13: Adding Spear to RightHandSlot should succeed"), AmountAdded > 0);
 	    Res &= Test->TestTrue(TEXT("Step 13: MainhandSlotWeapon should hold Spear"),
 	        GearManager->MainhandSlotWeapon &&
 	        GearManager->MainhandSlotWeapon->ItemData &&
@@ -292,20 +358,24 @@ public:
 	    // Step 14: Attempt to equip Rock into offhand; should fail with spear equipped.
 	    // ***********************************************
 	    AmountAdded = InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, LeftHandSlot, RockData->ItemId, 1, false);
-	    Res &= Test->TestTrue(TEXT("Step 14: Adding Rock to LeftHandSlot should fail with spear equipped"), AmountAdded == 0);
+		Context.TickTime(GearManager->UnequipDelay);
+		Context.TickTime(GearManager->EquipDelay);
+		Res &= Test->TestTrue(TEXT("Step 14: Adding Rock to LeftHandSlot should fail with spear equipped"), AmountAdded == 0);
 	    Res &= Test->TestTrue(TEXT("Step 14: OffhandSlotWeapon remains null"), GearManager->OffhandSlotWeapon == nullptr);
 
 	    // ***********************************************
 	    // Step 15: Remove Spear from mainhand.
 	    // ***********************************************
 	    AmountAdded = InventoryComponent->RemoveQuantityFromTaggedSlot_IfServer(RightHandSlot, 999, EItemChangeReason::Removed, true, true);
-	    Res &= Test->TestTrue(TEXT("Step 15: After removal, MainhandSlotWeapon should be null"), GearManager->MainhandSlotWeapon == nullptr);
+		Context.TickTime(GearManager->UnequipDelay);
+		Res &= Test->TestTrue(TEXT("Step 15: After removal, MainhandSlotWeapon should be null"), GearManager->MainhandSlotWeapon == nullptr);
 
 	    // ***********************************************
 	    // Step 16: Equip Rock into offhand.
 	    // ***********************************************
 	    AmountAdded = InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, LeftHandSlot, RockData->ItemId, 1, false);
-	    Res &= Test->TestTrue(TEXT("Step 16: Adding Rock to LeftHandSlot should succeed"), AmountAdded > 0);
+		Context.TickTime(GearManager->EquipDelay);
+		Res &= Test->TestTrue(TEXT("Step 16: Adding Rock to LeftHandSlot should succeed"), AmountAdded > 0);
 	    Res &= Test->TestTrue(TEXT("Step 16: OffhandSlotWeapon should hold Rock"),
 	        GearManager->OffhandSlotWeapon &&
 	        GearManager->OffhandSlotWeapon->ItemData &&
@@ -319,14 +389,17 @@ public:
 	    InventoryComponent->SetTaggedSlotBlocked(LeftHandSlot, true);
 	    // Attempt to equip Rock again into the locked slot should fail.
 	    AmountAdded = InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, LeftHandSlot, RockData->ItemId, 1, false);
-	    Res &= Test->TestTrue(TEXT("Step 17: Adding Rock to a locked LeftHandSlot should fail"), AmountAdded == 0);
+		Context.TickTime(GearManager->UnequipDelay);
+		Context.TickTime(GearManager->EquipDelay);
+		Res &= Test->TestTrue(TEXT("Step 17: Adding Rock to a locked LeftHandSlot should fail"), AmountAdded == 0);
 	    
 	    // ***********************************************
 	    // Step 18: Unlock the LeftHandSlot.
 	    // ***********************************************
 	    InventoryComponent->SetTaggedSlotBlocked(LeftHandSlot, false);
 	    AmountAdded = InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, LeftHandSlot, RockData->ItemId, 1, false);
-	    Res &= Test->TestTrue(TEXT("Step 18: Adding Rock to LeftHandSlot should now succeed after unlocking"), AmountAdded > 0);
+		Context.TickTime(GearManager->EquipDelay);
+		Res &= Test->TestTrue(TEXT("Step 18: Adding Rock to LeftHandSlot should now succeed after unlocking"), AmountAdded > 0);
 	    Res &= Test->TestTrue(TEXT("Step 18: OffhandSlotWeapon should hold Rock"),
 	        GearManager->OffhandSlotWeapon &&
 	        GearManager->OffhandSlotWeapon->ItemData &&
@@ -337,7 +410,9 @@ public:
 	    // Expect failure.
 	    // ***********************************************
 	    MoveResult = InventoryComponent->MoveItem(SpearData->ItemId, 1, FGameplayTag::EmptyTag, LeftHandSlot, RockData->ItemId, 1);
-	    Res &= Test->TestTrue(TEXT("Step 19: Invalid swap should fail (result 0)"), MoveResult == 0);
+		Context.TickTime(GearManager->UnequipDelay);
+		Context.TickTime(GearManager->EquipDelay);
+		Res &= Test->TestTrue(TEXT("Step 19: Invalid swap should fail (result 0)"), MoveResult == 0);
 	    Res &= Test->TestTrue(TEXT("Step 19: LeftHandSlotWeapon remains Rock"),
 	        GearManager->OffhandSlotWeapon &&
 	        GearManager->OffhandSlotWeapon->ItemData &&
@@ -347,17 +422,16 @@ public:
 	    // Step 20: Finally, remove all items via DropAllItems_IfServer.
 	    // ***********************************************
 	    int32 TotalDropped = InventoryComponent->DropAllItems_IfServer();
+		Context.TickTime(GearManager->UnequipDelay);
+		Context.TickTime(GearManager->UnequipDelay);
+		Context.TickTime(GearManager->UnequipDelay);
 	    Res &= Test->TestTrue(TEXT("Step 20: Dropping all items should drop at least 1 item"), TotalDropped >= 1);
 
-	    // ***********************************************
-	    // Step 21: Verify final state: both weapon slots should be empty.
-	    // ***********************************************
+	    // Verify final state: both weapon slots should be empty.
 	    Res &= Test->TestTrue(TEXT("Step 21: Final state - MainhandSlotWeapon should be null"), GearManager->MainhandSlotWeapon == nullptr);
 	    Res &= Test->TestTrue(TEXT("Step 21: Final state - OffhandSlotWeapon should be null"), GearManager->OffhandSlotWeapon == nullptr);
 
-	    // ***********************************************
-	    // Step 22: (Optional additional check) Verify ActiveWeaponIndex is valid (if managed).
-	    // ***********************************************
+	    // Verify ActiveWeaponIndex is valid (if managed).
 	    Res &= Test->TestTrue(TEXT("Step 22: ActiveWeaponIndex should be set (>= 0)"), GearManager->ActiveWeaponIndex >= 0);
 
 	    return Res;
@@ -374,17 +448,21 @@ public:
 
 		// Equip 3 rocks to right hand, verify we get it back when asking for active weapon, them remove just one rock anmd verify we still have weapon
 		InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, RightHandSlot, ItemIdRock, 3, false);
+		Context.TickTime(0);
+		Context.TickTime(GearManager->EquipDelay);
 		AWeaponActor* ActiveWeapon = GearManager->GetActiveWeapon();
 		Res &= Test->TestTrue(TEXT("Active weapon should be valid after equipping 3 rocks"), ActiveWeapon != nullptr);
 
 		for (int i = 0; i < 2; i++)
 		{
 			InventoryComponent->RemoveQuantityFromTaggedSlot_IfServer(RightHandSlot, 1, EItemChangeReason::Removed, true);
+			Context.TickTime(GearManager->UnequipDelay);
 			ActiveWeapon = GearManager->GetActiveWeapon();
 			Res &= Test->TestTrue(TEXT("Active weapon should still be valid after removing 1 rock"), ActiveWeapon != nullptr);
 		}
 
 		InventoryComponent->RemoveQuantityFromTaggedSlot_IfServer(RightHandSlot, 1, EItemChangeReason::Removed, true);
+		Context.TickTime(GearManager->UnequipDelay);
 		ActiveWeapon = GearManager->GetActiveWeapon();
 		Res &= Test->TestTrue(TEXT("Active weapon should be null after removing all rocks"), ActiveWeapon == nullptr);		
 		

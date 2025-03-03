@@ -112,8 +112,7 @@ public:
 		MakeshiftWeaponDefinition->Cooldown = 1.0f;
 		MakeshiftWeaponDefinition->HandCompatability = EHandCompatibility::BothHands;
 		MakeshiftWeaponDefinition->IsLowPriority = true;
-		RockData->ItemDefinitions.Add(UWeaponDefinition::StaticClass(), MakeshiftWeaponDefinition);
-
+		RockData->ItemDefinitions.Add(MakeshiftWeaponDefinition);
 
 		UItemStaticData* SticksData = NewObject<UItemStaticData>();
 		SticksData->ItemId = ItemIdSticks;
@@ -172,7 +171,7 @@ public:
 		SpearWeaponDefinition->Range = 2;
 		SpearWeaponDefinition->Cooldown = 1.0f;
 		SpearWeaponDefinition->HandCompatability = EHandCompatibility::TwoHanded;
-		SpearData->ItemDefinitions.Add(UWeaponDefinition::StaticClass(), SpearWeaponDefinition);
+		SpearData->ItemDefinitions.Add(SpearWeaponDefinition);
 		Subsystem->HardcodeItem(ItemIdSpear, SpearData);
 
 		UItemStaticData* GiantBoulderData = NewObject<UItemStaticData>();
@@ -193,8 +192,9 @@ public:
 		BrittleCopperKnife->MaxStackSize = 1;
 		BrittleCopperKnife->ItemWeight = 3;
 		BrittleCopperKnife->ItemCategories.AddTag(ItemTypeMakeshiftWeapon);
-		BrittleCopperKnife->ItemDefinitions.Add(UWeaponDefinition::StaticClass(), MakeshiftWeaponDefinition);
+		BrittleCopperKnife->ItemDefinitions.Add(MakeshiftWeaponDefinition);
 		BrittleCopperKnife->ItemCategories.AddTag(LeftHandSlot);
+		BrittleCopperKnife->ItemCategories.AddTag(RightHandSlot);
 		BrittleCopperKnife->ItemInstanceDataClass = UItemDurabilityTestInstanceData::StaticClass();
 
 		//UItemStaticData* BlockingOneHandedItem = NewObject<UItemStaticData>();

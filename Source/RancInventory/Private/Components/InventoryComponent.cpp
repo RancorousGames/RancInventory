@@ -259,7 +259,8 @@ int32 UInventoryComponent::AddItemToTaggedSlot_IfServer(TScriptInterface<IItemSo
 }
 
 int32 UInventoryComponent::AddItemToAnySlot(TScriptInterface<IItemSource> ItemSource, const FGameplayTag& ItemId,
-                                            int32 RequestedQuantity, EPreferredSlotPolicy PreferTaggedSlots, bool AllowPartial)
+                                            int32 RequestedQuantity, EPreferredSlotPolicy PreferTaggedSlots,
+                                            bool AllowPartial)
 {
 	const auto* ItemData = URISSubsystem::GetItemDataById(ItemId);
 	if (!ItemData)
@@ -573,9 +574,9 @@ int32 UInventoryComponent::MoveItem_ServerImpl(const FGameplayTag& ItemId, int32
 	if (!SourceItemData)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Source item data not found"));
-		return 0;	
+		return 0;
 	}
-	
+
 	if (TargetItem.GetItemId().IsValid())
 	{
 		const bool ShouldStack = SourceItemData->MaxStackSize > 1 && SourceItem.GetItemId() == TargetItem.GetItemId();
@@ -615,7 +616,8 @@ int32 UInventoryComponent::MoveItem_ServerImpl(const FGameplayTag& ItemId, int32
 
 	if (SourceIsTaggedSlot && TargetIsTaggedSlot)
 	{
-		const FRISMoveResult MoveResult = URISFunctions::MoveBetweenSlots(SourceItem, TargetItem,  false, RequestedQuantity, true);
+		const FRISMoveResult MoveResult = URISFunctions::MoveBetweenSlots(
+			SourceItem, TargetItem, false, RequestedQuantity, true);
 
 		// SourceItem and TargetItem are now swapped in content
 
@@ -635,7 +637,7 @@ int32 UInventoryComponent::MoveItem_ServerImpl(const FGameplayTag& ItemId, int32
 				                                      EItemChangeReason::Moved);
 				OnItemAddedToTaggedSlot.Broadcast(SourceTaggedSlot, TargetItemData, SourceItem.GetQuantity(),
 				                                  FTaggedItemBundle(TargetTaggedSlot, SourceItemId,
-				                                                   SourceQuantity),
+				                                                    SourceQuantity),
 				                                  EItemChangeReason::Moved);
 			}
 			OnItemAddedToTaggedSlot.Broadcast(TargetTaggedSlot, SourceItemData, MovedQuantity,
@@ -676,19 +678,6 @@ int32 UInventoryComponent::MoveItem_ServerImpl(const FGameplayTag& ItemId, int32
 	}
 	else // TargetIsTaggedSlot
 	{
-		if (SwapItemId.IsValid() && SwapQuantity > 0 && !SuppressUpdate)
-		// first perform any requested swap from target tagged slot to container
-		{
-			ensureMsgf(SwapQuantity == TargetItem.GetQuantity(),
-			           TEXT("Requested swap did not swap all of target item"));
-			ensureMsgf(!SourceIsTaggedSlot || MovedQuantity == SourceItem.GetQuantity(),
-			           TEXT("Requested swap did not swap all of tagged source item"));
-			// Notify of the first part of the swap (we dont actually need to do any moving as its going to get overwritten anyway)
-			OnItemRemovedFromTaggedSlot.Broadcast(TargetTaggedSlot, TargetItemData, SwapQuantity,
-			                                      EItemChangeReason::Moved);
-			OnItemAddedToContainer.Broadcast(TargetItemData, SwapQuantity, EItemChangeReason::Moved);
-		}
-
 		auto PreviousItem = FTaggedItemBundle(TargetTaggedSlot, TargetItemId, TargetQuantity);
 		if (TargetItem.GetItemId() != ItemId) // If we are swapping or filling a newly added tagged slot
 		{
@@ -697,8 +686,22 @@ int32 UInventoryComponent::MoveItem_ServerImpl(const FGameplayTag& ItemId, int32
 		}
 		TargetItem.SetQuantity(TargetItem.GetQuantity() + MovedQuantity);
 		UpdateBlockingState(TargetTaggedSlot, SourceItemData, true);
+
+
 		if (!SuppressUpdate)
 		{
+			if (SwapItemId.IsValid() && SwapQuantity > 0 && !SuppressUpdate)
+			{
+				ensureMsgf(SwapQuantity == TargetQuantity,
+				           TEXT("Requested swap did not swap all of target item"));
+				ensureMsgf(!SourceIsTaggedSlot || MovedQuantity == SourceQuantity,
+				           TEXT("Requested swap did not swap all of tagged source item"));
+				// Notify of the first part of the swap (we dont actually need to do any moving as its going to get overwritten anyway)
+				OnItemRemovedFromTaggedSlot.Broadcast(TargetTaggedSlot, TargetItemData, SwapQuantity,
+				                                      EItemChangeReason::Moved);
+				OnItemAddedToContainer.Broadcast(TargetItemData, SwapQuantity, EItemChangeReason::Moved);
+			}
+			
 			OnItemRemovedFromContainer.Broadcast(SourceItemData, MovedQuantity, EItemChangeReason::Moved);
 			OnItemAddedToTaggedSlot.Broadcast(TargetTaggedSlot, SourceItemData, MovedQuantity, PreviousItem,
 			                                  EItemChangeReason::Moved);
@@ -884,8 +887,7 @@ int32 UInventoryComponent::UseItemFromTaggedSlot(const FGameplayTag& SlotTag)
 		return 0;
 	}
 
-	const UUsableItemDefinition* UsableItem = ItemData->GetItemDefinition<UUsableItemDefinition>(
-		UUsableItemDefinition::StaticClass());
+	const UUsableItemDefinition* UsableItem = ItemData->GetItemDefinition<UUsableItemDefinition>();
 
 	if (!UsableItem)
 	{
@@ -917,8 +919,7 @@ void UInventoryComponent::UseItemFromTaggedSlot_Server_Implementation(const FGam
 			return;
 		}
 
-		UUsableItemDefinition* UsableItem = ItemData->GetItemDefinition<UUsableItemDefinition>(
-			UUsableItemDefinition::StaticClass());
+		UUsableItemDefinition* UsableItem = ItemData->GetItemDefinition<UUsableItemDefinition>();
 
 		if (!UsableItem)
 		{
@@ -995,7 +996,8 @@ int32 UInventoryComponent::GetIndexForTaggedSlot(const FGameplayTag& SlotTag) co
 int32 UInventoryComponent::AddItem_ServerImpl(TScriptInterface<IItemSource> ItemSource, const FGameplayTag& ItemId,
                                               int32 RequestedQuantity, bool AllowPartial, bool SuppressUpdate)
 {
-	return AddItemToAnySlot(ItemSource, ItemId, RequestedQuantity, EPreferredSlotPolicy::PreferSpecializedTaggedSlot, AllowPartial);
+	return AddItemToAnySlot(ItemSource, ItemId, RequestedQuantity, EPreferredSlotPolicy::PreferSpecializedTaggedSlot,
+	                        AllowPartial);
 }
 
 TArray<FTaggedItemBundle> UInventoryComponent::GetAllTaggedItems() const
@@ -1129,7 +1131,8 @@ TArray<std::tuple<FGameplayTag, int32>> UInventoryComponent::GetItemDistribution
 	int32 TotalQuantityDistributed = 0;
 	int32 QuantityDistributedToGenericSlots = 0;
 
-	TArray<FGameplayTag> TaggedSlotsToExclude = TArray<FGameplayTag>(); // We dont want to add to the same tagged slot twice
+	TArray<FGameplayTag> TaggedSlotsToExclude = TArray<FGameplayTag>();
+	// We dont want to add to the same tagged slot twice
 	if (ItemData->MaxStackSize > 1)
 	{
 		// First we need to check for any partially filled slots that we can top off first
@@ -1164,12 +1167,13 @@ TArray<std::tuple<FGameplayTag, int32>> UInventoryComponent::GetItemDistribution
 			}
 		}
 	}
-	
+
 	if (PreferTaggedSlots == EPreferredSlotPolicy::PreferGenericInventory)
 	{
 		const int32 QuantityContainersGenericSlotsCanReceive = Super::GetReceivableQuantityImpl(ItemId);
 		// Try adding to generic slots first if not preferring tagged slots
-		QuantityDistributedToGenericSlots += FMath::Min(QuantityToAdd - TotalQuantityDistributed, QuantityContainersGenericSlotsCanReceive);
+		QuantityDistributedToGenericSlots += FMath::Min(QuantityToAdd - TotalQuantityDistributed,
+		                                                QuantityContainersGenericSlotsCanReceive);
 		TotalQuantityDistributed += QuantityDistributedToGenericSlots;
 	}
 
@@ -1252,12 +1256,13 @@ TArray<std::tuple<FGameplayTag, int32>> UInventoryComponent::GetItemDistribution
 	int32 FinalAddedtoGenericSlots = QuantityToAdd - TotalQuantityDistributed;
 	QuantityDistributedToGenericSlots += FinalAddedtoGenericSlots;
 	TotalQuantityDistributed += FinalAddedtoGenericSlots;
-	
+
 	if (QuantityDistributedToGenericSlots > 0)
 		DistributionPlan.Add(std::make_tuple(FGameplayTag::EmptyTag, QuantityDistributedToGenericSlots));
 
-	ensureMsgf(TotalQuantityDistributed == QuantityToAdd, TEXT("Quantity distributed does not match requested quantity"));
-	
+	ensureMsgf(TotalQuantityDistributed == QuantityToAdd,
+	           TEXT("Quantity distributed does not match requested quantity"));
+
 	return DistributionPlan;
 }
 

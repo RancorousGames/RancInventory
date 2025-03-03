@@ -3,7 +3,6 @@
 #include "CoreMinimal.h"
 #include "RangedWeaponDefinition.h"
 #include "WeaponActor.h"
-#include "RangedWeaponStaticData.h"
 #include "Components/ItemContainerComponent.h"
 #include "RangedWeaponActor.generated.h"
 

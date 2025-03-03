@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "GearDefinition.h"
 #include "Data/ItemStaticData.h"
 #include "RISWeaponsDataTypes.h"
 #include "Data/ItemDefinitionBase.h"
@@ -10,7 +11,7 @@
  * UWeaponDefinition - Data definition class for weapon-specific data.
  */
 UCLASS(Blueprintable, DefaultToInstanced, EditInlineNew, Category = "RIS | Classes | Data")
-class RANCINVENTORYWEAPONS_API UWeaponDefinition : public UItemDefinitionBase
+class RANCINVENTORYWEAPONS_API UWeaponDefinition : public UGearDefinition
 {
     GENERATED_BODY()
 
@@ -27,13 +28,6 @@ public:
 	/** The hand compatibility of the weapon (e.g., mainhand, offhand, or two-handed) */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS | Weapon", meta = (AssetBundles = "Data"))
 	FGameplayTag WeaponType;
-	
-    /** Animation montage data for equipping the weapon */
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS | Weapon", meta = (AssetBundles = "Data"))
-    FMontageData EquipMontage;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS | Weapon", meta = (AssetBundles = "Data"))
-	FMontageData HolsterMontage;
 	
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS | Weapon", meta = (AssetBundles = "Data"))
 	TArray<FMontageData> AttackMontages;
