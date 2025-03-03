@@ -1,7 +1,6 @@
 #include "RangedWeaponActor.h"
 
 #include "LogRancInventorySystem.h"
-#include "RangedWeaponStaticData.h"
 #include "Components/ItemContainerComponent.h"
 #include "Core/RISFunctions.h"
 #include "Core/RISSubsystem.h"

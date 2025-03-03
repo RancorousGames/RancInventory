@@ -22,7 +22,10 @@ UE_DEFINE_GAMEPLAY_TAG(ChestSlot, "Test.Gameplay.Slots.Chest");
 UE_DEFINE_GAMEPLAY_TAG(ItemTypeResource, "Test.Gameplay.Items.Types.Resource");
 UE_DEFINE_GAMEPLAY_TAG(ItemTypeArmor, "Test.Gameplay.Items.Types.Armor");
 UE_DEFINE_GAMEPLAY_TAG(ItemTypeTwoHanded, "Test.Gameplay.Items.Types.TwoHanded");
+UE_DEFINE_GAMEPLAY_TAG(ItemTypeTwoHandedOffhand, "Test.Gameplay.Items.Types.TwoHandedOffhand");
+UE_DEFINE_GAMEPLAY_TAG(ItemTypeOffHandOnly, "Test.Gameplay.Items.Types.OffHandOnly");
 UE_DEFINE_GAMEPLAY_TAG(ItemTypeMakeshiftWeapon, "Test.Gameplay.Items.Types.MakeshiftWeapon");
+UE_DEFINE_GAMEPLAY_TAG(ItemTypeRangedWeapon, "Test.Gameplay.Items.Types.RangedWeapon");
 
 UE_DEFINE_GAMEPLAY_TAG(ItemIdRock, "Test.Items.IDs.Rock");
 UE_DEFINE_GAMEPLAY_TAG(ItemIdSticks, "Test.Items.IDs.Sticks");
@@ -33,6 +36,8 @@ UE_DEFINE_GAMEPLAY_TAG(ItemIdChestArmor, "Test.Items.IDs.ChestArmor");
 UE_DEFINE_GAMEPLAY_TAG(ItemIdGiantBoulder, "Test.Items.IDs.GiantBoulder");
 UE_DEFINE_GAMEPLAY_TAG(ItemIdBlockingOneHandedItem, "Test.Items.IDs.ItemIdBlockingOneHandedItem");
 UE_DEFINE_GAMEPLAY_TAG(ItemIdBrittleCopperKnife, "Test.Items.IDs.BrittleCopperKnife");
+UE_DEFINE_GAMEPLAY_TAG(ItemIdShortbow, "Test.Items.IDs.Shortbow");
+UE_DEFINE_GAMEPLAY_TAG(ItemIdLongbow, "Test.Items.IDs.Longbow");
 
 // Macros for commonly used item bundles
 #define ONE_SPEAR ItemIdSpear, 1
@@ -112,8 +117,7 @@ public:
 		MakeshiftWeaponDefinition->Cooldown = 1.0f;
 		MakeshiftWeaponDefinition->HandCompatability = EHandCompatibility::BothHands;
 		MakeshiftWeaponDefinition->IsLowPriority = true;
-		RockData->ItemDefinitions.Add(UWeaponDefinition::StaticClass(), MakeshiftWeaponDefinition);
-
+		RockData->ItemDefinitions.Add(MakeshiftWeaponDefinition);
 
 		UItemStaticData* SticksData = NewObject<UItemStaticData>();
 		SticksData->ItemId = ItemIdSticks;
@@ -172,7 +176,7 @@ public:
 		SpearWeaponDefinition->Range = 2;
 		SpearWeaponDefinition->Cooldown = 1.0f;
 		SpearWeaponDefinition->HandCompatability = EHandCompatibility::TwoHanded;
-		SpearData->ItemDefinitions.Add(UWeaponDefinition::StaticClass(), SpearWeaponDefinition);
+		SpearData->ItemDefinitions.Add(SpearWeaponDefinition);
 		Subsystem->HardcodeItem(ItemIdSpear, SpearData);
 
 		UItemStaticData* GiantBoulderData = NewObject<UItemStaticData>();
@@ -193,19 +197,50 @@ public:
 		BrittleCopperKnife->MaxStackSize = 1;
 		BrittleCopperKnife->ItemWeight = 3;
 		BrittleCopperKnife->ItemCategories.AddTag(ItemTypeMakeshiftWeapon);
-		BrittleCopperKnife->ItemDefinitions.Add(UWeaponDefinition::StaticClass(), MakeshiftWeaponDefinition);
+		BrittleCopperKnife->ItemDefinitions.Add(MakeshiftWeaponDefinition);
 		BrittleCopperKnife->ItemCategories.AddTag(LeftHandSlot);
+		BrittleCopperKnife->ItemCategories.AddTag(RightHandSlot);
 		BrittleCopperKnife->ItemInstanceDataClass = UItemDurabilityTestInstanceData::StaticClass();
 
-		//UItemStaticData* BlockingOneHandedItem = NewObject<UItemStaticData>();
-		//BlockingOneHandedItem->ItemId = ItemIdBlockingOneHandedItem;
-		//BlockingOneHandedItem->ItemName = FName("BlockingOneHandedItem");
-		//BlockingOneHandedItem->ItemDescription = FText::FromString("An item that blocks offhand but does not require two hands");
-		//BlockingOneHandedItem->ItemPrimaryType = ItemTypeResource;
-		//BlockingOneHandedItem->MaxStackSize = 1;
-		//BlockingOneHandedItem->ItemWeight = 1;
-		//BlockingOneHandedItem->ItemCategories.AddTag(ItemIdBlockingOneHandedItem);
-		//Subsystem->HardcodeItem(ItemIdBlockingOneHandedItem, BlockingOneHandedItem);
+		UItemStaticData* ShortbowData = NewObject<UItemStaticData>();
+		ShortbowData->ItemId = ItemIdShortbow;
+		ShortbowData->ItemName = FName("Shortbow");
+		ShortbowData->ItemDescription = FText::FromString("A Shortbow that must be held in offhand.");
+		ShortbowData->ItemPrimaryType = ItemTypeRangedWeapon;
+		ShortbowData->MaxStackSize = 1;
+		ShortbowData->ItemWeight = 3;
+		ShortbowData->ItemCategories.AddTag(ItemTypeOffHandOnly);
+		ShortbowData->ItemCategories.AddTag(LeftHandSlot);
+
+		UWeaponDefinition* ShortBowWeaponDefinition = NewObject<UWeaponDefinition>();
+		ShortBowWeaponDefinition->WeaponType = ItemTypeRangedWeapon;
+		ShortBowWeaponDefinition->Damage = 10;
+		ShortBowWeaponDefinition->Range = 20;
+		ShortBowWeaponDefinition->Cooldown = 1.0f;
+		ShortBowWeaponDefinition->HandCompatability = EHandCompatibility::OnlyOffhand;
+		ShortbowData->ItemDefinitions.Add(ShortBowWeaponDefinition);
+		Subsystem->HardcodeItem(ItemIdShortbow, ShortbowData);
+
+		
+		UItemStaticData* LongbowData = NewObject<UItemStaticData>();
+		LongbowData->ItemId = ItemIdLongbow;
+		LongbowData->ItemName = FName("Longbow");
+		LongbowData->ItemDescription = FText::FromString("A longbow that must be held in left hand and uses both hands");
+		LongbowData->ItemPrimaryType = ItemTypeRangedWeapon;
+		LongbowData->MaxStackSize = 1;
+		LongbowData->ItemWeight = 3;
+		LongbowData->ItemCategories.AddTag(ItemTypeOffHandOnly);
+		LongbowData->ItemCategories.AddTag(ItemTypeTwoHandedOffhand);
+		LongbowData->ItemCategories.AddTag(LeftHandSlot);
+
+		UWeaponDefinition* LongbowWeaponDefinition = NewObject<UWeaponDefinition>();
+		LongbowWeaponDefinition->WeaponType = ItemTypeRangedWeapon;
+		LongbowWeaponDefinition->Damage = 10;
+		LongbowWeaponDefinition->Range = 20;
+		LongbowWeaponDefinition->Cooldown = 1.0f;
+		LongbowWeaponDefinition->HandCompatability = EHandCompatibility::TwoHandedOffhand;
+		LongbowData->ItemDefinitions.Add(LongbowWeaponDefinition);
+		Subsystem->HardcodeItem(ItemIdLongbow, LongbowData);
 
 		Subsystem->HardcodeItem(ItemIdBrittleCopperKnife, BrittleCopperKnife);
 	}

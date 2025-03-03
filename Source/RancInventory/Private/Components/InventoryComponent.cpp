@@ -259,7 +259,8 @@ int32 UInventoryComponent::AddItemToTaggedSlot_IfServer(TScriptInterface<IItemSo
 }
 
 int32 UInventoryComponent::AddItemToAnySlot(TScriptInterface<IItemSource> ItemSource, const FGameplayTag& ItemId,
-                                            int32 RequestedQuantity, EPreferredSlotPolicy PreferTaggedSlots, bool AllowPartial)
+                                            int32 RequestedQuantity, EPreferredSlotPolicy PreferTaggedSlots,
+                                            bool AllowPartial)
 {
 	const auto* ItemData = URISSubsystem::GetItemDataById(ItemId);
 	if (!ItemData)
@@ -573,9 +574,9 @@ int32 UInventoryComponent::MoveItem_ServerImpl(const FGameplayTag& ItemId, int32
 	if (!SourceItemData)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Source item data not found"));
-		return 0;	
+		return 0;
 	}
-	
+
 	if (TargetItem.GetItemId().IsValid())
 	{
 		const bool ShouldStack = SourceItemData->MaxStackSize > 1 && SourceItem.GetItemId() == TargetItem.GetItemId();
@@ -615,7 +616,8 @@ int32 UInventoryComponent::MoveItem_ServerImpl(const FGameplayTag& ItemId, int32
 
 	if (SourceIsTaggedSlot && TargetIsTaggedSlot)
 	{
-		const FRISMoveResult MoveResult = URISFunctions::MoveBetweenSlots(SourceItem, TargetItem,  false, RequestedQuantity, true);
+		const FRISMoveResult MoveResult = URISFunctions::MoveBetweenSlots(
+			SourceItem, TargetItem, false, RequestedQuantity, true);
 
 		// SourceItem and TargetItem are now swapped in content
 
@@ -635,7 +637,7 @@ int32 UInventoryComponent::MoveItem_ServerImpl(const FGameplayTag& ItemId, int32
 				                                      EItemChangeReason::Moved);
 				OnItemAddedToTaggedSlot.Broadcast(SourceTaggedSlot, TargetItemData, SourceItem.GetQuantity(),
 				                                  FTaggedItemBundle(TargetTaggedSlot, SourceItemId,
-				                                                   SourceQuantity),
+				                                                    SourceQuantity),
 				                                  EItemChangeReason::Moved);
 			}
 			OnItemAddedToTaggedSlot.Broadcast(TargetTaggedSlot, SourceItemData, MovedQuantity,
@@ -676,19 +678,6 @@ int32 UInventoryComponent::MoveItem_ServerImpl(const FGameplayTag& ItemId, int32
 	}
 	else // TargetIsTaggedSlot
 	{
-		if (SwapItemId.IsValid() && SwapQuantity > 0 && !SuppressUpdate)
-		// first perform any requested swap from target tagged slot to container
-		{
-			ensureMsgf(SwapQuantity == TargetItem.GetQuantity(),
-			           TEXT("Requested swap did not swap all of target item"));
-			ensureMsgf(!SourceIsTaggedSlot || MovedQuantity == SourceItem.GetQuantity(),
-			           TEXT("Requested swap did not swap all of tagged source item"));
-			// Notify of the first part of the swap (we dont actually need to do any moving as its going to get overwritten anyway)
-			OnItemRemovedFromTaggedSlot.Broadcast(TargetTaggedSlot, TargetItemData, SwapQuantity,
-			                                      EItemChangeReason::Moved);
-			OnItemAddedToContainer.Broadcast(TargetItemData, SwapQuantity, EItemChangeReason::Moved);
-		}
-
 		auto PreviousItem = FTaggedItemBundle(TargetTaggedSlot, TargetItemId, TargetQuantity);
 		if (TargetItem.GetItemId() != ItemId) // If we are swapping or filling a newly added tagged slot
 		{
@@ -697,8 +686,22 @@ int32 UInventoryComponent::MoveItem_ServerImpl(const FGameplayTag& ItemId, int32
 		}
 		TargetItem.SetQuantity(TargetItem.GetQuantity() + MovedQuantity);
 		UpdateBlockingState(TargetTaggedSlot, SourceItemData, true);
+
+
 		if (!SuppressUpdate)
 		{
+			if (SwapItemId.IsValid() && SwapQuantity > 0 && !SuppressUpdate)
+			{
+				ensureMsgf(SwapQuantity == TargetQuantity,
+				           TEXT("Requested swap did not swap all of target item"));
+				ensureMsgf(!SourceIsTaggedSlot || MovedQuantity == SourceQuantity,
+				           TEXT("Requested swap did not swap all of tagged source item"));
+				// Notify of the first part of the swap (we dont actually need to do any moving as its going to get overwritten anyway)
+				OnItemRemovedFromTaggedSlot.Broadcast(TargetTaggedSlot, TargetItemData, SwapQuantity,
+				                                      EItemChangeReason::Moved);
+				OnItemAddedToContainer.Broadcast(TargetItemData, SwapQuantity, EItemChangeReason::Moved);
+			}
+			
 			OnItemRemovedFromContainer.Broadcast(SourceItemData, MovedQuantity, EItemChangeReason::Moved);
 			OnItemAddedToTaggedSlot.Broadcast(TargetTaggedSlot, SourceItemData, MovedQuantity, PreviousItem,
 			                                  EItemChangeReason::Moved);
@@ -884,8 +887,7 @@ int32 UInventoryComponent::UseItemFromTaggedSlot(const FGameplayTag& SlotTag)
 		return 0;
 	}
 
-	const UUsableItemDefinition* UsableItem = ItemData->GetItemDefinition<UUsableItemDefinition>(
-		UUsableItemDefinition::StaticClass());
+	const UUsableItemDefinition* UsableItem = ItemData->GetItemDefinition<UUsableItemDefinition>();
 
 	if (!UsableItem)
 	{
@@ -917,8 +919,7 @@ void UInventoryComponent::UseItemFromTaggedSlot_Server_Implementation(const FGam
 			return;
 		}
 
-		UUsableItemDefinition* UsableItem = ItemData->GetItemDefinition<UUsableItemDefinition>(
-			UUsableItemDefinition::StaticClass());
+		UUsableItemDefinition* UsableItem = ItemData->GetItemDefinition<UUsableItemDefinition>();
 
 		if (!UsableItem)
 		{
@@ -971,8 +972,7 @@ bool UInventoryComponent::CanItemBeEquippedInUniversalSlot(const FGameplayTag& I
 	int32 Index = GetIndexForTaggedSlot(Slot.Slot);
 	return IsTaggedSlotCompatible(ItemId, Slot.Slot) &&
 		(IgnoreBlocking || !WouldItemMoveIndirectlyViolateBlocking(Slot.Slot, ItemData)) &&
-		TaggedSlotItemInstances.IsValidIndex(Index) &&
-		(IgnoreBlocking || !TaggedSlotItemInstances[Index].IsBlocked);
+		(IgnoreBlocking || !TaggedSlotItemInstances.IsValidIndex(Index) || !TaggedSlotItemInstances[Index].IsBlocked);
 }
 
 bool UInventoryComponent::IsTaggedSlotBlocked(const FGameplayTag& Slot) const
@@ -995,7 +995,8 @@ int32 UInventoryComponent::GetIndexForTaggedSlot(const FGameplayTag& SlotTag) co
 int32 UInventoryComponent::AddItem_ServerImpl(TScriptInterface<IItemSource> ItemSource, const FGameplayTag& ItemId,
                                               int32 RequestedQuantity, bool AllowPartial, bool SuppressUpdate)
 {
-	return AddItemToAnySlot(ItemSource, ItemId, RequestedQuantity, EPreferredSlotPolicy::PreferSpecializedTaggedSlot, AllowPartial);
+	return AddItemToAnySlot(ItemSource, ItemId, RequestedQuantity, EPreferredSlotPolicy::PreferSpecializedTaggedSlot,
+	                        AllowPartial);
 }
 
 TArray<FTaggedItemBundle> UInventoryComponent::GetAllTaggedItems() const
@@ -1129,7 +1130,8 @@ TArray<std::tuple<FGameplayTag, int32>> UInventoryComponent::GetItemDistribution
 	int32 TotalQuantityDistributed = 0;
 	int32 QuantityDistributedToGenericSlots = 0;
 
-	TArray<FGameplayTag> TaggedSlotsToExclude = TArray<FGameplayTag>(); // We dont want to add to the same tagged slot twice
+	TArray<FGameplayTag> TaggedSlotsToExclude = TArray<FGameplayTag>();
+	// We dont want to add to the same tagged slot twice
 	if (ItemData->MaxStackSize > 1)
 	{
 		// First we need to check for any partially filled slots that we can top off first
@@ -1164,12 +1166,13 @@ TArray<std::tuple<FGameplayTag, int32>> UInventoryComponent::GetItemDistribution
 			}
 		}
 	}
-	
+
 	if (PreferTaggedSlots == EPreferredSlotPolicy::PreferGenericInventory)
 	{
 		const int32 QuantityContainersGenericSlotsCanReceive = Super::GetReceivableQuantityImpl(ItemId);
 		// Try adding to generic slots first if not preferring tagged slots
-		QuantityDistributedToGenericSlots += FMath::Min(QuantityToAdd - TotalQuantityDistributed, QuantityContainersGenericSlotsCanReceive);
+		QuantityDistributedToGenericSlots += FMath::Min(QuantityToAdd - TotalQuantityDistributed,
+		                                                QuantityContainersGenericSlotsCanReceive);
 		TotalQuantityDistributed += QuantityDistributedToGenericSlots;
 	}
 
@@ -1252,100 +1255,127 @@ TArray<std::tuple<FGameplayTag, int32>> UInventoryComponent::GetItemDistribution
 	int32 FinalAddedtoGenericSlots = QuantityToAdd - TotalQuantityDistributed;
 	QuantityDistributedToGenericSlots += FinalAddedtoGenericSlots;
 	TotalQuantityDistributed += FinalAddedtoGenericSlots;
-	
+
 	if (QuantityDistributedToGenericSlots > 0)
 		DistributionPlan.Add(std::make_tuple(FGameplayTag::EmptyTag, QuantityDistributedToGenericSlots));
 
-	ensureMsgf(TotalQuantityDistributed == QuantityToAdd, TEXT("Quantity distributed does not match requested quantity"));
-	
+	ensureMsgf(TotalQuantityDistributed == QuantityToAdd,
+	           TEXT("Quantity distributed does not match requested quantity"));
+
 	return DistributionPlan;
 }
 
 void UInventoryComponent::SortUniversalTaggedSlots()
 {
-	const int32 NumSlots = UniversalTaggedSlots.Num();
-	// Build an adjacency list representing our dependency graph:
-	// If slot A can block slot B, then add an edge from A to B.
-	TArray<TArray<int32>> Graph;
-	Graph.SetNum(NumSlots);
+    const int32 NumSlots = UniversalTaggedSlots.Num();
+    // Build an adjacency list representing our dependency graph:
+    // If slot A can block slot B, then add an edge from A to B.
+    TArray<TArray<int32>> Graph;
+    Graph.SetNum(NumSlots);
 
-	// Array to keep track of how many dependencies (incoming edges) each slot has.
-	TArray<int32> InDegree;
-	InDegree.Init(0, NumSlots);
+    // Array to keep track of how many dependencies (incoming edges) each slot has.
+    TArray<int32> InDegree;
+    InDegree.Init(0, NumSlots);
 
-	// Build the graph.
-	for (int32 i = 0; i < NumSlots; ++i)
-	{
-		const FUniversalTaggedSlot& SlotA = UniversalTaggedSlots[i];
-		// If this slot doesn't block anything, skip it.
-		if (!SlotA.UniversalSlotToBlock.IsValid())
-		{
-			continue;
-		}
+    // Build the graph.
+    for (int32 i = 0; i < NumSlots; ++i)
+    {
+       const FUniversalTaggedSlot& SlotA = UniversalTaggedSlots[i];
+       // If this slot doesn't block anything, skip it.
+       if (!SlotA.UniversalSlotToBlock.IsValid())
+       {
+          continue;
+       }
 
-		for (int32 j = 0; j < NumSlots; ++j)
-		{
-			if (i == j)
-			{
-				continue;
-			}
-			const FUniversalTaggedSlot& SlotB = UniversalTaggedSlots[j];
-			// If SlotA's UniversalSlotToBlock matches SlotB's Slot, then A can block B.
-			if (SlotA.UniversalSlotToBlock == SlotB.Slot)
-			{
-				Graph[i].Add(j);
-				InDegree[j]++;
-			}
-		}
-	}
+       for (int32 j = 0; j < NumSlots; ++j)
+       {
+          if (i == j)
+          {
+             continue;
+          }
+          const FUniversalTaggedSlot& SlotB = UniversalTaggedSlots[j];
+          // If SlotA's UniversalSlotToBlock matches SlotB's Slot, then A can block B.
+          if (SlotA.UniversalSlotToBlock == SlotB.Slot)
+          {
+             Graph[i].Add(j);
+             InDegree[j]++;
+          }
+       }
+    }
 
-	// Kahn's algorithm: Start with all nodes that have no incoming edges.
-	TQueue<int32> Queue;
-	for (int32 i = 0; i < NumSlots; ++i)
-	{
-		if (InDegree[i] == 0)
-		{
-			Queue.Enqueue(i);
-		}
-	}
+    // Kahn's algorithm with cycle handling
+    TQueue<int32> Queue;
+    for (int32 i = 0; i < NumSlots; ++i)
+    {
+       if (InDegree[i] == 0)
+       {
+          Queue.Enqueue(i);
+       }
+    }
 
-	// This will hold the sorted order of indices.
-	TArray<int32> SortedIndices;
-	while (!Queue.IsEmpty())
-	{
-		int32 Index;
-		Queue.Dequeue(Index);
-		SortedIndices.Add(Index);
+    // This will hold the sorted order of indices.
+    TArray<int32> SortedIndices;
+    TArray<int32> CyclicIndices;
 
-		// Remove this node from the graph.
-		for (int32 Neighbor : Graph[Index])
-		{
-			InDegree[Neighbor]--;
-			if (InDegree[Neighbor] == 0)
-			{
-				Queue.Enqueue(Neighbor);
-			}
-		}
-	}
+    while (!Queue.IsEmpty())
+    {
+       int32 Index;
+       Queue.Dequeue(Index);
+       SortedIndices.Add(Index);
 
-	// Check for cycles (if any, SortedIndices won't contain all indices).
-	if (SortedIndices.Num() != NumSlots)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("Cycle detected in UniversalTaggedSlots dependency graph!"));
-		// Handle cycles appropriately here if needed.
-		return;
-	}
+       // Remove this node from the graph.
+       for (int32 Neighbor : Graph[Index])
+       {
+          InDegree[Neighbor]--;
+          if (InDegree[Neighbor] == 0)
+          {
+             Queue.Enqueue(Neighbor);
+          }
+       }
+    }
 
-	// Build a new sorted array based on the topological order.
-	TArray<FUniversalTaggedSlot> SortedSlots;
-	SortedSlots.SetNum(NumSlots);
-	for (int32 i = 0; i < NumSlots; ++i)
-	{
-		SortedSlots[i] = UniversalTaggedSlots[SortedIndices[i]];
-	}
+    // Collect any remaining indices with non-zero in-degree (cyclic dependencies)
+    for (int32 i = 0; i < NumSlots; ++i)
+    {
+       if (InDegree[i] > 0)
+       {
+           CyclicIndices.Add(i);
+       }
+    }
 
-	// Replace the original array with the sorted one.
-	UniversalTaggedSlots = SortedSlots;
+    // If cycles are detected, log a warning and partially sort
+    if (!CyclicIndices.IsEmpty())
+    {
+       UE_LOG(LogTemp, Warning, TEXT("Cycle detected in UniversalTaggedSlots dependency graph! %d slots have cyclic dependencies."), CyclicIndices.Num());
+       
+       // Log the specific cyclic slots for debugging
+       for (int32 CyclicIndex : CyclicIndices)
+       {
+           UE_LOG(LogTemp, Warning, TEXT("Cyclic Slot Index: %d, Slot: %s"), 
+                  CyclicIndex, 
+                  *UniversalTaggedSlots[CyclicIndex].Slot.ToString());
+       }
+    }
+
+    // Build a new sorted array based on the available topological order
+    TArray<FUniversalTaggedSlot> SortedSlots;
+    SortedSlots.SetNum(NumSlots);
+
+    // First, add slots without dependencies
+    for (int32 Index : SortedIndices)
+    {
+       SortedSlots[SortedSlots.Num() - SortedIndices.Num() + SortedIndices.IndexOfByKey(Index)] = UniversalTaggedSlots[Index];
+    }
+
+    // Then, add remaining cyclic slots (if any)
+    int32 SortedCount = SortedIndices.Num();
+    for (int32 CyclicIndex : CyclicIndices)
+    {
+       SortedSlots[SortedCount++] = UniversalTaggedSlots[CyclicIndex];
+    }
+
+    // Replace the original array with the partially sorted one
+    UniversalTaggedSlots = SortedSlots;
 }
 
 void UInventoryComponent::OnRep_Slots()

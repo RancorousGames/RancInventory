@@ -24,8 +24,8 @@ public:
 		TempActor = World->SpawnActor<AActor>();
 		InventoryComponent = NewObject<UInventoryComponent>(TempActor);
 		TempActor->AddInstanceComponent(InventoryComponent);
-		InventoryComponent->UniversalTaggedSlots.Add(FUniversalTaggedSlot(LeftHandSlot));
 		InventoryComponent->UniversalTaggedSlots.Add(FUniversalTaggedSlot(RightHandSlot, LeftHandSlot, ItemTypeTwoHanded, ItemTypeTwoHanded));
+		InventoryComponent->UniversalTaggedSlots.Add(FUniversalTaggedSlot(LeftHandSlot, RightHandSlot,ItemTypeTwoHandedOffhand, ItemTypeOffHandOnly));
 		InventoryComponent->SpecializedTaggedSlots.Add(HelmetSlot);
 		InventoryComponent->SpecializedTaggedSlots.Add(ChestSlot);
 		InventoryComponent->MaxContainerSlotCount = NumSlots;
@@ -530,6 +530,8 @@ public:
 	    Res &= Test->TestTrue(TEXT("Move spear to any tagged slot"), ViewModel->MoveItemToAnyTaggedSlot(NoTag, 2));
 		Res &= ViewModel->AssertViewModelSettled();
 		Res &= Test->TestTrue(TEXT("Spear should be in right hand tagged slot"), ViewModel->GetItemForTaggedSlot(RightHandSlot).ItemId == ItemIdSpear);
+		int32 SlotWithRock = ViewModel->GetItem(0).ItemId == ItemIdRock ? 0 : 2; // Rock should have been either swapped or moved to 0
+		Res &= Test->TestTrue(TEXT("Rock should be in generic slot 0"), ViewModel->GetItem(SlotWithRock).ItemId == ItemIdRock);
 		Res &= ViewModel->AssertViewModelSettled();
 		
 	    // Attempt to move item that is already in its correct tagged slot (helmet), should result in no action
@@ -547,13 +549,13 @@ public:
 	    Res &= Test->TestTrue(TEXT("Chest armor should be in ChestSlot"), !ViewModel->IsTaggedSlotEmpty(ChestSlot));
 
 	    // Attempt to move an item to a tagged slot when all suitable slots are occupied
-	    InventoryComponent->AddItem_IfServer(Subsystem, OneRock); // Add another rock
-	    Res &= Test->TestFalse(TEXT("Attempt to move extra rock to should fail as no slots are available"), ViewModel->MoveItemToAnyTaggedSlot(NoTag, 4));
+	    Res &= Test->TestFalse(TEXT("Attempt to move extra rock to tagged should fail as no slots are available"), ViewModel->MoveItemToAnyTaggedSlot(NoTag, SlotWithRock));
 		
-	    InventoryComponent->AddItem_IfServer(Subsystem, OneSpecialHelmet); // goes to slot 0
-	    Res &= Test->TestTrue(TEXT("A different helmet should swap into the helmet slot"), ViewModel->MoveItemToAnyTaggedSlot(NoTag, 0));
+	    InventoryComponent->AddItem_IfServer(Subsystem, OneSpecialHelmet); // goes to slot 0 or 1
+		int32 SlotWithSpecialHelmet = ViewModel->GetItem(0).ItemId == ItemIdSpecialHelmet ? 0 : 1;
+		Res &= Test->TestTrue(TEXT("A different helmet should swap into the helmet slot"), ViewModel->MoveItemToAnyTaggedSlot(NoTag, SlotWithSpecialHelmet));
 		Res &= Test->TestTrue(TEXT("Special helmet should be in HelmetSlot"), ViewModel->GetItemForTaggedSlot(HelmetSlot).ItemId == ItemIdSpecialHelmet);
-		Res &= Test->TestTrue(TEXT("Helmet should be in generic slot 0"), ViewModel->GetItem(0).ItemId == ItemIdHelmet);
+		Res &= Test->TestTrue(TEXT("Helmet should be in generic slot 0"), ViewModel->GetItem(SlotWithSpecialHelmet).ItemId == ItemIdHelmet);
 
 	    // Attempt to move an item to a tagged slot when the source index is invalid
 	    Res &= Test->TestFalse(TEXT("Attempting to move item from invalid source index should fail"), ViewModel->MoveItemToAnyTaggedSlot(NoTag, 100));
@@ -604,9 +606,13 @@ public:
 		// Creat a world item
 		AWorldItem* WorldItem = Subsystem->SpawnWorldItem(InventoryComponent, FItemBundleWithInstanceData(OneSpear), FVector::Zero(), AWorldItem::StaticClass());
 		ViewModel->PickupItem(WorldItem, EPreferredSlotPolicy::PreferSpecializedTaggedSlot, false);
-		Res &= Test->TestTrue(TEXT("Rock should be in generic slot 0 or 1"), ViewModel->GetItem(0).ItemId == ItemIdRock);
-		Res &= Test->TestTrue(TEXT("Spear should be in right hand"), ViewModel->GetItemForTaggedSlot(RightHandSlot).ItemId == ItemIdSpear);
-		Res &= Test->TestTrue(TEXT("Left hand should be empty"), ViewModel->IsTaggedSlotEmpty(LeftHandSlot));
+
+		Res &= Test->TestTrue(TEXT("Rock should still be in left hand"), ViewModel->GetItemForTaggedSlot(LeftHandSlot).ItemId == ItemIdRock);
+		Res &= Test->TestTrue(TEXT("Spear should be generic slot 0 or 1"), ViewModel->GetItem(0).ItemId == ItemIdSpear || ViewModel->GetItem(1).ItemId == ItemIdSpear);
+		// Logic was changed so we dont want a pickup to move items out
+		//Res &= Test->TestTrue(TEXT("Rock should be in generic slot 0 or 1"), ViewModel->GetItem(0).ItemId == ItemIdRock);
+		//Res &= Test->TestTrue(TEXT("Spear should be in right hand"), ViewModel->GetItemForTaggedSlot(RightHandSlot).ItemId == ItemIdSpear);
+		//Res &= Test->TestTrue(TEXT("Left hand should be empty"), ViewModel->IsTaggedSlotEmpty(LeftHandSlot));
 
 		// Test a previous duplication issue. Add spear to right hand and 2 sticks to generic inventory, then move sticks to right hand then to left hand
 		InventoryComponent->Clear_IfServer();
@@ -622,7 +628,101 @@ public:
 		
 	    return Res;
 	}
-	
+
+	bool TestMakeshiftWeapons()
+	{
+		GridViewModelTestContext Context(50.0f, 9, false);
+		auto* InventoryComponent = Context.InventoryComponent;
+		auto* ViewModel = Context.ViewModel;
+		auto* Subsystem = Context.TestFixture.GetSubsystem();
+
+		FDebugTestResult Res = true;
+
+		// Add makeshift weapons to the inventory
+		AWorldItem* WorldItem = Subsystem->SpawnWorldItem(InventoryComponent, FItemBundleWithInstanceData(ItemIdBrittleCopperKnife, 1), FVector::Zero(), AWorldItem::StaticClass());
+		ViewModel->PickupItem(WorldItem, EPreferredSlotPolicy::PreferSpecializedTaggedSlot, false);
+
+		// Since rock is a makeshift weapon, it should add itself to right hand
+		Res &= Test->TestTrue(TEXT("Knife should be in right hand"), ViewModel->GetItemForTaggedSlot(RightHandSlot).ItemId == ItemIdBrittleCopperKnife);
+
+		// Add another makeshift weapon to the inventory
+		WorldItem = Subsystem->SpawnWorldItem(InventoryComponent, FItemBundleWithInstanceData(ItemIdBrittleCopperKnife, 1), FVector::Zero(), AWorldItem::StaticClass());
+		ViewModel->PickupItem(WorldItem, EPreferredSlotPolicy::PreferSpecializedTaggedSlot, false);
+
+		// Since stick is a dual wieldable makeshift weapon, it should add itself to left hand
+		Res &= Test->TestTrue(TEXT("Second knife should be in left hand"), ViewModel->GetItemForTaggedSlot(LeftHandSlot).ItemId == ItemIdBrittleCopperKnife);
+
+		// Test that a spear will move itself to the right hand
+		InventoryComponent->AddItemToAnySlot(Subsystem, OneSpear, EPreferredSlotPolicy::PreferGenericInventory);
+		ViewModel->MoveItemToAnyTaggedSlot(NoTag, 0);
+
+		Res &= Test->TestTrue(TEXT("Spear should be in right hand"), ViewModel->GetItemForTaggedSlot(RightHandSlot).ItemId == ItemIdSpear);
+		Res &= Test->TestTrue(TEXT("Left hand should be empty"), ViewModel->IsTaggedSlotEmpty(LeftHandSlot));
+		Res &= ViewModel->AssertViewModelSettled();
+		
+		return Res;
+	}
+
+	bool TestLeftHandHeldBows()
+	{
+		// We have two bows, shortbow and longbow. Both can only be held in offhand, but only the longbow is a two-handed weapon.
+		
+		GridViewModelTestContext Context(50.0f, 9, false);
+		auto* InventoryComponent = Context.InventoryComponent;
+		auto* ViewModel = Context.ViewModel;
+		auto* Subsystem = Context.TestFixture.GetSubsystem();
+
+		FDebugTestResult Res = true;
+
+		// Add the shortbow to the inventory
+		AWorldItem* WorldItem = Subsystem->SpawnWorldItem(InventoryComponent, FItemBundleWithInstanceData(ItemIdShortbow, 1), FVector::Zero(), AWorldItem::StaticClass());
+		ViewModel->PickupItem(WorldItem, EPreferredSlotPolicy::PreferSpecializedTaggedSlot, false);
+
+		// Should add itself to the left hand
+		Res &= Test->TestTrue(TEXT("Shortbow should be in left hand"), ViewModel->GetItemForTaggedSlot(LeftHandSlot).ItemId == ItemIdShortbow);
+
+		// Ensure the right hand is empty but that the right hand is not blocked
+		Res &= Test->TestTrue(TEXT("Right hand should be empty"), ViewModel->IsTaggedSlotEmpty(RightHandSlot));
+		Res &= Test->TestFalse(TEXT("Right hand should not be blocked"), InventoryComponent->IsTaggedSlotBlocked(RightHandSlot));
+		Res &= Test->TestTrue(TEXT("Right hand should not be blocked"), ViewModel->CanTaggedSlotReceiveItem(OneRock, RightHandSlot));
+		
+		// Try (and fail) to move the bow to the right hand
+		Res &= Test->TestFalse(TEXT("Should not be able to move shortbow to right hand"), ViewModel->MoveItemToAnyTaggedSlot(LeftHandSlot, -1));
+		Res &= Test->TestTrue(TEXT("Shortbow should still be in left hand"), ViewModel->GetItemForTaggedSlot(LeftHandSlot).ItemId == ItemIdShortbow);
+
+		// Move it to generic and then move it to anytaggedslot and verify it moves to left hand
+		Res &= Test->TestTrue(TEXT("Move shortbow to generic slot"), ViewModel->MoveItem(LeftHandSlot, -1, NoTag, 0));
+		Res &= Test->TestTrue(TEXT("Shortbow should be in generic slot 0"), ViewModel->GetItem(0).ItemId == ItemIdShortbow);
+		Res &= Test->TestTrue(TEXT("Left hand should be empty"), ViewModel->IsTaggedSlotEmpty(LeftHandSlot));
+
+		Res &= Test->TestTrue(TEXT("Move shortbow to left hand"), ViewModel->MoveItemToAnyTaggedSlot(NoTag, 0));
+		Res &= Test->TestTrue(TEXT("Shortbow should be in left hand"), ViewModel->GetItemForTaggedSlot(LeftHandSlot).ItemId == ItemIdShortbow);
+
+		// Now remove the shortbow and add the longbow
+		InventoryComponent->RemoveQuantityFromTaggedSlot_IfServer(LeftHandSlot, 1, EItemChangeReason::Removed, true);
+		WorldItem = Subsystem->SpawnWorldItem(InventoryComponent, FItemBundleWithInstanceData(ItemIdLongbow, 1), FVector::Zero(), AWorldItem::StaticClass());
+		ViewModel->PickupItem(WorldItem, EPreferredSlotPolicy::PreferSpecializedTaggedSlot, false);
+
+		Res &= Test->TestTrue(TEXT("Longbow should be in left hand"), ViewModel->GetItemForTaggedSlot(LeftHandSlot).ItemId == ItemIdLongbow);
+		Res &= Test->TestTrue(TEXT("Right hand should be empty"), ViewModel->IsTaggedSlotEmpty(RightHandSlot));
+		Res &= Test->TestTrue(TEXT("Right hand should be blocked"), InventoryComponent->IsTaggedSlotBlocked(RightHandSlot));
+		Res &= Test->TestFalse(TEXT("Right hand should be blocked"), ViewModel->CanTaggedSlotReceiveItem(OneRock, RightHandSlot));
+
+		Res &= Test->TestFalse(TEXT("Should not be able to move longbow to right hand"), ViewModel->MoveItemToAnyTaggedSlot(LeftHandSlot, -1));
+		Res &= Test->TestTrue(TEXT("Longbow should still be in left hand"), ViewModel->GetItemForTaggedSlot(LeftHandSlot).ItemId == ItemIdLongbow);
+
+		// Now move the longbow to generic and then move it to anytaggedslot and verify it moves to left hand and unblocking as needed
+		InventoryComponent->MoveItem(ItemIdLongbow, 1, LeftHandSlot, NoTag);
+		InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, RightHandSlot, OneRock); // indirectly blocking two-handed items
+		Res &= Test->TestTrue(TEXT("Move longbow to generic slot"), ViewModel->MoveItemToAnyTaggedSlot(NoTag, 0));
+
+		Res &= Test->TestTrue(TEXT("Longbow should be in left hand"), ViewModel->GetItemForTaggedSlot(LeftHandSlot).ItemId == ItemIdLongbow);
+		Res &= Test->TestTrue(TEXT("Right hand should be empty"), ViewModel->IsTaggedSlotEmpty(RightHandSlot));
+		Res &= Test->TestTrue(TEXT("Generic slot should contain the rock"), InventoryComponent->GetContainerOnlyItemQuantity(ItemIdRock) == 1);
+		Res &= ViewModel->AssertViewModelSettled();
+		
+		return Res;
+	}
 
 	bool TestSlotReceiveItem()
 	{
@@ -704,6 +804,8 @@ bool FRISGridViewModelTest::RunTest(const FString& Parameters)
 	Res &= TestScenarios.TestSwappingMoves();
 	Res &= TestScenarios.TestSplitItems();
 	Res &= TestScenarios.TestMoveItemToAnyTaggedSlot();
+	Res &= TestScenarios.TestMakeshiftWeapons();
+	Res &= TestScenarios.TestLeftHandHeldBows();
 	Res &= TestScenarios.TestSlotReceiveItem();
 	Res &= TestScenarios.TestDrop();
 

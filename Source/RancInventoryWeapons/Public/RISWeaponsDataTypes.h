@@ -10,11 +10,13 @@ UENUM(BlueprintType)
 enum class EHandCompatibility : uint8
 {
     /** Compatible with both hands */
-    BothHands UMETA(DisplayName = "Both Hands"),
-    
-       OnlyMainHand, TwoHanded, OnlyOffhand,
+    BothHands,
+    OnlyMainHand,
+    TwoHanded,
+    TwoHandedOffhand,
+    OnlyOffhand,
     /** Not compatible with any hand */
-    None UMETA(DisplayName = "None")
+    None
 };
 
 

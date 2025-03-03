@@ -97,8 +97,8 @@ public:
 	UStaticMesh* ItemWorldMesh = nullptr;
 	
 	/* Allows extending item data without inheritance. Similar to components */
-	UPROPERTY(EditDefaultsOnly, Instanced, BlueprintReadOnly, Category = "RIS", meta = (DisplayName = "Item definitions"))
-	TMap<TSubclassOf<UObject>, UItemDefinitionBase*> ItemDefinitions;
+	UPROPERTY(EditDefaultsOnly, Instanced, BlueprintReadOnly, Category = "RIS", meta = (DisplayName = "Item definitionstemp"))
+	TArray<UItemDefinitionBase*> ItemDefinitions;
 	
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS",
 		meta = (UIMin = 0, ClampMin = 0, AssetBundles = "Data"))
@@ -121,10 +121,13 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "RIS", meta = (DeterminesOutputType = "Definition"))
 	UObject* GetItemDefinition(class TSubclassOf<UItemDefinitionBase> Definition, bool& Found)
 	{
-		if (ItemDefinitions.Contains(Definition))
+		for (UItemDefinitionBase* ItemDefinition : ItemDefinitions)
 		{
-			Found = true;
-			return ItemDefinitions[Definition];
+			if (ItemDefinition && ItemDefinition->IsA(Definition))
+			{
+				Found = true;
+				return ItemDefinition;
+			}
 		}
 		
 		Found = false;
@@ -132,13 +135,21 @@ public:
 	}
 
 	template<typename T>
-	T* GetItemDefinition(TSubclassOf<T> Definition) const
-	{
-		if (ItemDefinitions.Contains(Definition))
+	T* GetItemDefinition() const
 		{
-			return Cast<T>(ItemDefinitions[Definition]);
-		}
+			static_assert(std::is_base_of_v<UItemDefinitionBase, T>, 
+						  "T must derive from UItemDefinitionBase");
+	                  
+			TSubclassOf<T> Definition = T::StaticClass();
+	    
+			for (UItemDefinitionBase* ItemDefinition : ItemDefinitions)
+			{
+				if (ItemDefinition && ItemDefinition->IsA(Definition))
+				{
+					return Cast<T>(ItemDefinition);
+				}
+			}
 
-		return nullptr;
-	}
+			return nullptr;
+		}
 };

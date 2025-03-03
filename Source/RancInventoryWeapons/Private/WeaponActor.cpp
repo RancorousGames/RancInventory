@@ -60,7 +60,7 @@ void AWeaponActor::Initialize_Impl(bool InitializeWeaponData, bool InitializeSta
         }
         if (InitializeWeaponData)
         {
-            WeaponData = ItemData->GetItemDefinition<UWeaponDefinition>(UWeaponDefinition::StaticClass());
+            WeaponData = ItemData->GetItemDefinition<UWeaponDefinition>();
         }
     }
     else

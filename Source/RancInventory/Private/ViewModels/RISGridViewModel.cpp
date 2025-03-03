@@ -199,17 +199,18 @@ bool URISGridViewModel::SplitItem_Implementation(FGameplayTag SourceTaggedSlot,
 
 bool URISGridViewModel::TryUnblockingMove(FGameplayTag TargetTaggedSlot, FGameplayTag ItemId)
 {
+	bool Unblocked = true;
 	if (auto* BlockingSlot = LinkedInventoryComponent->WouldItemMoveIndirectlyViolateBlocking(TargetTaggedSlot, URISSubsystem::GetItemDataById(ItemId)))
 	{
 		FTaggedItemBundle BlockingItem = GetItemForTaggedSlot(BlockingSlot->UniversalSlotToBlock);
 		if (BlockingItem.IsValid())
 		{
 			// Move blocking item to generic slot with a recursive call
-			return MoveItem_Impl(BlockingSlot->UniversalSlotToBlock, -1, FGameplayTag(), FindSlotIndexForItem(BlockingItem.ItemId, BlockingItem.Quantity), BlockingItem.Quantity, false);
+			Unblocked &= MoveItem_Impl(BlockingSlot->UniversalSlotToBlock, -1, FGameplayTag(), FindSlotIndexForItem(BlockingItem.ItemId, BlockingItem.Quantity), BlockingItem.Quantity, false);
 		}
 	}
-
-	return false;
+	
+	return Unblocked;
 }
 
 bool URISGridViewModel::MoveItem_Impl(FGameplayTag SourceTaggedSlot,
@@ -399,7 +400,7 @@ bool URISGridViewModel::CanSlotReceiveItem_Implementation(const FGameplayTag& It
 
 bool URISGridViewModel::CanTaggedSlotReceiveItem_Implementation(const FGameplayTag& ItemId, int32 Quantity, const FGameplayTag& SlotTag, bool CheckContainerLimits) const
 {
-	bool BasicCheck = LinkedInventoryComponent->IsTaggedSlotCompatible(ItemId, SlotTag) && (!CheckContainerLimits || LinkedInventoryComponent->
+	bool BasicCheck = LinkedInventoryComponent->IsTaggedSlotCompatible(ItemId, SlotTag) && !LinkedInventoryComponent->IsTaggedSlotBlocked(SlotTag) && (!CheckContainerLimits || LinkedInventoryComponent->
 		CanContainerReceiveItems(ItemId, Quantity));
 
 	if (!BasicCheck) return false;
@@ -661,9 +662,6 @@ void URISGridViewModel::PickupItem(AWorldItem* WorldItem, EPreferredSlotPolicy P
 		return;
 	}
 
-	auto PreferredSlot = FindTaggedSlotForItem(WorldItem->RepresentedItem.ItemId, WorldItem->RepresentedItem.Quantity);
-	TryUnblockingMove(PreferredSlot, WorldItem->RepresentedItem.ItemId);
-	
 	LinkedInventoryComponent->PickupItem(WorldItem, PreferTaggedSlots, DestroyAfterPickup);
 }
 
@@ -701,7 +699,8 @@ FGameplayTag URISGridViewModel::FindTaggedSlotForItem(const FGameplayTag& ItemId
 	const UItemStaticData* ItemData = URISSubsystem::GetItemDataById(ItemId);
 	if (!ItemData) return FGameplayTag::EmptyTag; // Ensure the item data is valid
 
-	FGameplayTag FallbackSwapSlot = FGameplayTag::EmptyTag;
+	FGameplayTag FallbackSlot = FGameplayTag::EmptyTag;
+	FGameplayTag FallbackFallbackSlot = FGameplayTag::EmptyTag;
 	
 	// First try specialized slots
 	for (const FGameplayTag& SlotTag : LinkedInventoryComponent->SpecializedTaggedSlots)
@@ -713,42 +712,46 @@ FGameplayTag URISGridViewModel::FindTaggedSlotForItem(const FGameplayTag& ItemId
 				return SlotTag;
 			}
 			
-			FallbackSwapSlot = SlotTag;
+			FallbackSlot = SlotTag;
 		}
 	}
 
 	// rather swap to a non-empty specialized slot than to an empty universal slot
-	if (!PreferEmptyUniversalSlots && FallbackSwapSlot.IsValid()) return FallbackSwapSlot;
+	if (!PreferEmptyUniversalSlots && FallbackSlot.IsValid()) return FallbackSlot;
 
 	// Then try universal slots, but prefer slots that are matched by a category
 	for (const FUniversalTaggedSlot& UniSlotTag : LinkedInventoryComponent->UniversalTaggedSlots)
 	{
 		// this needs to account for empty blocking and universal exclusive slot
-		if (IsTaggedSlotEmpty(UniSlotTag.Slot) && LinkedInventoryComponent->CanItemBeEquippedInUniversalSlot(ItemId, UniSlotTag.Slot, true))
+		if (LinkedInventoryComponent->CanItemBeEquippedInUniversalSlot(ItemId, UniSlotTag.Slot, true))
 		{
-			if (!FallbackSwapSlot.IsValid()) FallbackSwapSlot = UniSlotTag.Slot;
-
-			if (ItemData->ItemCategories.HasTag(UniSlotTag.Slot))
+			if (IsTaggedSlotEmpty(UniSlotTag.Slot))
 			{
-				FTaggedItemBundle ExistingItem = GetItemForTaggedSlot(UniSlotTag.Slot);
-				if (!ExistingItem.IsValid() || !URISSubsystem::GetItemDataById(ExistingItem.ItemId)->ItemCategories.HasTag(UniSlotTag.Slot))
+				if (!FallbackSlot.IsValid()) FallbackSlot = UniSlotTag.Slot;
+
+				if (ItemData->ItemCategories.HasTag(UniSlotTag.Slot))
 				{
-					// This is the right slot if it is empty or if we are a better fit
-					return UniSlotTag.Slot;
+					FTaggedItemBundle ExistingItem = GetItemForTaggedSlot(UniSlotTag.Slot);
+					if (!ExistingItem.IsValid() || !URISSubsystem::GetItemDataById(ExistingItem.ItemId)->ItemCategories.HasTag(UniSlotTag.Slot))
+					{
+						// This is the right slot if it is empty or if we are a better fit
+						return UniSlotTag.Slot;
+					}
 				}
+			}
+			else
+			{
+				// This slot is at least compatible
+				if (!FallbackFallbackSlot.IsValid()) FallbackFallbackSlot = UniSlotTag.Slot;
 			}
 		}
 	}
 
-	// Attempt to swap with the fallback slot if one was identified
-	if (!FallbackSwapSlot.IsValid())
-	{
-		if (LinkedInventoryComponent->UniversalTaggedSlots.Num() == 0) return FGameplayTag::EmptyTag;
+	// Attempt to return with the fallback slot if one was identified
+	if (!FallbackSlot.IsValid())
+		return FallbackFallbackSlot;
 
-		FallbackSwapSlot = LinkedInventoryComponent->UniversalTaggedSlots[0].Slot;
-	}
-
-	return FallbackSwapSlot;
+	return FallbackSlot;
 }
 
 bool URISGridViewModel::MoveItemToAnyTaggedSlot_Implementation(const FGameplayTag& SourceTaggedSlot, int32 SourceSlotIndex)
@@ -769,8 +772,6 @@ bool URISGridViewModel::MoveItemToAnyTaggedSlot_Implementation(const FGameplayTa
 	{
 		SourceItem = &ViewableGridSlots[SourceSlotIndex];
 	}
-
-	if (!SourceItem.IsValid()) return false;
 
 	const auto TargetSlot = FindTaggedSlotForItem(SourceItem.GetItemId(), SourceItem.GetQuantity());
 
