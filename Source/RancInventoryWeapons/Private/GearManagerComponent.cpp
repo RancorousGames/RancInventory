@@ -10,6 +10,7 @@
 #include "Core/RISFunctions.h"
 #include "GameFramework/Character.h"
 #include "Net/UnrealNetwork.h"
+#include "RecordingSystem/WeaponAttackRecorderComponent.h"
 #include "RecordingSystem/WeaponAttackRecorderDataTypes.h"
 
 // Sets default values for this component's properties
@@ -642,6 +643,14 @@ AWeaponActor* UGearManagerComponent::SpawnWeapon_IfServer(const UItemStaticData*
 	if (AWeaponActor* NewWeaponActor = Cast<AWeaponActor>( GetWorld()->SpawnActorDeferred<AWeaponActor>(WeaponClass, FTransform(FRotator(0.0f, 0.0f, 0.0f), SpawnLocation, FVector::OneVector), GetOwner())))
 		{
 			NewWeaponActor->ItemData = ItemData;
+
+			if (bRecordAttackTraces)
+			{
+				if (UWeaponAttackRecorderComponent* RecorderComponent = NewObject<UWeaponAttackRecorderComponent>(Owner, UWeaponAttackRecorderComponent::StaticClass()))
+				{
+					RecorderComponent->RegisterComponent();
+				}
+			}
 
 			NewWeaponActor->FinishSpawning(FTransform(FRotator(0.0f, 0.0f, 0.0f), SpawnLocation, FVector::OneVector));
 			return NewWeaponActor;

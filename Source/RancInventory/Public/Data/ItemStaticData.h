@@ -97,7 +97,7 @@ public:
 	UStaticMesh* ItemWorldMesh = nullptr;
 	
 	/* Allows extending item data without inheritance. Similar to components */
-	UPROPERTY(EditDefaultsOnly, Instanced, BlueprintReadOnly, Category = "RIS", meta = (DisplayName = "Item definitionstemp"))
+	UPROPERTY(EditDefaultsOnly, Instanced, BlueprintReadOnly, Category = "RIS")
 	TArray<UItemDefinitionBase*> ItemDefinitions;
 	
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS",

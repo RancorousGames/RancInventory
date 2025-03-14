@@ -246,6 +246,10 @@ public:
 	
 	UPROPERTY(VisibleAnywhere,BlueprintReadOnly, Category = "Ranc Inventory Weapons|Gear|Internal")
 	AWeaponActor* UnarmedWeaponActor = nullptr;
+
+	/* If this is true, the WeaponAttackRecorderComponent will be added to all spawned weapons which will cause attack trace assets to get recorded */
+	UPROPERTY(EditAnywhere,BlueprintReadWrite, Category = "Ranc Inventory Weapons|Gear|Configuration")
+	bool bRecordAttackTraces = false;
 	
 	// Delayed gear change state. Note that the delayed change is triggered by the client as we dont rely on the server playing animations
 

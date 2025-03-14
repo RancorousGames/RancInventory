@@ -48,9 +48,9 @@ void AWeaponActor::Initialize_Implementation(bool InitializeWeaponData, bool Ini
 void AWeaponActor::Initialize_Impl(bool InitializeWeaponData, bool InitializeStaticMesh)
 {
     // Set static actor model based on weapon data
-    if (ItemData && ItemData->ItemWorldMesh)
+    if (ItemData)
     {
-        if (InitializeStaticMesh)
+        if (InitializeStaticMesh && ItemData->ItemWorldMesh)
         {
             GetStaticMeshComponent()->SetStaticMesh(ItemData->ItemWorldMesh);
             SetActorScale3D(ItemData->ItemWorldScale); // This is overwritten when attaching, see GetAttachTransform_Impl
