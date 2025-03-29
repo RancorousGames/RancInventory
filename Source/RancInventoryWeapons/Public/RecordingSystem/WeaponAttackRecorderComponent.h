@@ -21,15 +21,20 @@ struct FRecordingSession
     GENERATED_BODY()
 
     FMontageData MontageData;
+    UPROPERTY()
     TArray<FName> RelevantSockets;
     float AnimationDuration;
     float IntervalBetweenRecordings;
     float CurrentTime;
+    FTransform PivotTransform;
     int32 CurrentIndex;
+    UPROPERTY()
     UWeaponAttackData* AttackData;
+    UPROPERTY()
     FTimerHandle RecordingTimerHandle;
 };
 
+// A component for recording trace sequences to be replayed later. Added to weaponactors when settings are defined.
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class RANCINVENTORYWEAPONS_API UWeaponAttackRecorderComponent : public UActorComponent
 {
@@ -48,30 +53,36 @@ public:
     bool bIsRecording;
     bool RecordingInitialized;
     double RecordStartTime;
+    double RecordInitTime;
     int ReplayCurrentIndex;
     bool bReplaySlowmotion;
+    UPROPERTY()
     FRecordingSession ReplayedSession;
     double ReplayStopTime;
     FTimerHandle ReplayTimerHandle;
-    bool bReplayInitialOwnerPositionSaved;
-    FTransform ReplayInitialOwnerPosition;
+    UPROPERTY()
+    ACharacter* OwningCharacter;
 
+    void OnAnimNotifyBegin(FName AnimName);
+    void OnAnimNotifyEnd(FName AnimName);
+    
 protected:
     virtual void BeginPlay() override;
     virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 private:
     FRecordingSession CurrentSession;
+    UPROPERTY()
     AWeaponActor* OwningWeapon;
+    UPROPERTY()
+    UMeshComponent* OwningWeaponMesh; // can be static or skeletal mesh
+    UPROPERTY()
     UGearManagerComponent* OwningGearManager;
-    class UAnimInstance* OwningCharacterAnimInstance;
+    UPROPERTY()
+    UAnimInstance* OwningCharacterAnimInstance;
     
     void Initialize();
-    void OnAnimNotifyBegin(FName NotifyName, const FBranchingPointNotifyPayload& BranchingPointNotifyPayload);
-    void OnAnimNotifyBegin(FName AnimName);
-    void OnAnimNotifyEnd(FName AnimName);
-    void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction);
-    void OnAnimNotifyEnd(FName NotifyName, const FBranchingPointNotifyPayload& BranchingPointNotifyPayload);
+    virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
     UFUNCTION()
     void OnAttackPerformed(FMontageData MontageData);
     bool InitializeRecordingSession(FMontageData MontageData);

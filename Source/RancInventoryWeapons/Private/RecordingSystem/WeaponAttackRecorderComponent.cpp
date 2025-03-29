@@ -33,14 +33,15 @@ void UWeaponAttackRecorderComponent::EndPlay(const EEndPlayReason::Type EndPlayR
 void UWeaponAttackRecorderComponent::Initialize()
 {
     OwningWeapon = Cast<AWeaponActor>(GetOwner());
-    if (!OwningWeapon || !OwningWeapon->GetOwner()->GetOwner())
+    OwningCharacter = OwningWeapon ? Cast<ACharacter>(OwningWeapon->GetOwner()) : nullptr;
+    // Gear UGearManagerComponent
+    OwningGearManager = OwningCharacter ? OwningCharacter->FindComponentByClass<UGearManagerComponent>() : nullptr;
+    if (!OwningWeapon || !OwningCharacter || !OwningGearManager)
     {
         UE_LOG(LogTemp, Error, TEXT("WeaponAttackRecorderComponent is not attached to an AWeaponActor!"));
         return;
     }
-    ACharacter* OwningCharacter = Cast<ACharacter>(OwningWeapon->GetOwner());
-    // Gear UGearManagerComponent
-    OwningGearManager = OwningCharacter->FindComponentByClass<UGearManagerComponent>();
+    
     if (OwningGearManager)
     {
         OwningGearManager->OnAttackPerformed.AddDynamic(this, &UWeaponAttackRecorderComponent::OnAttackPerformed);
@@ -72,38 +73,6 @@ void UWeaponAttackRecorderComponent::Initialize()
             UE_LOG(LogTemp, Warning, TEXT("No WeaponAttackRecorderSettings found. Created a new instance with default values."));
         }
     }
-
-    // Get the owning character's animation instance
-    if (OwningCharacter)
-    {
-        OwningCharacterAnimInstance = OwningCharacter->GetMesh()->GetAnimInstance();
-        if (OwningCharacterAnimInstance)
-        {
-            OwningCharacterAnimInstance->OnPlayMontageNotifyBegin.AddDynamic(this, &UWeaponAttackRecorderComponent::OnAnimNotifyBegin);
-            OwningCharacterAnimInstance->OnPlayMontageNotifyEnd.AddDynamic(this, &UWeaponAttackRecorderComponent::OnAnimNotifyEnd);
-        }
-    }
-    else
-    {
-        UE_LOG(LogTemp, Error, TEXT("WeaponAttackRecorderComponent could not find the owning character!"));
-    }
-}
-
-
-void UWeaponAttackRecorderComponent::OnAnimNotifyBegin(FName NotifyName, const FBranchingPointNotifyPayload& BranchingPointNotifyPayload)
-{
-    if (NotifyName == Settings->StartRecordingNotify)
-    {
-        StartRecording();
-    }
-}
-
-void UWeaponAttackRecorderComponent::OnAnimNotifyEnd(FName NotifyName, const FBranchingPointNotifyPayload& BranchingPointNotifyPayload)
-{
-    if (NotifyName == Settings->StopRecordingNotify)
-    {
-        StopRecording();
-    }
 }
 
 bool UWeaponAttackRecorderComponent::InitializeRecordingSession(FMontageData MontageData)
@@ -119,15 +88,20 @@ bool UWeaponAttackRecorderComponent::InitializeRecordingSession(FMontageData Mon
     }
   
     // Get the weapon mesh
-    UMeshComponent* WeaponMesh = OwningWeapon->GetStaticMeshComponent();
-    if (!WeaponMesh)
+    OwningWeaponMesh = OwningWeapon->GetStaticMeshComponent();
+
+    if (!OwningWeaponMesh || IsValid(OwningWeaponMesh))
     {
-        UE_LOG(LogTemp, Error, TEXT("Failed to get weapon mesh for recording"));
-        return false;
+        OwningWeaponMesh = OwningWeapon->GetComponentByClass<USkeletalMeshComponent>();
+        if (!OwningWeaponMesh)
+        {
+            UE_LOG(LogTemp, Error, TEXT("Failed to get weapon mesh for recording"));
+            return false;
+        }
     }
 
     // Find relevant sockets
-    CurrentSession.RelevantSockets = FindRelevantSockets(WeaponMesh);
+    CurrentSession.RelevantSockets = FindRelevantSockets(OwningWeaponMesh);
     if (CurrentSession.RelevantSockets.Num() == 0)
     {
         UE_LOG(LogTemp, Warning, TEXT("No relevant sockets found for recording"));
@@ -137,10 +111,20 @@ bool UWeaponAttackRecorderComponent::InitializeRecordingSession(FMontageData Mon
     // Calculate animation duration and interval between recordings
     CurrentSession.CurrentTime = 0;
     CurrentSession.CurrentIndex = 0;
+    CurrentSession.PivotTransform = OwningCharacter->GetActorTransform(); // Get actors transform
+    
+    FTransform PivotOffsetTransform;
+    PivotOffsetTransform.SetRotation(FQuat(OwningCharacter->GetActorRotation()));
+    CurrentSession.PivotTransform.AddToTranslation(PivotOffsetTransform.TransformPosition(OwningGearManager->ReplayAttackPivotLocationOffset));
+    auto AimParams = OwningGearManager->GetAttackTraceAimParams();
 
+    FQuat YawQuat = FQuat(FRotator(0.f, AimParams.AimYaw, 0.f));
+    FQuat PitchQuat = FQuat(FRotator(AimParams.AimPitch, 0.f, 0.f));
+    CurrentSession.PivotTransform.SetRotation(YawQuat * PitchQuat);  // Yaw then Pitch
+    
     CurrentSession.AttackData = NewObject<UWeaponAttackData>(this, UWeaponAttackData::StaticClass());
-    // CurrentSession.AttackData->AttackSequence.SetNum(Settings->Resolution);
     RecordingInitialized = true;
+    RecordInitTime = GetWorld()->GetTimeSeconds();
     return true;
 }
 
@@ -154,8 +138,9 @@ void UWeaponAttackRecorderComponent::StartRecording()
     UE_LOG(LogTemp, Warning, TEXT("Starting recording"));
     // Start a high-frequency recording (every frame)
     CurrentSession.CurrentIndex = 0;
-    bIsRecording = true;
     RecordStartTime = GetWorld()->GetTimeSeconds();
+    CurrentSession.AttackData->FirstTraceDelay = RecordStartTime - RecordInitTime;
+    bIsRecording = true;
     RecordAttackData(0.0f);
 }
 
@@ -192,7 +177,13 @@ void UWeaponAttackRecorderComponent::StopRecording()
 
     RecordingInitialized = false;
     bIsRecording = false;
+
+
+    // Start replay visualization after processing
+    StartReplayVisualization();
+    
     CurrentSession = FRecordingSession();
+    
 }
 
 void UWeaponAttackRecorderComponent::OnAnimNotifyBegin(FName AnimName)
@@ -279,17 +270,19 @@ void UWeaponAttackRecorderComponent::RecordAttackData(float DeltaTime)
     // Record traces for each relevant socket
     for (const FName& SocketName : CurrentSession.RelevantSockets)
     {
-        FVector SocketGlobalLocation = OwningWeapon->GetStaticMeshComponent()->GetSocketLocation(SocketName);
+        FVector SocketGlobalLocation = OwningWeaponMesh->GetSocketLocation(SocketName);
         // Get relative location of the socket
-        FVector SocketLocation = OwningWeapon->GetOwner()->GetActorTransform().InverseTransformPosition(SocketGlobalLocation);
+
+        FVector SocketRelativeToPivotLocation = CurrentSession.PivotTransform.InverseTransformPosition(SocketGlobalLocation);
         
-        Timestamp.SocketPositions.Add(SocketLocation);
+        Timestamp.SocketPositions.Add(SocketRelativeToPivotLocation);
     }
 
     CurrentSession.AttackData->AttackSequence.Add(Timestamp);
 
     // Increment the current index
     CurrentSession.CurrentIndex++;
+
 }
 
 
@@ -468,9 +461,7 @@ void UWeaponAttackRecorderComponent::PostProcessRecordedData()
 
     // Replace the original sequence with the reduced one
     CurrentSession.AttackData->AttackSequence = ReducedSequence;
-
-    // Start replay visualization after processing
-    StartReplayVisualization();
+    
 }
 
 
@@ -526,7 +517,11 @@ bool UWeaponAttackRecorderComponent::SaveAttackSequence(const FString& AssetName
 
     UE_LOG(LogTemp, Warning, TEXT("Asset created or found: %s"), *AssetName);
     // Copy properties from the input AttackData to the new asset
+    NewAsset->FirstTraceDelay = AttackData->FirstTraceDelay;
     NewAsset->AttackSequence = AttackData->AttackSequence;
+
+    // Set the attackdata of the session to the new version, this prevents the old one being used for replay which may be garbage collected
+    CurrentSession.AttackData = NewAsset;
 
     // Mark the package as dirty
     Package->MarkPackageDirty();
@@ -592,7 +587,6 @@ void UWeaponAttackRecorderComponent::UpdateMontageDataWithRecordedSequence(FMont
 void UWeaponAttackRecorderComponent::StartReplayVisualization()
 {
     UE_LOG(LogTemp, Warning, TEXT("Starting replay visualization"));
-    bReplayInitialOwnerPositionSaved = false;
     ReplayCurrentIndex = 0;
     bReplaySlowmotion = false;
     ReplayedSession = CurrentSession;
@@ -617,13 +611,6 @@ void UWeaponAttackRecorderComponent::ReplayRecording()
         return;
     }
 
-    // Save the initial owner's position at the start of replaying if not already saved
-    if (!bReplayInitialOwnerPositionSaved)
-    {
-        ReplayInitialOwnerPosition = OwningWeapon->GetOwner()->GetActorTransform();
-        bReplayInitialOwnerPositionSaved = true;
-    }
-
     // Increment the current frame index
     if (ReplayCurrentIndex >= ReplayedSession.AttackData->AttackSequence.Num() - 1)
     {
@@ -637,8 +624,8 @@ void UWeaponAttackRecorderComponent::ReplayRecording()
         return;
     }
 
-    const FWeaponAttackTimestamp& CurrentTimestamp = ReplayedSession.AttackData->AttackSequence[ReplayCurrentIndex];
-    const FWeaponAttackTimestamp& NextTimestamp = ReplayedSession.AttackData->AttackSequence[ReplayCurrentIndex + 1];
+    const FWeaponAttackTimestamp CurrentTimestamp = ReplayedSession.AttackData->AttackSequence[ReplayCurrentIndex];
+    const FWeaponAttackTimestamp NextTimestamp = ReplayedSession.AttackData->AttackSequence[ReplayCurrentIndex + 1];
     
     // Adjust the timer to control replay speed
     float TimeDelta = NextTimestamp.Timestamp - CurrentTimestamp.Timestamp;
@@ -646,8 +633,8 @@ void UWeaponAttackRecorderComponent::ReplayRecording()
     // Draw debug lines for each socket's movement from current to next position
     for (int32 SocketIndex = 0; SocketIndex < CurrentTimestamp.SocketPositions.Num(); ++SocketIndex)
     {
-        FVector StartLocation = ReplayInitialOwnerPosition.TransformPosition(CurrentTimestamp.SocketPositions[SocketIndex]);
-        FVector EndLocation = ReplayInitialOwnerPosition.TransformPosition(NextTimestamp.SocketPositions[SocketIndex]);
+        FVector StartLocation = ReplayedSession.PivotTransform.TransformPosition(CurrentTimestamp.SocketPositions[SocketIndex]);
+        FVector EndLocation = ReplayedSession.PivotTransform.TransformPosition(NextTimestamp.SocketPositions[SocketIndex]);
 
         FColor LineColor = bReplaySlowmotion ? FColor::Cyan : FColor::Green;
         DrawDebugLine(GetWorld(), StartLocation, EndLocation, LineColor, false, ReplayInterval, 0, 2.0f);

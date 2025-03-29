@@ -40,6 +40,11 @@ class UWeaponAttackData : public UDataAsset
 	GENERATED_BODY()
 
 public:
+
+	// The delay from the triggering of the attack until we start doing the first hit trace
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float FirstTraceDelay = 0.0f;
+	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TArray<FWeaponAttackTimestamp> AttackSequence;
 };

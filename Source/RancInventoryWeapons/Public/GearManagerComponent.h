@@ -50,6 +50,19 @@ struct FGearSlotDefinition
     UStaticMeshComponent* MeshComponent = nullptr;
 };
 
+
+USTRUCT(BlueprintType)
+struct FAttackAimParams
+{
+	GENERATED_BODY()
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Ranc Inventory")
+	float AimYaw = 0.0f;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Ranc Inventory")
+	float AimPitch = 0.0f;
+};
+
 UENUM(BlueprintType)
 enum class EPendingGearChangeType : uint8
 {
@@ -134,12 +147,6 @@ public:
 	
 	UPROPERTY(BlueprintAssignable, Category = "Ranc Inventory Weapons|Gear")
 	FGearUpdated OnGearUnequipped;
-	
-	/*
-	Called after SpawnWeaponsFromSavedData() is done
-	*/
-	UPROPERTY(BlueprintAssignable)
-	FWeaponEvent OnFinishSpawningWeapons;
 
 	DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnHitDetected, AActor*, HitActor, FHitResult, HitResult);
 	UPROPERTY(BlueprintAssignable, Category = "Ranc Inventory Weapons|Gear")
@@ -241,15 +248,11 @@ public:
 	UPROPERTY(VisibleAnywhere,BlueprintReadOnly, Category = "Ranc Inventory Weapons|Gear|Internal")
 	ACharacter* Owner = nullptr;
 
-	UPROPERTY(EditAnywhere,BlueprintReadWrite, Category = "Ranc Inventory Weapons|Gear|Internal")
+	UPROPERTY(Replicated, EditAnywhere,BlueprintReadWrite, Category = "Ranc Inventory Weapons|Gear|Internal")
 	TArray<const UItemStaticData*> SelectableWeaponsData;
 	
 	UPROPERTY(VisibleAnywhere,BlueprintReadOnly, Category = "Ranc Inventory Weapons|Gear|Internal")
 	AWeaponActor* UnarmedWeaponActor = nullptr;
-
-	/* If this is true, the WeaponAttackRecorderComponent will be added to all spawned weapons which will cause attack trace assets to get recorded */
-	UPROPERTY(EditAnywhere,BlueprintReadWrite, Category = "Ranc Inventory Weapons|Gear|Configuration")
-	bool bRecordAttackTraces = false;
 	
 	// Delayed gear change state. Note that the delayed change is triggered by the client as we dont rely on the server playing animations
 
@@ -261,7 +264,7 @@ public:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Ranc Inventory Weapons|Gear|Internal", meta = (AllowPrivateAccess = "true"))
 	bool bHasActiveTransaction;
-
+	
 	UPROPERTY()
 	FTimerHandle GearChangeCommitHandle;
 
@@ -272,8 +275,15 @@ public:
 	void QueueGearChange(const FGearChangeTransaction& Transaction);
 	void HandleInterruption();
 	
+	UFUNCTION(BlueprintNativeEvent, Category = "Ranc Inventory Weapons", meta=(DisplayName="OnAttackTraceStateBeginEnd"))
+	void OnAttackTraceStateBeginEnd(bool Started);
+
+	// Called during replay of attack trace recordings to adjust the traces rotation, relative to the AttackReplayPivotBone
+	UFUNCTION(BlueprintNativeEvent, Category = "Ranc Inventory Weapons", meta=(DisplayName="GetAttackTraceAimParams"))
+	FAttackAimParams GetAttackTraceAimParams();
+
 	/*	Initialized variables. Called from Begin play	*/
-	UFUNCTION(BlueprintCallable, Category = "Ranc Inventory Weapons|Gear")
+	UFUNCTION(BlueprintCallable, Category = "Ranc Inventory Weapons")
 	void Initialize();
 
 
@@ -300,15 +310,16 @@ public:
 
 	/* Try to perform an attack montage
 	 * This will succeed if cooldown is ready The weapon is notified of the attack
+	 * @Param AimPitch - Only used if using attack trace replays, allows attacks to be vertically adjusted, 0 is neutral pitch
 	 * @Param UseOffhand - If true, we will use the Offhand weapon
 	 * @Param MontageIdOverride - If >= 0, we will use this montage id instead of cycling
 	 * Multicasts the attack to all clients
 	 */
 	UFUNCTION(Reliable, Server, BlueprintCallable, Category = "Ranc Inventory Weapons|Gear")
-	void TryAttack_Server(FVector AimLocation = FVector(0,0,0), bool ForceOffHand = false, int32 MontageIdOverride = -1);
+	void TryAttack_Server(FVector AimLocation = FVector(0,0,0), float AimPitch = 0, bool ForceOffHand = false, int32 MontageIdOverride = -1);
 
 	UFUNCTION(Reliable, NetMulticast, BlueprintCallable, Category = "Ranc Inventory Weapons|Gear")
-	void Attack_Multicast(FVector AimLocation, bool UseOffhand = false, int32 MontageIdOverride = -1);
+	void Attack_Multicast(FVector AimLocation, float AimPitch, bool UseOffhand = false, int32 MontageIdOverride = -1);
 
 	UFUNCTION(BlueprintCallable, Category = "Ranc Inventory Weapons|Gear")
 	void SelectNextActiveWeapon(bool bPlayMontage = true);
@@ -394,7 +405,7 @@ protected:
     void OnGearChangeAnimNotify(FName NotifyName, const FBranchingPointNotifyPayload& BranchingPointNotifyPayload);
 	
 	// Block below is used for rotating towards the attack direction
-	float TargetYaw;
+	float RotateToAttackTargetYaw;
 	FTimerHandle TimerHandle_RotationUpdate;
 	
 	FTimerHandle TimerHandle_EquipDelay;
@@ -419,8 +430,9 @@ protected:
 	
 	virtual void GetLifetimeReplicatedProps(TArray < class FLifetimeProperty > & OutLifetimeProps) const override;
 
-	void PlayRecordedAttackSequence(const UWeaponAttackData* AttackData);
-	void StartAttackReplay();
+	void PlayRecordedAttackSequence(const UWeaponAttackData* AttackData, float AimPitch);
+	void SendAttackTraceAimRPC_Client();
+	void ContinueAttackReplay();
 	void StopAttackReplay();
 
 	FMontageData GetEquipMontage(const UGearDefinition* WeaponData) const;
@@ -433,12 +445,35 @@ protected:
 	
 	bool UseOffhandNext = false;
 
-	// Trace replays
+	// attack trace recording replay
+
+public:
+	
+	/* If this is true, the WeaponAttackRecorderComponent will be added to all spawned weapons which will cause attack trace assets to get recorded */
+	UPROPERTY(EditAnywhere,BlueprintReadWrite, Category = "Ranc Inventory Weapons|Gear|AttackTraceRecording")
+	bool bRecordAttackTraces = false;
+	
+	UPROPERTY(EditAnywhere,BlueprintReadWrite, Category = "Ranc Inventory Weapons|Gear|AttackTraceRecording")
+	FVector ReplayAttackPivotLocationOffset;
+	
+protected:
+	
+	// RPC for sending aim direction to server
+	UFUNCTION(Server, Reliable)
+	void SetAimInformationRPC_Server(FAttackAimParams AimParams, bool FinalAimUpdate);
+	FAttackAimParams ReceivedReplayAttackAimParams;
+
 	int ReplayCurrentIndex;
-	bool bReplayInitialOwnerPositionSaved;
+	UPROPERTY()
 	const UWeaponAttackData* ReplayedAttackData;
-	FTimerHandle ReplayTimerHandle;
-	FTransform ReplayInitialOwnerPosition;
+	double AttackStartTime;
+	FTimerHandle SendAimDirectionRPC_TimerHandle;
+	FTimerHandle AttackTrace_TimerHandle;
+	FTransform ReplayOwnerAttackOrigin;
+
+	UPROPERTY()
+	TArray<UObject*> LoadedAttackData;
+	
 	ECollisionChannel TraceChannel;
 };
 

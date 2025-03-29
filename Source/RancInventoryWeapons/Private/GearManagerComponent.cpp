@@ -221,6 +221,32 @@ void UGearManagerComponent::AddAndSetSelectedWeapon(const UItemStaticData* ItemD
 	OnWeaponSelected.Broadcast(HandSlot->SlotTag, WeaponActor);
 
 	ActiveWeaponIndex = ExistingEntry;
+
+	// Finally load any montage attack recording data
+	TArray<FSoftObjectPath> PathsToLoad;
+	for (const FMontageData& MontageData : WeaponData->AttackMontages)
+	{
+		if (!MontageData.RecordedTraceSequence.IsNull())
+		{
+			// Convert the soft reference to a soft object path
+			PathsToLoad.Add(MontageData.RecordedTraceSequence.ToSoftObjectPath());
+		}
+	}
+
+	// Get the Streamable Manager from the Asset Manager
+	FStreamableManager& Streamable = UAssetManager::GetStreamableManager();
+
+	// Request an asynchronous load for all the gathered paths
+	Streamable.RequestAsyncLoad(PathsToLoad, FStreamableDelegate::CreateLambda([this, PathsToLoad]()
+	{
+		// Once all assets are loaded, iterate over the paths and retrieve the loaded objects
+		for (const FSoftObjectPath& Path : PathsToLoad)
+		{
+			if (UObject* LoadedObject = Path.ResolveObject())
+				LoadedAttackData.Add(LoadedObject);
+		}
+	}));
+	
 }
 
 const FGearSlotDefinition* UGearManagerComponent::GetHandSlotToUse(const UWeaponDefinition* WeaponData) const
@@ -463,13 +489,11 @@ void UGearManagerComponent::UnequipGear(FGameplayTag Slot, const UItemStaticData
                 WeaponToUnequip->Holster();
                 OnWeaponHolstered.Broadcast(Slot, WeaponToUnequip);
 
-                if (!DefaultUnarmedWeaponData || WeaponToUnequip->ItemData != DefaultUnarmedWeaponData)
+                WeaponToUnequip->Destroy();
+                if ((!DefaultUnarmedWeaponData || WeaponToUnequip->ItemData != DefaultUnarmedWeaponData) &&
+                	!MainhandSlotWeapon && !OffhandSlotWeapon && UnarmedWeaponActor)
                 {
-                    WeaponToUnequip->Destroy();
-                    if (!MainhandSlotWeapon && !OffhandSlotWeapon && UnarmedWeaponActor)
-                    {
-                        SelectUnarmed_Server();
-                    }
+                    SelectUnarmed_Server();
                 }
 
                 OnEquippedWeaponsChange.Broadcast();
@@ -535,6 +559,12 @@ void UGearManagerComponent::EquipGear(FGameplayTag Slot, const UItemStaticData* 
 
         case EGearChangeStep::Apply:
         {
+        	// If the active weapon is unarmed then unequip it
+        	if (GetActiveWeapon() == UnarmedWeaponActor)
+			{
+				UnequipGear(MainHandSlot->SlotTag, DefaultUnarmedWeaponData, true, EGearChangeStep::Apply);
+			}
+        		
 	        if (UWeaponDefinition* WeaponData = NewItemData->GetItemDefinition<UWeaponDefinition>())
         	{
         		AddAndSetSelectedWeapon(NewItemData, Slot);
@@ -646,8 +676,9 @@ AWeaponActor* UGearManagerComponent::SpawnWeapon_IfServer(const UItemStaticData*
 
 			if (bRecordAttackTraces)
 			{
-				if (UWeaponAttackRecorderComponent* RecorderComponent = NewObject<UWeaponAttackRecorderComponent>(Owner, UWeaponAttackRecorderComponent::StaticClass()))
+				if (UWeaponAttackRecorderComponent* RecorderComponent = NewObject<UWeaponAttackRecorderComponent>(NewWeaponActor, UWeaponAttackRecorderComponent::StaticClass()))
 				{
+					NewWeaponActor->AddOwnedComponent(RecorderComponent);
 					RecorderComponent->RegisterComponent();
 				}
 			}
@@ -700,7 +731,7 @@ void UGearManagerComponent::RotateToAimLocation(FVector AimLocation)
 {
 	if (bRotateToAttackDirection && !AimLocation.IsZero())
 	{
-		TargetYaw = FRotationMatrix::MakeFromX(AimLocation - Owner->GetActorLocation()).Rotator().Yaw;
+		RotateToAttackTargetYaw = FRotationMatrix::MakeFromX(AimLocation - Owner->GetActorLocation()).Rotator().Yaw;
 
 		// Start rotation immediately on the next tick
 		GetWorld()->GetTimerManager().SetTimer(TimerHandle_RotationUpdate, this, &UGearManagerComponent::UpdateRotation, GetWorld()->GetDeltaSeconds(), true);
@@ -714,6 +745,7 @@ FMontageData UGearManagerComponent::GetUnequipMontage(const UGearDefinition* Wea
 		return DefaultUnequipMontage;
 	return WeaponData->HolsterMontage;
 }
+
 
 FMontageData UGearManagerComponent::GetEquipMontage(const UGearDefinition* WeaponData) const
 {
@@ -810,11 +842,25 @@ void UGearManagerComponent::HandleInterruption()
     PendingGearChanges.Empty();
 }
 
+void UGearManagerComponent::OnAttackTraceStateBeginEnd_Implementation(bool Started)
+{
+	if (!IsRunningDedicatedServer() && IsValid(ReplayedAttackData))
+		SendAttackTraceAimRPC_Client();
+}
+
+FAttackAimParams UGearManagerComponent::GetAttackTraceAimParams_Implementation()
+{
+	auto Forward = Owner->GetActorForwardVector();
+	float AimYaw = FMath::RadiansToDegrees(FMath::Atan2(Forward.Y, Forward.X));
+	float AimPitch = FMath::RadiansToDegrees(FMath::Asin(Forward.Z));
+	
+	return FAttackAimParams{AimYaw, AimPitch};
+}
 
 //////////////////////// BEHAVIOR ////////////////////////
 
 
-void UGearManagerComponent::TryAttack_Server_Implementation(FVector AimLocation, bool ForceOffHand, int32 MontageIdOverride)
+void UGearManagerComponent::TryAttack_Server_Implementation(FVector AimLocation, float AimPitch, bool ForceOffHand, int32 MontageIdOverride)
 {
 	auto* WeaponActor =  MainhandSlotWeapon;
 	if (!WeaponActor || !WeaponActor->CanAttack() || ForceOffHand) WeaponActor = OffhandSlotWeapon;
@@ -830,12 +876,12 @@ void UGearManagerComponent::TryAttack_Server_Implementation(FVector AimLocation,
 
 		if (WeaponActor->CanAttack())
 		{
-			Attack_Multicast(AimLocation, WeaponActor == OffhandSlotWeapon, MontageIdOverride);
+			Attack_Multicast(AimLocation, AimPitch, WeaponActor == OffhandSlotWeapon, MontageIdOverride);
 		}
 	}
 }
 
-void UGearManagerComponent::Attack_Multicast_Implementation(FVector AimLocation, bool UseOffhand, int32 MontageIdOverride)
+void UGearManagerComponent::Attack_Multicast_Implementation(FVector AimLocation, float AimPitch, bool UseOffhand, int32 MontageIdOverride)
 {
 	AWeaponActor* WeaponActor = UseOffhand ? OffhandSlotWeapon : MainhandSlotWeapon;
 
@@ -845,6 +891,12 @@ void UGearManagerComponent::Attack_Multicast_Implementation(FVector AimLocation,
 	RotateToAimLocation(AimLocation);
 	WeaponActor->PerformAttack();
 	FMontageData AttackMontage = WeaponActor->GetAttackMontage(MontageIdOverride);
+	OnAttackPerformed.Broadcast(AttackMontage);
+
+	if (auto* RecordedAttack = AttackMontage.RecordedTraceSequence.Get())
+	{
+		PlayRecordedAttackSequence(RecordedAttack, AimPitch);
+	}
 
 	PlayMontage(Owner, AttackMontage.Montage.Get(), AttackMontage.PlayRate, FName(""));
 }
@@ -864,7 +916,7 @@ void UGearManagerComponent::UpdateRotation()
 	// Get current rotation as a quaternion
 	const FQuat CurrentQuat = Owner->GetActorRotation().Quaternion();
 	// Create target rotation as a quaternion
-	FQuat TargetQuat = FQuat(FRotator(0.f, TargetYaw, 0.f));
+	FQuat TargetQuat = FQuat(FRotator(0.f, RotateToAttackTargetYaw, 0.f));
 
 	// Perform spherical interpolation between the current and target rotations
 	FQuat NewQuat = FQuat::Slerp(CurrentQuat, TargetQuat, RotateToAttackDirectionSpeed * DeltaTime);
@@ -882,7 +934,7 @@ void UGearManagerComponent::UpdateRotation()
 	}
 }
 
-void UGearManagerComponent::PlayRecordedAttackSequence(const UWeaponAttackData* AttackData)
+void UGearManagerComponent::PlayRecordedAttackSequence(const UWeaponAttackData* AttackData, float AimPitch)
 {
     if (!IsValid(AttackData) || AttackData->AttackSequence.Num() == 0)
     {
@@ -892,14 +944,54 @@ void UGearManagerComponent::PlayRecordedAttackSequence(const UWeaponAttackData* 
 
     // Initialize replay session
     ReplayCurrentIndex = 0;
-    bReplayInitialOwnerPositionSaved = false;
     ReplayedAttackData = AttackData;
-    
-    // Start the trace replay
-    StartAttackReplay();
+
+	AttackStartTime = GetWorld()->GetTimeSeconds();
 }
 
-void UGearManagerComponent::StartAttackReplay()
+void UGearManagerComponent::SendAttackTraceAimRPC_Client()
+{
+	ensureMsgf(!IsRunningDedicatedServer(), TEXT("SendAttackTraceAimRPC_Client() called on dedicated server!"));
+	
+	double MaxTimeUntilNextUpdate = ReplayedAttackData->FirstTraceDelay - (GetWorld()->GetTimeSeconds() - AttackStartTime);
+	
+	if (MaxTimeUntilNextUpdate < 0.05f)
+	{
+		GetWorld()->GetTimerManager().ClearTimer(SendAimDirectionRPC_TimerHandle);
+		
+		ReceivedReplayAttackAimParams = GetAttackTraceAimParams();
+		SetAimInformationRPC_Server(ReceivedReplayAttackAimParams, true);
+		// We also want to trace on client
+		ContinueAttackReplay();
+	}
+	else
+	{
+		// Not currently active code, but built to ensure we call the RPC around the time of FirstTraceDelay. can be adjusted to call multiple times during the trace as well
+		float TimeUntilNextUpdate = FMath::Min(MaxTimeUntilNextUpdate, 0.1f);
+		GetWorld()->GetTimerManager().SetTimer(SendAimDirectionRPC_TimerHandle, this, &UGearManagerComponent::SendAttackTraceAimRPC_Client, TimeUntilNextUpdate, false);
+	}
+}
+
+
+void UGearManagerComponent::SetAimInformationRPC_Server_Implementation(FAttackAimParams AimParams, bool FinalAimUpdate)
+{
+	ensureMsgf(GetOwner()->HasAuthority(), TEXT("SendAttackTraceAimRPC_Client() called on non authority!"));
+	
+	ReceivedReplayAttackAimParams = AimParams;
+
+	if (FinalAimUpdate)
+	{
+		if ((GetWorld()->GetTimeSeconds() - AttackStartTime) > ReplayedAttackData->FirstTraceDelay + 0.4f)
+		{
+			// Final attack arrived too late, drop it
+			return;
+		}
+		
+		ContinueAttackReplay();
+	}
+}
+
+void UGearManagerComponent::ContinueAttackReplay()
 {
     if (!IsValid(ReplayedAttackData) || ReplayedAttackData->AttackSequence.Num() == 0)
     {
@@ -907,13 +999,19 @@ void UGearManagerComponent::StartAttackReplay()
         return;
     }
 
-    // Save initial position if not already done
-    if (!bReplayInitialOwnerPositionSaved)
-    {
-        ReplayInitialOwnerPosition = GetOwner()->GetActorTransform();
-        bReplayInitialOwnerPositionSaved = true;
-    }
 
+	FTransform PivotOffsetTransform;
+	PivotOffsetTransform.SetRotation(FQuat(Owner->GetActorRotation()));
+    ReplayOwnerAttackOrigin.SetLocation(Owner->GetActorLocation() + PivotOffsetTransform.TransformPosition(ReplayAttackPivotLocationOffset));
+    if (ReceivedReplayAttackAimParams.AimPitch != 0 || ReceivedReplayAttackAimParams.AimYaw != 0)
+    {
+    	FQuat YawQuat = FQuat(FRotator(0.f, ReceivedReplayAttackAimParams.AimYaw, 0.f));
+    	FQuat PitchQuat = FQuat(FRotator(ReceivedReplayAttackAimParams.AimPitch, 0.f, 0.f));
+    	ReplayOwnerAttackOrigin.SetRotation(YawQuat * PitchQuat);  // Yaw then Pitch
+    }
+    else
+		ReplayOwnerAttackOrigin.SetRotation(FQuat(Owner->GetActorRotation()));
+	
     // Stop if we reached the end of the attack sequence
     if (ReplayCurrentIndex >= ReplayedAttackData->AttackSequence.Num() - 1)
     {
@@ -931,28 +1029,22 @@ void UGearManagerComponent::StartAttackReplay()
     // Perform line traces between the recorded socket positions
     for (int32 SocketIndex = 0; SocketIndex < CurrentTimestamp.SocketPositions.Num(); ++SocketIndex)
     {
-        FVector StartPosition = ReplayInitialOwnerPosition.TransformPosition(CurrentTimestamp.SocketPositions[SocketIndex]);
-        FVector EndPosition = ReplayInitialOwnerPosition.TransformPosition(NextTimestamp.SocketPositions[SocketIndex]);
-
+    	FVector StartPosition = ReplayOwnerAttackOrigin.TransformPosition(CurrentTimestamp.SocketPositions[SocketIndex]);
+    	FVector EndPosition = ReplayOwnerAttackOrigin.TransformPosition(NextTimestamp.SocketPositions[SocketIndex]);
+    	
         FHitResult HitResult;
         FCollisionQueryParams QueryParams;
         QueryParams.AddIgnoredActor(GetOwner());
 
-        bool bHit = GetWorld()->LineTraceSingleByChannel(HitResult, StartPosition, EndPosition, TraceChannel, QueryParams);
-
-        if (bHit)
+	    if (bool bHit = GetWorld()->LineTraceSingleByChannel(HitResult, StartPosition, EndPosition, TraceChannel, QueryParams))
         {
-            AActor* HitActor = HitResult.GetActor();
-            if (HitActor)
+	        if (AActor* HitActor = HitResult.GetActor())
             {
-                UE_LOG(LogTemp, Log, TEXT("Hit detected on actor: %s"), *HitActor->GetName());
-
                 // Broadcast an event when a hit is detected
                 OnHitDetected.Broadcast(HitActor, HitResult);
             }
         }
 
-        // Optional: draw debug lines for each socket
         #if WITH_EDITOR
         DrawDebugLine(GetWorld(), StartPosition, EndPosition, FColor::Red, false, TimeDelta, 0, 2.0f);
         #endif
@@ -960,14 +1052,12 @@ void UGearManagerComponent::StartAttackReplay()
 
     // Schedule the next trace step
     ReplayCurrentIndex++;
-    GetWorld()->GetTimerManager().SetTimer(ReplayTimerHandle, this, &UGearManagerComponent::StartAttackReplay, TimeDelta, false);
+    GetWorld()->GetTimerManager().SetTimer(AttackTrace_TimerHandle, this, &UGearManagerComponent::ContinueAttackReplay, TimeDelta, false);
 }
 
 void UGearManagerComponent::StopAttackReplay()
 {
-    GetWorld()->GetTimerManager().ClearTimer(ReplayTimerHandle);
+    GetWorld()->GetTimerManager().ClearTimer(AttackTrace_TimerHandle);
     ReplayedAttackData = nullptr;
-    bReplayInitialOwnerPositionSaved = false;
 	OnAttackAnimNotifyEndEvent.Broadcast();
-    UE_LOG(LogTemp, Log, TEXT("Attack replay stopped."));
 }
