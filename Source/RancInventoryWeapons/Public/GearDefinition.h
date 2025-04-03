@@ -19,9 +19,9 @@ public:
     {
     }
     /** Animation montage data for equipping the weapon */
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS | Weapon", meta = (AssetBundles = "Data"))
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Gear", meta = (AssetBundles = "Data"))
     FMontageData EquipMontage;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS | Weapon", meta = (AssetBundles = "Data"))
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Gear", meta = (AssetBundles = "Data"))
 	FMontageData HolsterMontage;
 };

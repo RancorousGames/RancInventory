@@ -14,6 +14,10 @@ AWeaponActor::AWeaponActor(const FObjectInitializer& ObjectInitializer)
     GetStaticMeshComponent()->SetSimulatePhysics(false);
     GetStaticMeshComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
     GetStaticMeshComponent()->SetCollisionProfileName(TEXT("NoCollision"));
+
+    bReplicates = true;
+    bNetLoadOnClient = true;
+    AActor::SetReplicateMovement(false);
 }
 
 void AWeaponActor::BeginPlay()
@@ -26,9 +30,8 @@ void AWeaponActor::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLife
 {
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
-   // DOREPLIFETIME(AWeaponActor, PlacedInWorld);
-   // DOREPLIFETIME(AWeaponActor, MontageCycleIndex);
-   // DOREPLIFETIME(AWeaponActor, WeaponData);
+   DOREPLIFETIME_CONDITION(AWeaponActor, ItemId, COND_InitialOnly);
+   DOREPLIFETIME_CONDITION(AWeaponActor, HandSlotIndex, COND_InitialOnly);
 }
 
 UNetConnection* AWeaponActor::GetNetConnection() const
@@ -42,12 +45,20 @@ UNetConnection* AWeaponActor::GetNetConnection() const
 
 void AWeaponActor::Initialize_Implementation(bool InitializeWeaponData, bool InitializeStaticMesh)
 {
-    Initialize_Impl(InitializeWeaponData, InitializeStaticMesh);
-}
-
-void AWeaponActor::Initialize_Impl(bool InitializeWeaponData, bool InitializeStaticMesh)
-{
+    // I dont remember why InitializeWeaponData and InitializeStaticMesh were added
+    
     // Set static actor model based on weapon data
+    if (!ItemId.IsValid())
+    {
+        UE_LOG(LogTemp, Warning, TEXT("WeaponActor::Initialize_Impl: ItemId is invalid."));
+        return;
+    }
+
+    if (!ItemData)
+    {
+        ItemData = URISSubsystem::GetItemDataById(ItemId);
+    }
+    
     if (ItemData)
     {
         if (InitializeStaticMesh && ItemData->ItemWorldMesh)
@@ -58,31 +69,47 @@ void AWeaponActor::Initialize_Impl(bool InitializeWeaponData, bool InitializeSta
             GetStaticMeshComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
             GetStaticMeshComponent()->SetCollisionProfileName(TEXT("NoCollision"));
         }
+        
         if (InitializeWeaponData)
         {
             WeaponData = ItemData->GetItemDefinition<UWeaponDefinition>();
+
+            if (!WeaponData)
+            {
+                UE_LOG(LogTemp, Warning, TEXT("WeaponActor::Initialize_Impl: Item %s Does not have weapon definition."), *ItemId.ToString());
+            }
+        }
+
+        if (GetOwner())
+        {
+            if (auto* GearManager = GetOwner()->FindComponentByClass<UGearManagerComponent>())
+            {
+                GearManager->RegisterSpawnedWeapon(this);
+            }
+            else
+            {
+                UE_LOG(LogTemp, Warning, TEXT("WeaponActor::Initialize_Impl: Owner %s has no GearManagerComponent."), *GetOwner()->GetName());
+            }
+        }
+        else
+        {
+            UE_LOG(LogTemp, Warning, TEXT("WeaponActor::Initialize_Impl: Weapon %s has no owner."), *ItemId.ToString());
         }
     }
     else
     {
-        UE_LOG(LogTemp, Warning, TEXT("WeaponActor::Initialize_Impl: ItemData is nullptr."));
+        UE_LOG(LogTemp, Warning, TEXT("WeaponActor::Initialize_Impl: Failed to load itemdata for item %s."), *ItemId.ToString());
     }
 }
 
 bool AWeaponActor::CanAttack_Implementation()
 {
-    return CanAttack_Impl();
-}
-
-bool AWeaponActor::CanAttack_Impl()
-{
     // Default implementation: Always return true
     return true;
 }
 
-void AWeaponActor::PerformAttack_Implementation()
+void AWeaponActor::OnAttackPerformed_Implementation()
 {
-    PerformAttack_Impl();
 }
 
 
@@ -104,17 +131,13 @@ FTransform AWeaponActor::GetAttachTransform_Impl(FName SocketName)
     return Transform;
 }
 
-FMontageData AWeaponActor::GetAttackMontage_Implementation(int32 MontageIdOverride)
-{
-    return GetAttackMontage_Impl(MontageIdOverride);
-}
 
-FMontageData AWeaponActor::GetAttackMontage_Impl(int32 MontageIdOverride)
+int32 AWeaponActor::GetAttackMontageId_Implementation(int32 MontageIdOverride)
 {
     if (WeaponData->AttackMontages.IsEmpty())
     {
         UE_LOG(LogTemp, Warning, TEXT("WeaponActor::GetAttackMontage_Impl: No attack montages found."));
-        return FMontageData();
+        return -1;
     }
     
     if (MontageIdOverride >= 0)
@@ -126,29 +149,34 @@ FMontageData AWeaponActor::GetAttackMontage_Impl(int32 MontageIdOverride)
         MontageCycleIndex = (MontageCycleIndex+1) % WeaponData->AttackMontages.Num();
     }
 
-    return WeaponData->AttackMontages[MontageCycleIndex];
+    return MontageCycleIndex;
 }
 
-void AWeaponActor::Equip()
+FAttackMontageData AWeaponActor::GetAttackMontage_Implementation(int32 MontageId)
 {
-    EquipMulticast();
-    EquipMulticastImpl();
+    if (MontageId >= WeaponData->AttackMontages.Num() || MontageId < 0)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("WeaponActor::GetAttackMontage: MontageId %d out of range."), MontageId);
+        return FAttackMontageData();
+    }
+    return WeaponData->AttackMontages[MontageId];
 }
 
-void AWeaponActor::EquipMulticast_Implementation()
-{
-    EquipMulticastImpl();
-}
-
-void AWeaponActor::EquipMulticastImpl()
+void AWeaponActor::Equip_Impl_Implementation()
 {
     OnWeaponEquipped.Broadcast();
 }
 
-void AWeaponActor::EquipServer_Implementation()
+void AWeaponActor::Equip_Server_Implementation()
 {
-    Equip();
+    Equip_Multicast();
 }
+
+void AWeaponActor::Equip_Multicast_Implementation()
+{
+    Equip_Impl();
+}
+
 
 void AWeaponActor::Holster()
 {
@@ -163,39 +191,4 @@ void AWeaponActor::HolsterMulticast_Implementation()
 void AWeaponActor::HolsterServer_Implementation()
 {
     Holster();
-}
-
-void AWeaponActor::Remove()
-{
-    RemoveMulticast();
-}
-
-void AWeaponActor::RemoveMulticast_Implementation()
-{
-    // Placeholder for cleanup logic
-}
-
-void AWeaponActor::RemoveServer_Implementation()
-{
-    Remove();
-}
-
-
-void AWeaponActor::PerformAttack_Impl()
-{
-	// Get the current montage data
-	FMontageData CurrentMontage = GetAttackMontage();
-
-	// Perform normal attack logic
-	if (CanAttack())
-	{
-		// Start playing animation and attack logic...
-
-		// If the weapon has an attached recorder component, start recording
-	    // I believe this is no longer used as we rely on anim notifies instead
-		//if (UWeaponAttackRecorderComponent* Recorder = FindComponentByClass<UWeaponAttackRecorderComponent>())
-		//{
-		//	Recorder->Star();
-		//}
-	}
 }

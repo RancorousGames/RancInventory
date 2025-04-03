@@ -99,7 +99,7 @@ public:
 	/* Allows extending item data without inheritance. Similar to components */
 	UPROPERTY(EditDefaultsOnly, Instanced, BlueprintReadOnly, Category = "RIS")
 	TArray<UItemDefinitionBase*> ItemDefinitions;
-	
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS",
 		meta = (UIMin = 0, ClampMin = 0, AssetBundles = "Data"))
 	FVector ItemWorldScale = FVector(1.0f, 1.0f, 1.0f);

@@ -17,10 +17,8 @@ class UMeleeMontageComponent;
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FWeaponStateChange);
 
 /**
- * 
  * Base class for a replicated weapon, meant to be attached to character skeletal mesh.
- * Notably overrides GetNetConnection() to return the net connection of GetAttachParentActor() , so firing components attached to this actor can
- * call RPCs.
+ * When spawning, set the ItemId and PlacedInWorld properties.
  */
 UCLASS(Blueprintable, BlueprintType, ClassGroup=(Custom))
 class RANCINVENTORYWEAPONS_API AWeaponActor : public AStaticMeshActor
@@ -46,28 +44,28 @@ public:
 	
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Ranc Inventory | Weapon", meta = (ExposeOnSpawn))
 	const UWeaponDefinition* WeaponData;
+	
+	UPROPERTY(Replicated, BlueprintReadOnly, VisibleAnywhere, Category = "Ranc Inventory | Weapon", meta = (ExposeOnSpawn))
+	FGameplayTag ItemId;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Ranc Inventory | Weapon", meta = (ExposeOnSpawn))
+	// The hand slot index that this weapon is currently in, if not in world. Is only replicated and modified on spawn.
+	UPROPERTY(Replicated, BlueprintReadOnly, VisibleAnywhere, Category = "Ranc Inventory | Weapon", meta = (ExposeOnSpawn))
+	int HandSlotIndex = -1;
+
+	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Category = "Ranc Inventory | Weapon", meta = (ExposeOnSpawn))
 	const UItemStaticData* ItemData;
 	
-	/* Index of the next attack montage to play */
-	UPROPERTY(BlueprintReadWrite, Category = "Ranc Inventory | Weapon", meta = (ExposeOnSpawn))
-	int32 MontageCycleIndex = -1;
-
+	// Ensure to call base Initialize when overriding
 	UFUNCTION(BlueprintNativeEvent, Category = "Ranc Inventory | Weapon")
 	void Initialize(bool InitializeWeaponData = true, bool InitializeStaticMesh = true);
 	
-	virtual void Initialize_Impl(bool InitializeWeaponData = true, bool InitializeStaticMesh = true);
-
-	/* Function to notify the weapon an attack is requested
+	/* Note: Cooldown is handled by GearManagerComponent, returns true in base class but can be overriden
 	 * @return true if the weapon can attack, false otherwise */
 	UFUNCTION(BlueprintPure, BlueprintCallable, BlueprintNativeEvent, Category = "Ranc Inventory | Weapon")
 	bool CanAttack();
-	virtual bool CanAttack_Impl();
 
 	UFUNCTION(BlueprintNativeEvent, Category = "Ranc Inventory | Weapon")
-	void PerformAttack();
-	virtual void PerformAttack_Impl();
+	void OnAttackPerformed();
 
 	/* Returns a transform representing an offset of how the weapon should attach
 	 * By default this will try to get a matching socket on the static mesh
@@ -76,23 +74,22 @@ public:
 	FTransform GetAttachTransform(FName SocketName);
 	virtual FTransform GetAttachTransform_Impl(FName SocketName);
 	
-	UFUNCTION(BlueprintNativeEvent, Category = "Ranc Inventory | Weapon", meta=(DisplayName = "GetAttackMontage"))
-	FMontageData GetAttackMontage(int32 MontageIdOverride = -1);
-
-	virtual FMontageData GetAttackMontage_Impl(int32 MontageIdOverride = -1);
-
+	UFUNCTION(BlueprintAuthorityOnly, BlueprintNativeEvent, Category = "Ranc Inventory | Weapon", meta=(DisplayName = "GetAttackMontage"))
+	int32 GetAttackMontageId(int32 MontageIdOverride = -1);
 	
-	void Equip();
-
-	UFUNCTION(NetMulticast, Reliable)
-	void EquipMulticast();
-
-	// Called on all clients and server, lets C++ override
-	virtual void EquipMulticastImpl();
+	UFUNCTION(BlueprintNativeEvent, Category = "Ranc Inventory | Weapon", meta=(DisplayName = "GetAttackMontage"))
+	FAttackMontageData GetAttackMontage(int32 MontageId);
 
 	UFUNCTION(Server, Reliable)
-	void EquipServer();
+	void Equip_Server();
 	
+	UFUNCTION(NetMulticast, Reliable)
+	void Equip_Multicast();
+	
+	UFUNCTION(BlueprintInternalUseOnly, BlueprintNativeEvent, Category = "Ranc Inventory | Weapon")
+	void Equip_Impl();
+	
+
 	void Holster();
 
 	UFUNCTION(NetMulticast, Reliable)
@@ -100,28 +97,9 @@ public:
 
 	UFUNCTION(Server, Reliable)
 	void HolsterServer();
+protected:
 	
-	/*
-	Weapon no longer inventory. This is what you call when a weapon is dropped from ACharacter to clean up
-	*/
-	void Remove();
-
-	UFUNCTION(NetMulticast, Reliable)
-	void RemoveMulticast();
-
-	UFUNCTION(Server, Reliable)
-	void RemoveServer();
-	
-	UPROPERTY(BlueprintReadWrite, Category = "Ranc Inventory | Weapon", meta = (ExposeOnSpawn))
-	bool PlacedInWorld = true;
-	
-	UFUNCTION(BlueprintCallable, Category = "Ranc Inventory | Weapon", meta = (BlueprintGetter = "IsPlacedInWorld"))
-	virtual bool IsPlacedInWorld_Implementation()
-	{
-		return PlacedInWorld;
-	}
-
-private:
+	/* Index of the next attack montage to play, only managed on server */
+	int32 MontageCycleIndex = -1;
 	TArray<TSharedPtr<FStreamableHandle>> AnimationHandles;
-	
 };

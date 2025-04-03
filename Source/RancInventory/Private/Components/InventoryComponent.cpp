@@ -1195,7 +1195,7 @@ TArray<std::tuple<FGameplayTag, int32>> UInventoryComponent::GetItemDistribution
 			}
 		}
 
-		TArray<FGameplayTag> BlockedSlots = TArray<FGameplayTag>();
+		TArray<FGameplayTag> BlockedSlots = TArray<FGameplayTag>(); // Some items in universal slots can block others, e.g. two handed in mainhand blocks offhand
 
 		// First check universal slots for slots that are strongly preferred by the item
 		for (const FUniversalTaggedSlot& SlotTag : UniversalTaggedSlots)

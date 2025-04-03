@@ -130,8 +130,8 @@ public:
 //	TMap<FGameplayTag, FGearSlotDefinition> GearDefinitionsPerSlot;
 
 	// Shortcuts into the GearDefinitionsPerSlot
-	const FGearSlotDefinition* MainHandSlot;
-	const FGearSlotDefinition* OffhandSlot;
+	int32 MainHandSlotIndex;
+	int32 OffhandSlotIndex;
 
 	UPROPERTY(BlueprintAssignable, Category = "Ranc Inventory Weapons|Gear")
 	FWeaponEvent OnEquippedWeaponsChange;
@@ -152,7 +152,7 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Ranc Inventory Weapons|Gear")
 	FOnHitDetected OnHitDetected;
 	
-	DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnAttackPerformed, FMontageData, MontageData);
+	DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnAttackPerformed, FAttackMontageData, MontageData);
 	UPROPERTY(BlueprintAssignable, Category = "Ranc Inventory Weapons|Gear")
 	FOnAttackPerformed OnAttackPerformed;
 
@@ -308,18 +308,22 @@ public:
 	UFUNCTION()
 	void HandleItemRemovedFromSlot(const FGameplayTag& SlotTag, const UItemStaticData* Data, int32 Quantity, EItemChangeReason Reason);
 
+	UFUNCTION(BlueprintNativeEvent, Category = "Ranc Inventory Weapons|Gear")
+	bool CanAttack(FVector AimLocation = FVector(0,0,0), bool ForceOffHand = false);
+	
+	
 	/* Try to perform an attack montage
 	 * This will succeed if cooldown is ready The weapon is notified of the attack
 	 * @Param AimPitch - Only used if using attack trace replays, allows attacks to be vertically adjusted, 0 is neutral pitch
 	 * @Param UseOffhand - If true, we will use the Offhand weapon
-	 * @Param MontageIdOverride - If >= 0, we will use this montage id instead of cycling
+	 * @Param MontageIdOverride - If >= 0, we will use this montage id instead of letting the weapon decide (by default a cycling pattern)
 	 * Multicasts the attack to all clients
 	 */
 	UFUNCTION(Reliable, Server, BlueprintCallable, Category = "Ranc Inventory Weapons|Gear")
-	void TryAttack_Server(FVector AimLocation = FVector(0,0,0), float AimPitch = 0, bool ForceOffHand = false, int32 MontageIdOverride = -1);
+	void TryAttack_Server(FVector AimLocation = FVector(0,0,0), bool ForceOffHand = false, int32 MontageIdOverride = -1);
 
 	UFUNCTION(Reliable, NetMulticast, BlueprintCallable, Category = "Ranc Inventory Weapons|Gear")
-	void Attack_Multicast(FVector AimLocation, float AimPitch, bool UseOffhand = false, int32 MontageIdOverride = -1);
+	void Attack_Multicast(FVector AimLocation, int32 MontageId, bool UseOffhand = false);
 
 	UFUNCTION(BlueprintCallable, Category = "Ranc Inventory Weapons|Gear")
 	void SelectNextActiveWeapon(bool bPlayMontage = true);
@@ -353,6 +357,8 @@ public:
 	void EquipGear(FGameplayTag Slot, const UItemStaticData* NewItemData, FTaggedItemBundle PreviousItem, bool SkipAnim, EGearChangeStep Step);
 
 	FGearSlotDefinition* FindGearSlotDefinition(FGameplayTag SlotTag);
+	int32 FindGearSlotIndex(FGameplayTag SlotTag) const;
+
 
 	/*
 	* If PlayUnequipMontage is false then the swap will happen immediately
@@ -377,7 +383,8 @@ public:
 	UFUNCTION()
 	void OnRep_ActiveWeapon();
 	
-	bool PlayEquipMontage(AWeaponActor* WeaponActor);
+	void RegisterSpawnedWeapon(AWeaponActor* WeaponActor);
+
 	
 	/*
 	Spawns the weapon on the server, and tries to add it to the array.
@@ -387,8 +394,8 @@ public:
 	I didn't bother exposing it because ESpawnActorCollisionHandlingMethod::AlwaysSpawn, and  
 	the spawned actor is immediately passed to AddWeaponToArray(NewWeaponActor)
 	*/
-	UFUNCTION(BlueprintCallable, Category = "Ranc Inventory Weapons|Gear")
-	AWeaponActor* SpawnWeapon_IfServer(const UItemStaticData* ItemData, const UWeaponDefinition* WeaponType);
+	UFUNCTION(BlueprintAuthorityOnly, BlueprintCallable, Category = "Ranc Inventory Weapons|Gear")
+	AWeaponActor* SpawnWeapon_IfServer(const UItemStaticData* ItemData, const UWeaponDefinition* WeaponType, int32 HandSlotIndex);
 
 protected:
 	// Called when the game starts
@@ -399,7 +406,7 @@ protected:
 	return OwnerChar->PlayAnimMontage(Montage,PlayRate,StartSectionName);
 	returns 0.0f if can't play the montage cause of nullptrs
 	*/
-	static float PlayMontage( ACharacter* OwnerChar, UAnimMontage* Montage, float PlayRate = 1.0f,  FName StartSectionName = FName(""), bool bShowDebugWarnings = false);
+	static float PlayMontage( ACharacter* OwnerChar, UAnimMontage* Montage, float PlayRate = 1.0f,  FName StartSectionName = FName(""));
 
 	UFUNCTION()
     void OnGearChangeAnimNotify(FName NotifyName, const FBranchingPointNotifyPayload& BranchingPointNotifyPayload);
@@ -416,7 +423,8 @@ protected:
 	void RotateToAimLocation(FVector AimLocation);
 	void UpdateRotation();
 
-	const FGearSlotDefinition* GetHandSlotToUse(const UWeaponDefinition* WeaponData) const;
+	int32 GetHandSlotIndexToUse(const UWeaponDefinition* WeaponData) const;
+	
 	AWeaponActor* GetWeaponForSlot(const FGearSlotDefinition* Slot) const;
 	
 	/*
@@ -424,13 +432,12 @@ protected:
 	*/
 	void AttachWeaponToOwner(AWeaponActor* InputWeaponActor,FName SocketName);
 		
-	/* Adds the weapon to the list of weapons that can be hotswapped to with */
-	void AddAndSetSelectedWeapon(const UItemStaticData* WeaponData, FGameplayTag ForcedSlot = FGameplayTag());
-	
+	/* Spawns the weapon and equips it. Adds the weapon to the list of weapons that can be hotswapped to with if not already there */
+	void AddAndSetSelectedWeapon_IfServer(const UItemStaticData* WeaponData, FGameplayTag ForcedSlot = FGameplayTag());
 	
 	virtual void GetLifetimeReplicatedProps(TArray < class FLifetimeProperty > & OutLifetimeProps) const override;
 
-	void PlayRecordedAttackSequence(const UWeaponAttackData* AttackData, float AimPitch);
+	void PlayRecordedAttackSequence(const UWeaponAttackData* AttackData);
 	void SendAttackTraceAimRPC_Client();
 	void ContinueAttackReplay();
 	void StopAttackReplay();
@@ -472,7 +479,7 @@ protected:
 	FTransform ReplayOwnerAttackOrigin;
 
 	UPROPERTY()
-	TArray<UObject*> LoadedAttackData;
+	TArray<UObject*> LoadedAttackAssets;
 	
 	ECollisionChannel TraceChannel;
 };

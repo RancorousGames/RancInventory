@@ -20,7 +20,7 @@ struct FRecordingSession
 {
     GENERATED_BODY()
 
-    FMontageData MontageData;
+    FAttackMontageData MontageData;
     UPROPERTY()
     TArray<FName> RelevantSockets;
     float AnimationDuration;
@@ -84,8 +84,8 @@ private:
     void Initialize();
     virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
     UFUNCTION()
-    void OnAttackPerformed(FMontageData MontageData);
-    bool InitializeRecordingSession(FMontageData MontageData);
+    void OnAttackPerformed(FAttackMontageData MontageData);
+    bool InitializeRecordingSession(FAttackMontageData MontageData);
     void RecordAttackData(float DeltaTime);
     void StartRecording();
     void StopRecording();
@@ -95,8 +95,7 @@ private:
 
     TArray<FName> FindRelevantSockets(class UMeshComponent* WeaponMesh) const;
     bool ValidateAssetSavePath() const;
-    FString GenerateUniqueAssetName(const FString& BaseName) const;
-    void UpdateMontageDataWithRecordedSequence(FMontageData& MontageData, UWeaponAttackData* AttackData);
+    void UpdateMontageDataWithRecordedSequence(FAttackMontageData& MontageData, UWeaponAttackData* AttackData);
     void StartReplayVisualization();
     void StopReplayVisualization();
     void ReplayRecording();

@@ -14,15 +14,15 @@ class RANCINVENTORYWEAPONS_API ARangedWeaponActor : public AWeaponActor
 public:
     ARangedWeaponActor(const FObjectInitializer& ObjectInitializer);
 
-    virtual bool CanAttack_Impl() override;
-    virtual void PerformAttack_Impl() override;
+    virtual bool CanAttack_Implementation() override;
+    virtual void OnAttackPerformed_Implementation() override;
 	
 protected:
     virtual void BeginPlay() override;
 
-    virtual void Initialize_Impl(bool InitializeWeaponData = true, bool InitializeStaticMesh = true) override;
+    virtual void Initialize_Implementation(bool InitializeWeaponData = true, bool InitializeStaticMesh = true) override;
 
-    void EquipMulticastImpl();
+    virtual void Equip_Impl_Implementation() override;
     void ReloadWeapon();
     void OnReloadComplete_IfServer();
     

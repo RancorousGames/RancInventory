@@ -19,9 +19,9 @@ ARangedWeaponActor::ARangedWeaponActor(const FObjectInitializer& ObjectInitializ
 {
 }
 
-void ARangedWeaponActor::Initialize_Impl(bool InitializeWeaponData, bool InitializeStaticMesh)
+void ARangedWeaponActor::Initialize_Implementation(bool InitializeWeaponData, bool InitializeStaticMesh)
 {
-    Super::Initialize_Impl(InitializeWeaponData, InitializeStaticMesh);
+    Super::Initialize_Implementation(InitializeWeaponData, InitializeStaticMesh);
     UE_LOG(LogRISInventory, Verbose, TEXT("Initialize_Impl called for %s"), *GetName());
 
     InternalMagazineAmmoContainer = GetComponentByClass<UItemContainerComponent>();
@@ -78,7 +78,7 @@ void ARangedWeaponActor::Initialize_Impl(bool InitializeWeaponData, bool Initial
     }
 }
 
-bool ARangedWeaponActor::CanAttack_Impl()
+bool ARangedWeaponActor::CanAttack_Implementation()
 {
     bool bCanAttack = RangedWeaponData && RangedWeaponData->bInfiniteAmmo || CurrentAmmo > 0;
     UE_LOG(LogRISInventory, Verbose, TEXT("CanAttack_Impl called for %s, result: %s"), *GetName(), bCanAttack ? TEXT("true") : TEXT("false"));
@@ -92,8 +92,10 @@ bool ARangedWeaponActor::CanAttack_Impl()
     return bCanAttack;
 }
 
-void ARangedWeaponActor::PerformAttack_Impl()
+void ARangedWeaponActor::OnAttackPerformed_Implementation()
 {
+    Super::OnAttackPerformed_Implementation();
+    
     if (CurrentAmmo <= 0 || !RangedWeaponData)
     {
         UE_LOG(LogRISInventory, Warning, TEXT("PerformAttack_Impl called for %s but no ammo or RangedWeaponData"), *GetName());
@@ -263,9 +265,9 @@ void ARangedWeaponActor::PerformAttack_Impl()
     }*/
 }
 
-void ARangedWeaponActor::EquipMulticastImpl()
+void ARangedWeaponActor::Equip_Impl_Implementation()
 {
-    Super::EquipMulticastImpl();
+    Super::Equip_Impl_Implementation();
 
     if (!RangedWeaponData)
     {
@@ -292,7 +294,7 @@ void ARangedWeaponActor::ReloadWeapon()
     bIsReloading = true;
     UE_LOG(LogRISInventory, Verbose, TEXT("Reloading started for %s"), *GetName());
 
-    float ReloadAnimDuration = PlayMontage(WeaponHolder, RangedWeaponData->ReloadMontage.Montage.Get(), RangedWeaponData->ReloadMontage.PlayRate, NAME_None, false);
+    float ReloadAnimDuration = PlayMontage(WeaponHolder, RangedWeaponData->ReloadMontage.Montage, RangedWeaponData->ReloadMontage.PlayRate, NAME_None, false);
     float ReloadCallbackDuration = RangedWeaponData->ReloadTime > 0 ? RangedWeaponData->ReloadTime : ReloadAnimDuration;
 
     if (GetLocalRole() == ROLE_Authority && ReloadCallbackDuration > 0)

@@ -22,32 +22,32 @@ public:
     }
 
     /** The hand compatibility of the weapon (e.g., mainhand, offhand, or two-handed) */
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS | Weapon", meta = (AssetBundles = "Data"))
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon", meta = (AssetBundles = "Data"))
     EHandCompatibility HandCompatability;
 
 	/** The hand compatibility of the weapon (e.g., mainhand, offhand, or two-handed) */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS | Weapon", meta = (AssetBundles = "Data"))
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon", meta = (AssetBundles = "Data"))
 	FGameplayTag WeaponType;
 	
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS | Weapon", meta = (AssetBundles = "Data"))
-	TArray<FMontageData> AttackMontages;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon", meta = (AssetBundles = "Data"))
+	TArray<FAttackMontageData> AttackMontages;
 	
     /** Cooldown time between attacks */
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS | Weapon", meta = (UIMin = 0, ClampMin = 0, AssetBundles = "Data"))
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon", meta = (UIMin = 0, ClampMin = 0, AssetBundles = "Data"))
     float Cooldown;
 
     /** Base damage dealt by the weapon */
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS | Weapon", meta = (UIMin = 0, ClampMin = 0, AssetBundles = "Data"))
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon", meta = (UIMin = 0, ClampMin = 0, AssetBundles = "Data"))
     float Damage;
 
     /** Range of the weapon for attacks */
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS | Weapon", meta = (UIMin = 0, ClampMin = 0, AssetBundles = "Data"))
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon", meta = (UIMin = 0, ClampMin = 0, AssetBundles = "Data"))
     float Range;
 
 	// If a weapon is low priority then it will be readily replaced by other non-low priority weapons
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS | Weapon", meta = (AssetBundles = "Data"))
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon", meta = (AssetBundles = "Data"))
 	bool IsLowPriority;
 	
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS | Weapon", meta = (AssetBundles = "Data"))
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon", meta = (AssetBundles = "Data"))
 	TSubclassOf<AActor> WeaponActorClass;
 };

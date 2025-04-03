@@ -75,13 +75,13 @@ void UWeaponAttackRecorderComponent::Initialize()
     }
 }
 
-bool UWeaponAttackRecorderComponent::InitializeRecordingSession(FMontageData MontageData)
+bool UWeaponAttackRecorderComponent::InitializeRecordingSession(FAttackMontageData MontageData)
 {
     UE_LOG(LogTemp, Warning, TEXT("Initializing recording session"));
     CurrentSession = FRecordingSession();
     CurrentSession.MontageData = MontageData;
 
-    if (!CurrentSession.MontageData.Montage.IsValid())
+    if (!CurrentSession.MontageData.Montage)
     {
         UE_LOG(LogTemp, Error, TEXT("Invalid MontageData"));
         return false;
@@ -161,7 +161,7 @@ void UWeaponAttackRecorderComponent::StopRecording()
     }
 
     // Generate a unique asset name
-    FString AssetName = GenerateUniqueAssetName(CurrentSession.MontageData.Montage.Get()->GetName() + "_AttackData");
+    FString AssetName = CurrentSession.MontageData.Montage->GetName() + "_AttackData";
 
     // Reduce data to fewer keyframes
     PostProcessRecordedData(); 
@@ -190,12 +190,12 @@ void UWeaponAttackRecorderComponent::OnAnimNotifyBegin(FName AnimName)
 {
     UE_LOG(LogTemp, Warning, TEXT("OnAnimNotifyBegin: %s"), *AnimName.ToString());
 
-    UAnimMontage* Montage = CurrentSession.MontageData.Montage.Get();
+    UAnimMontage* Montage = CurrentSession.MontageData.Montage;
     // Load CurrentSession.MontageData.Montage softpointer if its not loaded
-    if (!CurrentSession.MontageData.Montage.IsValid())
+    if (!CurrentSession.MontageData.Montage)
     {
         // Load the softpointer
-        Montage = CurrentSession.MontageData.Montage.LoadSynchronous();
+        Montage = CurrentSession.MontageData.Montage;
     }
     
     if (!RecordingInitialized || !Montage)
@@ -219,12 +219,12 @@ void UWeaponAttackRecorderComponent::OnAnimNotifyEnd(FName AnimName)
 {
     UE_LOG(LogTemp, Warning, TEXT("OnAnimNotifyEnd: %s"), *AnimName.ToString())
     
-    UAnimMontage* Montage = CurrentSession.MontageData.Montage.Get();
+    UAnimMontage* Montage = CurrentSession.MontageData.Montage;
     // Load CurrentSession.MontageData.Montage softpointer if its not loaded
-    if (!CurrentSession.MontageData.Montage.IsValid())
+    if (!CurrentSession.MontageData.Montage)
     {
         // Load the softpointer
-        Montage = CurrentSession.MontageData.Montage.LoadSynchronous();
+        //Montage = CurrentSession.MontageData.Montage.LoadSynchronous();
     }
     
     if (!RecordingInitialized || !Montage)
@@ -286,21 +286,54 @@ void UWeaponAttackRecorderComponent::RecordAttackData(float DeltaTime)
 }
 
 
-void UWeaponAttackRecorderComponent::OnAttackPerformed(FMontageData MontageData)
+void UWeaponAttackRecorderComponent::OnAttackPerformed(FAttackMontageData MontageData)
 {
-    // Check if we should record this attack
-    if (bIsRecording || !MontageData.IsValid() || (MontageData.RecordedTraceSequence.IsValid() && !Settings->bOverwriteExisting))
+    // Initial checks: Already recording or invalid data?
+    if (bIsRecording)
     {
-        if (bIsRecording)
-        {
-            UE_LOG(LogTemp, Warning, TEXT("New attack started while recording was already in progress. Stopping current recording."));
-            StopRecording();
-        }
+        UE_LOG(LogTemp, Warning, TEXT("WeaponAttackRecorderComponent::OnAttackPerformed: New attack performed while recording was already in progress. Stopping current recording."));
+        StopRecording(); // Stop the ongoing one, but don't start a new one immediately
         return;
+    }
+
+    if (!MontageData.IsValid() || !MontageData.Montage)
+    {
+         UE_LOG(LogTemp, Warning, TEXT("WeaponAttackRecorderComponent::OnAttackPerformed: Received invalid MontageData or Montage reference. Cannot record."));
+        return;
+    }
+
+    // Check if overwriting existing assets is disabled
+    if (!Settings->bOverwriteExisting)
+    {
+        // --- Check for asset existence on disk ---
+
+        // Get the actual Montage asset to retrieve its name
+        UAnimMontage* Montage = MontageData.Montage;
+        if (!Montage)
+        {
+             UE_LOG(LogTemp, Error, TEXT("OnAttackPerformed: Failed to load Montage %s to check for existing asset."), *MontageData.Montage->GetName());
+             return;
+        }
+
+        // Construct the expected base asset name (before uniqueness suffix)
+        FString BaseAssetName = Montage->GetName() + "_AttackData";
+
+        // Construct the full package path where the asset *would* be saved
+        // Note: Assumes AssetSavePath does not start or end with '/'
+        FString ExpectedPackagePath = FString::Printf(TEXT("/Game/%s/%s"), *Settings->AssetSavePath.Path, *BaseAssetName);
+
+        // Check if a package (asset) already exists at that path
+        if (FPackageName::DoesPackageExist(ExpectedPackagePath))
+        {
+            return; // Asset exists, and we should not overwrite it.
+        }
     }
     
     // Initialize the recording session
-    InitializeRecordingSession(MontageData);
+    if (!InitializeRecordingSession(MontageData))
+    {
+        UE_LOG(LogTemp, Warning, TEXT("Failed to initialize recording session for Montage '%s'"), *MontageData.Montage->GetName());
+    }
 }
 
 TArray<FName> UWeaponAttackRecorderComponent::FindRelevantSockets(UMeshComponent* WeaponMesh) const
@@ -557,26 +590,7 @@ bool UWeaponAttackRecorderComponent::ValidateAssetSavePath() const
     return !Settings->AssetSavePath.Path.IsEmpty() && FPaths::DirectoryExists(FPaths::ProjectContentDir() + Settings->AssetSavePath.Path);
 }
 
-FString UWeaponAttackRecorderComponent::GenerateUniqueAssetName(const FString& BaseName) const
-{
-    FString UniqueName = BaseName;
-    int32 Suffix = 1;
-
-    while (true)
-    {
-        FString FullPath = Settings->AssetSavePath.Path / UniqueName;
-        if (!FPackageName::DoesPackageExist(FullPath))
-        {
-            break;
-        }
-        UniqueName = FString::Printf(TEXT("%s_%d"), *BaseName, Suffix);
-        Suffix++;
-    }
-
-    return UniqueName;
-}
-
-void UWeaponAttackRecorderComponent::UpdateMontageDataWithRecordedSequence(FMontageData& MontageData, UWeaponAttackData* AttackData)
+void UWeaponAttackRecorderComponent::UpdateMontageDataWithRecordedSequence(FAttackMontageData& MontageData, UWeaponAttackData* AttackData)
 {
     if (AttackData)
     {

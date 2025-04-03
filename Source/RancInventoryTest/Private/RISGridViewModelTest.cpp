@@ -10,14 +10,14 @@
 #include "Core/RISSubsystem.h"
 #include "Framework/DebugTestResult.h"
 
-#define TestName "GameTests.RIS.GridViewModel"
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRISGridViewModelTest, TestName, EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+#define TestNameGVM "GameTests.RIS.GridViewModel"
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRISGridViewModelTest, TestNameGVM, EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 class GridViewModelTestContext
 {
 public:
 	GridViewModelTestContext(float CarryCapacity, int32 NumSlots, bool PreferUniversalSlots)
-		: TestFixture(FName(*FString(TestName)))
+		: TestFixture(FName(*FString(TestNameGVM)))
 	{
 		URISSubsystem* Subsystem = TestFixture.GetSubsystem();
 		World = TestFixture.GetWorld();

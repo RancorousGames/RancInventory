@@ -83,12 +83,12 @@ void URISSubsystem::AllItemsLoadedCallback()
 			{
 				UItemStaticData* const CastedAsset = Cast<UItemStaticData>(Iterator);
 				AllLoadedItemsByTag.Add(CastedAsset->ItemId, CastedAsset);
+				LoadedItemsHeldRefs.Add(CastedAsset);
 			}
 		}
 
 		// fill AllItemIds
 		AllLoadedItemsByTag.GenerateKeyArray(AllItemIds);
-
 		AllItemsLoadedBroadcasted = true;
 		OnAllItemsLoaded.Broadcast();
 	}
@@ -250,6 +250,7 @@ void URISSubsystem::AllRecipesLoadedCallback()
 			{
 				UObjectRecipeData* const CastedAsset = Cast<UObjectRecipeData>(Iterator);
 				AllLoadedRecipes.Add(CastedAsset);
+				LoadedRecipesHeldRefs.Add(CastedAsset);
 			}
 		}
 

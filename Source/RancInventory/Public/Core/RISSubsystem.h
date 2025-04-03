@@ -115,4 +115,8 @@ private:
     static TMap<FGameplayTag, UItemStaticData*> AllLoadedItemsByTag;
     static TArray<FGameplayTag> AllItemIds;
     static TArray<UObjectRecipeData*> AllLoadedRecipes;
+
+    UPROPERTY()
+    TArray<UItemStaticData*> LoadedItemsHeldRefs;
+    TArray<UObjectRecipeData*> LoadedRecipesHeldRefs;
 };

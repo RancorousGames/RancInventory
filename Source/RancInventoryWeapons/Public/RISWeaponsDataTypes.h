@@ -19,14 +19,33 @@ enum class EHandCompatibility : uint8
     None
 };
 
-
 USTRUCT(BlueprintType)
-struct FMontageData
+struct FAttackMontageData2
 {
     GENERATED_BODY()
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ranc Inventory | Weapon")
-    TSoftObjectPtr<UAnimMontage> Montage = nullptr;
+    UAnimMontage* Montage = nullptr;
+
+};
+
+USTRUCT(BlueprintType)
+struct FAttackMontageData3
+{
+    GENERATED_BODY()
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ranc Inventory | Weapon")
+    TObjectPtr<UAnimMontage> Montage = nullptr;
+
+};
+
+USTRUCT(BlueprintType)
+struct FAttackMontageData
+{
+    GENERATED_BODY()
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ranc Inventory | Weapon")
+    UAnimMontage* Montage = nullptr;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ranc Inventory | Weapon")
     float PlayRate = 1.0f;
@@ -36,6 +55,24 @@ struct FMontageData
 
     bool IsValid() const
     {
-        return Montage.IsValid();
+        return Montage != nullptr;
+    }
+};
+
+USTRUCT(BlueprintType)
+struct FMontageData
+{
+    GENERATED_BODY()
+
+    // Note: Always loaded in memory, unlike attack montages
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ranc Inventory | Weapon")
+    TObjectPtr<UAnimMontage> Montage = nullptr;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ranc Inventory | Weapon")
+    float PlayRate = 1.0f;
+    
+    bool IsValid() const
+    {
+        return Montage != nullptr;
     }
 };

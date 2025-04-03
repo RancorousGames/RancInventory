@@ -16,7 +16,7 @@ public:
 	UPROPERTY(Replicated, BlueprintReadWrite, Meta = (DisplayName = "ItemInstance", ExposeOnSpawn = true), Category = "Item")
 	FItemBundleWithInstanceData RepresentedItem;
 	
-	UPROPERTY(BlueprintReadOnly, Meta = (DisplayName = "ItemData"), Category = "Item")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Meta = (DisplayName = "ItemData"), Category = "Item")
 	UItemStaticData* ItemData = nullptr;
 
 	UFUNCTION(BlueprintCallable, Category = "Item")
