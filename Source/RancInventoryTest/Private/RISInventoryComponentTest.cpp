@@ -187,6 +187,85 @@ public:
 		return Res;
 	}
 
+	bool TestRemoveAnyItemFromTaggedSlot()
+	{
+		InventoryComponentTestContext Context(100); // Sufficient capacity initially
+		auto* InventoryComponent = Context.InventoryComponent;
+		auto* Subsystem = Context.TestFixture.GetSubsystem();
+		InventoryComponent->MaxContainerSlotCount = 9; // Reset slots for clarity
+		FDebugTestResult Res = true;
+		UGlobalInventoryEventListener* Listener = NewObject<UGlobalInventoryEventListener>();
+		Listener->SubscribeToInventoryComponent(InventoryComponent);
+
+		// --- Test Case 1: Basic Move Success (Stackable Item) ---
+		InventoryComponent->Clear_IfServer();
+		Listener->Clear();
+		// Add 3 rocks to right hand
+		InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, RightHandSlot, ThreeRocks, true);
+		Res &= Test->TestTrue(TEXT("[RemoveAnyItem] Right hand should have 3 rocks before clear"),
+		                      InventoryComponent->GetItemForTaggedSlot(RightHandSlot).Quantity == 3);
+		Res &= Test->TestEqual(TEXT("[RemoveAnyItem] Generic inventory should be empty before clear"),
+		                       InventoryComponent->GetContainerOnlyItemQuantity(ItemIdRock), 0);
+
+		// Clear the slot
+		int32 MovedQuantity = InventoryComponent->RemoveAnyItemFromTaggedSlot_IfServer(RightHandSlot);
+		Res &= Test->TestEqual(TEXT("[RemoveAnyItem] Should return 3 as the moved quantity"), MovedQuantity, 3);
+		Res &= Test->TestFalse(TEXT("[RemoveAnyItem] Right hand slot should be empty after clear"),
+		                       InventoryComponent->GetItemForTaggedSlot(RightHandSlot).IsValid());
+		Res &= Test->TestEqual(TEXT("[RemoveAnyItem] Generic inventory should now have 3 rocks"),
+		                       InventoryComponent->GetContainerOnlyItemQuantity(ItemIdRock), 3);
+		// Verify events
+		Res &= Test->TestTrue(TEXT("[RemoveAnyItem] Remove event should fire"), Listener->bItemRemovedFromTaggedTriggered);
+		Res &= Test->TestTrue(TEXT("[RemoveAnyItem] Add event should fire"), Listener->bItemAddedTriggered);
+		Res &= Test->TestEqual(TEXT("[RemoveAnyItem] Correct removed quantity in event"), Listener->RemovedFromTaggedQuantity, 3);
+		Res &= Test->TestEqual(TEXT("[RemoveAnyItem] Correct added quantity in event"), Listener->AddedQuantity, 3);
+
+		// --- Test Case 2: Basic Move Success (Unstackable Item) ---
+		InventoryComponent->Clear_IfServer();
+		Listener->Clear();
+		InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, HelmetSlot, OneHelmet, true);
+		Res &= Test->TestTrue(TEXT("[RemoveAnyItem] Helmet slot should have helmet before clear"),
+		                      InventoryComponent->GetItemForTaggedSlot(HelmetSlot).IsValid());
+
+		MovedQuantity = InventoryComponent->RemoveAnyItemFromTaggedSlot_IfServer(HelmetSlot);
+		Res &= Test->TestEqual(TEXT("[RemoveAnyItem] Should return 1 for unstackable move"), MovedQuantity, 1);
+		Res &= Test->TestFalse(TEXT("[RemoveAnyItem] Helmet slot should be empty after clear"),
+		                       InventoryComponent->GetItemForTaggedSlot(HelmetSlot).IsValid());
+		Res &= Test->TestEqual(TEXT("[RemoveAnyItem] Generic inventory should now have 1 helmet"),
+		                       InventoryComponent->GetContainerOnlyItemQuantity(ItemIdHelmet), 1);
+		Res &= Test->TestTrue(TEXT("[RemoveAnyItem] Remove event should fire for helmet"), Listener->bItemRemovedFromTaggedTriggered);
+		Res &= Test->TestTrue(TEXT("[RemoveAnyItem] Add event should fire for helmet"), Listener->bItemAddedTriggered);
+
+		// --- Test Case 3: Failure - Clearing an Empty Slot ---
+		Listener->Clear();
+		MovedQuantity = InventoryComponent->RemoveAnyItemFromTaggedSlot_IfServer(LeftHandSlot); // Assuming empty
+		Res &= Test->TestEqual(TEXT("[RemoveAnyItem] Clearing an empty slot should return 0"), MovedQuantity, 0);
+		Res &= Test->TestFalse(TEXT("[RemoveAnyItem] No remove event should fire for empty slot"), Listener->bItemRemovedFromTaggedTriggered);
+		Res &= Test->TestFalse(TEXT("[RemoveAnyItem] No add event should fire for empty slot"), Listener->bItemAddedTriggered);
+
+        // --- Test Case 4: Success - Clearing a Blocked Slot (Item present) ---
+		// Moving *from* a blocked slot should succeed if the target (generic) is okay.
+		InventoryComponent->Clear_IfServer();
+		Listener->Clear();
+		InventoryComponent->MaxWeight = 100;
+		InventoryComponent->MaxContainerSlotCount = 9;
+        // Setup: Spear to RightHand (blocking LeftHand)
+        InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, RightHandSlot, OneSpear, true);
+		Res &= Test->TestTrue(TEXT("[RemoveAnyItem] Left hand should be blocked (with item)"), InventoryComponent->IsTaggedSlotBlocked(LeftHandSlot));
+
+        // Try to clear the blocked slot containing an item.
+		MovedQuantity = InventoryComponent->RemoveAnyItemFromTaggedSlot_IfServer(RightHandSlot);
+		Res &= Test->TestEqual(TEXT("[RemoveAnyItem] Clearing a blocked slot (with item) should succeed"), MovedQuantity, 1);
+        Res &= Test->TestFalse(TEXT("[RemoveAnyItem] Left hand slot should be empty after clearing blocked slot"), InventoryComponent->GetItemForTaggedSlot(LeftHandSlot).IsValid());
+        Res &= Test->TestFalse(TEXT("[RemoveAnyItem] Right hand slot should be empty after clearing blocked slot"), InventoryComponent->GetItemForTaggedSlot(RightHandSlot).IsValid());
+		// The slot itself remains marked as blocked because the Spear is still equipped
+		Res &= Test->TestEqual(TEXT("[RemoveAnyItem] Generic should have the spear after clearing blocked slot"), InventoryComponent->GetContainerOnlyItemQuantity(ItemIdSpear), 1);
+		Res &= Test->TestTrue(TEXT("[RemoveAnyItem] Remove event should fire for clearing blocked"), Listener->bItemRemovedFromTaggedTriggered);
+		Res &= Test->TestTrue(TEXT("[RemoveAnyItem] Add event should fire for clearing blocked"), Listener->bItemAddedTriggered);
+
+		return Res;
+	}
+	
 	bool TestMoveTaggedSlotItems()
 	{
 		InventoryComponentTestContext Context(100);
@@ -1491,6 +1570,7 @@ bool FRancInventoryComponentTest::RunTest(const FString& Parameters)
 	Res &= TestScenarios.TestAddItemToAnySlots();
 	Res &= TestScenarios.TestAddStackableItems();
 	Res &= TestScenarios.TestRemovingTaggedSlotItems();
+	Res &= TestScenarios.TestRemoveAnyItemFromTaggedSlot();
 	Res &= TestScenarios.TestMoveTaggedSlotItems();
 	Res &= TestScenarios.TestMoveOperationsWithSwapback();
 	Res &= TestScenarios.TestDroppingFromTaggedSlot();

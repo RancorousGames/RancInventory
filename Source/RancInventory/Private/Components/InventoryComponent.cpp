@@ -871,6 +871,57 @@ void UInventoryComponent::DropFromTaggedSlot_Server_Implementation(const FGamepl
 	SpawnItemIntoWorldFromContainer_ServerImpl(ItemId, QuantityToDrop, RelativeDropLocation, StateArrayToAppendTo);
 }
 
+int32 UInventoryComponent::RemoveAnyItemFromTaggedSlot_IfServer(FGameplayTag SlotTag)
+{
+	// Ensure execution on server or standalone
+	if (GetOwnerRole() < ROLE_Authority && GetOwnerRole() != ROLE_None)
+	{
+		UE_LOG(LogRISInventory, Warning, TEXT("ClearTaggedSlot_IfServer called on client for %s. Request ignored."), *SlotTag.ToString());
+		// In a real setup, you might queue an RPC request here instead of just returning 0.
+		return 0;
+	}
+
+	// Find the item in the specified slot
+	const FTaggedItemBundle& ItemInSlot = GetItemForTaggedSlot(SlotTag);
+
+	// If the slot is empty or the item is invalid, there's nothing to clear
+	if (!ItemInSlot.IsValid())
+	{
+		// UE_LOG(LogRISInventory, Verbose, TEXT("ClearTaggedSlot_IfServer: Slot %s is already empty or invalid."), *SlotTag.ToString());
+		return 0;
+	}
+
+	const FGameplayTag ItemIdToMove = ItemInSlot.ItemId;
+	const int32 QuantityToMove = ItemInSlot.Quantity;
+
+	// Use the existing MoveItem implementation to handle the logic.
+	// Source is the tagged slot, Target is the generic container (empty tag).
+	// We don't want automatic swapping.
+	int32 QuantityActuallyMoved = MoveItem_ServerImpl(
+		ItemIdToMove,
+		QuantityToMove,
+		SlotTag,          // Source Slot
+		FGameplayTag(),   // Target Slot (Empty = Generic Container)
+		false,            // AllowAutomaticSwapping = false
+		FGameplayTag(),   // SwapItemId (None)
+		0,                // SwapQuantity (None)
+		false,            // SuppressUpdate = false
+		false             // SimulateMoveOnly = false
+	);
+
+	if (QuantityActuallyMoved < QuantityToMove && QuantityActuallyMoved > 0)
+	{
+		UE_LOG(LogRISInventory, Log, TEXT("ClearTaggedSlot_IfServer: Partially cleared slot %s. Moved %d/%d of %s. Container likely full."),
+			*SlotTag.ToString(), QuantityActuallyMoved, QuantityToMove, *ItemIdToMove.ToString());
+	}
+	else if (QuantityActuallyMoved == 0 && QuantityToMove > 0)
+	{
+		UE_LOG(LogRISInventory, Warning, TEXT("ClearTaggedSlot_IfServer: Failed to clear slot %s containing %d of %s. Container likely full or move rejected."),
+			*SlotTag.ToString(), QuantityToMove, *ItemIdToMove.ToString());
+	}
+
+	return QuantityActuallyMoved;
+}
 
 int32 UInventoryComponent::UseItemFromTaggedSlot(const FGameplayTag& SlotTag)
 {

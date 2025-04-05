@@ -219,16 +219,19 @@ void UGearManagerComponent::AddAndSetSelectedWeapon_IfServer(const UItemStaticDa
 void UGearManagerComponent::RegisterSpawnedWeapon(AWeaponActor* WeaponActor)
 {
 	int32 HandSlotIndex = WeaponActor->HandSlotIndex;
-	if (GearSlots.IsValidIndex(HandSlotIndex))
+	if (!GearSlots.IsValidIndex(HandSlotIndex))
 	{
-		const FGearSlotDefinition* HandSlot = &GearSlots[HandSlotIndex];
-		// Use the pointer safely
+		UE_LOG(LogRISInventory, Error, TEXT("RegisterSpawnedWeapon() failed. HandSlotIndex is out of range."))
+		return;
 	}
 	
 	if (HandSlotIndex == MainHandSlotIndex)
 		MainhandSlotWeapon = WeaponActor;
 	else if (HandSlotIndex == OffhandSlotIndex)
 		OffhandSlotWeapon = WeaponActor;
+
+	if (WeaponActor->ItemData == DefaultUnarmedWeaponData)
+		UnarmedWeaponActor = WeaponActor;
 
 	WeaponActor->Equip_Server();
 
@@ -262,7 +265,7 @@ void UGearManagerComponent::RegisterSpawnedWeapon(AWeaponActor* WeaponActor)
 			PathsToLoad.Add(MontageData.RecordedTraceSequence.ToSoftObjectPath());
 		}
 	}
-
+	
 	// Get the Streamable Manager from the Asset Manager
 	FStreamableManager& Streamable = UAssetManager::GetStreamableManager();
 
@@ -437,15 +440,23 @@ void UGearManagerComponent::SelectActiveWeapon_Server_Implementation(int32 Weapo
 	{
 		HandSlotIndex = GetHandSlotIndexToUse(ItemData->GetItemDefinition<UWeaponDefinition>());
 	}
-
-	LinkedInventoryComponent->MoveItem(ItemData->ItemId, 1, FGameplayTag(), GearSlots[HandSlotIndex].SlotTag);
+	if (ItemData == DefaultUnarmedWeaponData)
+	{
+		// Clear mainhand and offhand which should cause unarmed to get equipped
+		LinkedInventoryComponent->RemoveAnyItemFromTaggedSlot_IfServer(GearSlots[OffhandSlotIndex].SlotTag);
+		LinkedInventoryComponent->RemoveAnyItemFromTaggedSlot_IfServer(GearSlots[MainHandSlotIndex].SlotTag);
+	}
+	else
+	{
+		LinkedInventoryComponent->MoveItem(ItemData->ItemId, 1, FGameplayTag(), GearSlots[HandSlotIndex].SlotTag);
+	}
 }
 
 void UGearManagerComponent::SelectUnarmed_Server_Implementation()
 {
-	if (DefaultUnarmedWeaponData)
+	if (IsValid(UnarmedWeaponActor))
 	{
-		AddAndSetSelectedWeapon_IfServer(DefaultUnarmedWeaponData);
+		RegisterSpawnedWeapon(UnarmedWeaponActor);
 	}
 }
 
@@ -509,7 +520,6 @@ void UGearManagerComponent::UnequipGear(FGameplayTag Slot, const UItemStaticData
 
         case EGearChangeStep::Apply:
         {
-            const UWeaponDefinition* WeaponData = Cast<UWeaponDefinition>(GearData);
             FGearSlotDefinition* GearSlot = FindGearSlotDefinition(Slot);
 
             if (AWeaponActor* WeaponToUnequip = GetWeaponForSlot(GearSlot))
@@ -520,18 +530,22 @@ void UGearManagerComponent::UnequipGear(FGameplayTag Slot, const UItemStaticData
                     OffhandSlotWeapon = nullptr;
 
                 WeaponToUnequip->Holster();
-                OnWeaponHolstered.Broadcast(Slot, WeaponToUnequip);
 
-            	WeaponToUnequip->Destroy();
-            	if (DefaultUnarmedWeaponData != nullptr &&                               // Ensure an unarmed weapon is defined
-				 WeaponToUnequip->ItemData != DefaultUnarmedWeaponData &&            // Ensure we didn't just unequip the unarmed weapon itself
-				 MainhandSlotWeapon == nullptr && OffhandSlotWeapon == nullptr)      // Check if both slots are now empty
+            	OnWeaponHolstered.Broadcast(Slot, WeaponToUnequip);
+            	
+            	if (WeaponToUnequip->ItemData != DefaultUnarmedWeaponData) // dont destroy unarmed and dont reequip it
             	{
-            		// We just removed the last regular weapon, revert to unarmed
-            		SelectUnarmed_Server();
+            		WeaponToUnequip->Destroy();
+            	
+            		if (DefaultUnarmedWeaponData != nullptr &&
+					 MainhandSlotWeapon == nullptr && OffhandSlotWeapon == nullptr)
+            		{
+            			// We just removed the last regular weapon, revert to unarmed
+            			SelectUnarmed_Server();
+            		}
             	}
-
-                OnEquippedWeaponsChange.Broadcast();
+            	
+            	OnEquippedWeaponsChange.Broadcast();
             }
             else
             {
