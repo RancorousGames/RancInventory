@@ -20,9 +20,7 @@ enum class EItemChangeReason : uint8
 {
     Added UMETA(DisplayName = "Added"),      
     Removed UMETA(DisplayName = "Removed"),  
-    Updated UMETA(DisplayName = "Updated"), 
-    Equipped UMETA(DisplayName = "Equipped"),
-    Unequipped UMETA(DisplayName = "Unequipped") ,
+    Updated UMETA(DisplayName = "Updated"),
     ForceDestroyed UMETA(DisplayName = "ForceDestroyed") ,
     Moved UMETA(DisplayName = "Moved"),
     Dropped UMETA(DisplayName = "Dropped"),

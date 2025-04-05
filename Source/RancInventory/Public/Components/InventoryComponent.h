@@ -94,6 +94,16 @@ public:
 	// Remove up to Quantity item from any tagged slot, will return the count that was removed, always allows partial removal
 	UFUNCTION(BlueprintCallable, Category = "RIS | Equipment")
 	int32 RemoveItemFromAnyTaggedSlots_IfServer(FGameplayTag ItemId, int32 QuantityToRemove, EItemChangeReason Reason, bool DestroyFromContainer = true);
+
+	/**
+	 * Attempts to clear a specific tagged slot by moving its contents to the generic inventory container.
+	 * This will only succeed if the generic container has enough space (weight/slots) to accept the item.
+	 * Does nothing if the slot is already empty. Only executes fully on the server.
+	 * @param SlotTag The tagged slot to clear.
+	 * @return The quantity of the item successfully moved out of the tagged slot and into the generic container. Returns 0 if the slot was empty or the move failed.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "RIS | Equipment")
+	int32 RemoveAnyItemFromTaggedSlot_IfServer(FGameplayTag SlotTag);
 	
 	/* Attempts to activate the item from the inventory, e.g. use a potion or active a magical item	 */
 	UFUNCTION(BlueprintCallable, Category = "RIS | Equipment")

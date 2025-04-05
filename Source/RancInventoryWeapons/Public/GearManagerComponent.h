@@ -268,12 +268,8 @@ public:
 	UPROPERTY()
 	FTimerHandle GearChangeCommitHandle;
 
-	UPROPERTY()
-	bool bIsInterrupted;
-
 	void ProcessNextGearChange();
 	void QueueGearChange(const FGearChangeTransaction& Transaction);
-	void HandleInterruption();
 	
 	UFUNCTION(BlueprintNativeEvent, Category = "Ranc Inventory Weapons", meta=(DisplayName="OnAttackTraceStateBeginEnd"))
 	void OnAttackTraceStateBeginEnd(bool Started);
@@ -350,11 +346,22 @@ public:
 	UFUNCTION(Reliable, Server, BlueprintCallable, Category = "Ranc Inventory Weapons|Gear")
 	void SelectUnarmed_Server();
 
+	/**
+	 * Interrupts any ongoing gear change process (equip/unequip).
+	 * Stops associated animations, cancels timers, and clears the pending change queue.
+	 * Useful when the character is hit, stunned, or performs another high-priority action.
+	 */
+	UFUNCTION(Reliable, Server, BlueprintCallable, Category = "Ranc Inventory Weapons|Gear")
+	void InterruptGearChange_Server(float DelayUntilNextGearChange = 0.5f, bool InterruptMontages = true);
+	
+	UFUNCTION(Reliable, NetMulticast, BlueprintCallable, Category = "Ranc Inventory Weapons|Gear")
+	void InterruptGearChange_Multicast(float DelayUntilNextGearChange, bool InterruptMontages);
+	
 	/*
 	 * If PlayEquipMontage is false then the swap will happen immediately
 	 * This is called internally by HandleItemAddedToSlot
 	 */ 
-	void EquipGear(FGameplayTag Slot, const UItemStaticData* NewItemData, FTaggedItemBundle PreviousItem, bool SkipAnim, EGearChangeStep Step);
+	void EquipGear(FGameplayTag Slot, const UItemStaticData* NewItemData, FTaggedItemBundle PreviousItem, EGearChangeStep Step);
 
 	FGearSlotDefinition* FindGearSlotDefinition(FGameplayTag SlotTag);
 	int32 FindGearSlotIndex(FGameplayTag SlotTag) const;
@@ -364,11 +371,12 @@ public:
 	* If PlayUnequipMontage is false then the swap will happen immediately
 	* This is called internally by HandleItemRemovedFromSlot
 	*/
-	void UnequipGear(FGameplayTag Slot, const UItemStaticData* ItemData, bool SkipAnim = false, EGearChangeStep Step = EGearChangeStep::Request);
+	void UnequipGear(FGameplayTag Slot, const UItemStaticData* ItemData, EGearChangeStep Step = EGearChangeStep::Request, bool SkipQueue = false);
 
+	/* If we are rotating to aim direction after an attack, this can be used to interrupt that rotation */
 	UFUNCTION(BlueprintCallable, Category = "Ranc Inventory Weapons|Gear")
-	void CancelGearChange();
-
+	void CancelRotateToAimDirection();
+	
 	/*
 	returns false if WeaponActor || Owner is a nullptr
 	Returns true if pointers are valid
@@ -413,7 +421,7 @@ protected:
 	
 	// Block below is used for rotating towards the attack direction
 	float RotateToAttackTargetYaw;
-	FTimerHandle TimerHandle_RotationUpdate;
+	bool bIsRotatingToAimRotation = false;
 	
 	FTimerHandle TimerHandle_EquipDelay;
 	

@@ -62,7 +62,7 @@ void UGearManagerComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
-	// ...
+	UpdateRotation();
 }
 
 
@@ -141,14 +141,14 @@ const UWeaponDefinition* UGearManagerComponent::GetOffhandWeaponData()
 
 void UGearManagerComponent::HandleItemAddedToSlot(const FGameplayTag& SlotTag, const UItemStaticData* Data, int32 Quantity, FTaggedItemBundle PreviousItem, EItemChangeReason Reason)
 {
-	EquipGear(SlotTag, Data, PreviousItem, false, EGearChangeStep::Request);
+	EquipGear(SlotTag, Data, PreviousItem, EGearChangeStep::Request);
 }
 
 void UGearManagerComponent::HandleItemRemovedFromSlot(const FGameplayTag& SlotTag, const UItemStaticData* Data, int32 Quantity, EItemChangeReason Reason)
 {
 	if (LinkedInventoryComponent->GetItemForTaggedSlot(SlotTag).ItemId != Data->ItemId)
 	{
-		UnequipGear(SlotTag, Data, false);
+		UnequipGear(SlotTag, Data, Reason == EItemChangeReason::Moved ? EGearChangeStep::Request : EGearChangeStep::Apply);
 	}
 }
 
@@ -219,16 +219,19 @@ void UGearManagerComponent::AddAndSetSelectedWeapon_IfServer(const UItemStaticDa
 void UGearManagerComponent::RegisterSpawnedWeapon(AWeaponActor* WeaponActor)
 {
 	int32 HandSlotIndex = WeaponActor->HandSlotIndex;
-	if (GearSlots.IsValidIndex(HandSlotIndex))
+	if (!GearSlots.IsValidIndex(HandSlotIndex))
 	{
-		const FGearSlotDefinition* HandSlot = &GearSlots[HandSlotIndex];
-		// Use the pointer safely
+		UE_LOG(LogRISInventory, Error, TEXT("RegisterSpawnedWeapon() failed. HandSlotIndex is out of range."))
+		return;
 	}
 	
 	if (HandSlotIndex == MainHandSlotIndex)
 		MainhandSlotWeapon = WeaponActor;
 	else if (HandSlotIndex == OffhandSlotIndex)
 		OffhandSlotWeapon = WeaponActor;
+
+	if (WeaponActor->ItemData == DefaultUnarmedWeaponData)
+		UnarmedWeaponActor = WeaponActor;
 
 	WeaponActor->Equip_Server();
 
@@ -262,7 +265,7 @@ void UGearManagerComponent::RegisterSpawnedWeapon(AWeaponActor* WeaponActor)
 			PathsToLoad.Add(MontageData.RecordedTraceSequence.ToSoftObjectPath());
 		}
 	}
-
+	
 	// Get the Streamable Manager from the Asset Manager
 	FStreamableManager& Streamable = UAssetManager::GetStreamableManager();
 
@@ -437,15 +440,23 @@ void UGearManagerComponent::SelectActiveWeapon_Server_Implementation(int32 Weapo
 	{
 		HandSlotIndex = GetHandSlotIndexToUse(ItemData->GetItemDefinition<UWeaponDefinition>());
 	}
-
-	LinkedInventoryComponent->MoveItem(ItemData->ItemId, 1, FGameplayTag(), GearSlots[HandSlotIndex].SlotTag);
+	if (ItemData == DefaultUnarmedWeaponData)
+	{
+		// Clear mainhand and offhand which should cause unarmed to get equipped
+		LinkedInventoryComponent->RemoveAnyItemFromTaggedSlot_IfServer(GearSlots[OffhandSlotIndex].SlotTag);
+		LinkedInventoryComponent->RemoveAnyItemFromTaggedSlot_IfServer(GearSlots[MainHandSlotIndex].SlotTag);
+	}
+	else
+	{
+		LinkedInventoryComponent->MoveItem(ItemData->ItemId, 1, FGameplayTag(), GearSlots[HandSlotIndex].SlotTag);
+	}
 }
 
 void UGearManagerComponent::SelectUnarmed_Server_Implementation()
 {
-	if (DefaultUnarmedWeaponData)
+	if (IsValid(UnarmedWeaponActor))
 	{
-		AddAndSetSelectedWeapon_IfServer(DefaultUnarmedWeaponData);
+		RegisterSpawnedWeapon(UnarmedWeaponActor);
 	}
 }
 
@@ -457,10 +468,9 @@ void UGearManagerComponent::OnGearChangeAnimNotify(FName NotifyName, const FBran
 	}
 }
 
-
-void UGearManagerComponent::CancelGearChange()
+void UGearManagerComponent::CancelRotateToAimDirection()
 {
-	HandleInterruption();
+	bIsRotatingToAimRotation = false;
 }
 
 FGearSlotDefinition* UGearManagerComponent::FindGearSlotDefinition(FGameplayTag SlotTag)
@@ -480,23 +490,32 @@ int32 UGearManagerComponent::FindGearSlotIndex(FGameplayTag SlotTag) const
 	return -1;
 }
 
-void UGearManagerComponent::UnequipGear(FGameplayTag Slot, const UItemStaticData* ItemData, bool SkipAnim, EGearChangeStep Step)
+void UGearManagerComponent::UnequipGear(FGameplayTag Slot, const UItemStaticData* ItemData, EGearChangeStep Step, bool SkipQueue)
 {
-    UGearDefinition* GearData = ItemData->GetItemDefinition<UWeaponDefinition>();
+    // Basic validation (keeping this minimal)
+    if (!ItemData || !Owner)
+    {
+        UE_LOG(LogRISInventory, Error, TEXT("UnequipGear: Invalid input (ItemData or Owner is null). Slot: %s"), *Slot.ToString());
+        return;
+    }
+
+    UGearDefinition* GearData = ItemData->GetItemDefinition<UWeaponDefinition>(); // Using UWeaponDefinition as in original
+
+    if (!SkipQueue)
+    {
+        // The Request step initiates the queuing process.
+        FGearChangeTransaction Transaction;
+        Transaction.ChangeType = EPendingGearChangeType::Unequip;
+        // Determine the step where the queued transaction should actually start processing.
+        Transaction.NextStep = Step > EGearChangeStep::Request ? Step : EGearChangeStep::PlayAnim;
+        Transaction.Slot = Slot;
+        Transaction.OldItemData = ItemData;
+        QueueGearChange(Transaction);
+    	return;
+    }
 
     switch (Step)
     {
-        case EGearChangeStep::Request:
-        {
-            FGearChangeTransaction Transaction;
-            Transaction.ChangeType = EPendingGearChangeType::Unequip;
-            Transaction.NextStep = SkipAnim ? EGearChangeStep::Apply : EGearChangeStep::PlayAnim;
-            Transaction.Slot = Slot;
-            Transaction.OldItemData = ItemData;
-            QueueGearChange(Transaction);
-            break;
-        }
-
         case EGearChangeStep::PlayAnim:
         {
             auto animDefinition = GetUnequipMontage(GearData);
@@ -509,7 +528,6 @@ void UGearManagerComponent::UnequipGear(FGameplayTag Slot, const UItemStaticData
 
         case EGearChangeStep::Apply:
         {
-            const UWeaponDefinition* WeaponData = Cast<UWeaponDefinition>(GearData);
             FGearSlotDefinition* GearSlot = FindGearSlotDefinition(Slot);
 
             if (AWeaponActor* WeaponToUnequip = GetWeaponForSlot(GearSlot))
@@ -520,16 +538,21 @@ void UGearManagerComponent::UnequipGear(FGameplayTag Slot, const UItemStaticData
                     OffhandSlotWeapon = nullptr;
 
                 WeaponToUnequip->Holster();
+
                 OnWeaponHolstered.Broadcast(Slot, WeaponToUnequip);
 
-            	WeaponToUnequip->Destroy();
-            	if (DefaultUnarmedWeaponData != nullptr &&                               // Ensure an unarmed weapon is defined
-				 WeaponToUnequip->ItemData != DefaultUnarmedWeaponData &&            // Ensure we didn't just unequip the unarmed weapon itself
-				 MainhandSlotWeapon == nullptr && OffhandSlotWeapon == nullptr)      // Check if both slots are now empty
-            	{
-            		// We just removed the last regular weapon, revert to unarmed
-            		SelectUnarmed_Server();
-            	}
+                if (WeaponToUnequip->ItemData != DefaultUnarmedWeaponData) 
+                {
+                   WeaponToUnequip->Destroy();
+
+                   // Original logic for reverting to unarmed
+                   if (DefaultUnarmedWeaponData != nullptr &&
+                       MainhandSlotWeapon == nullptr && OffhandSlotWeapon == nullptr)
+                   {
+                      // We just removed the last regular weapon, revert to unarmed
+                      SelectUnarmed_Server();
+                   }
+                }
 
                 OnEquippedWeaponsChange.Broadcast();
             }
@@ -541,17 +564,57 @@ void UGearManagerComponent::UnequipGear(FGameplayTag Slot, const UItemStaticData
                     GearSlot->MeshComponent->SetStaticMesh(nullptr);
                 }
             }
+
             break;
         }
 
         default:
-            UE_LOG(LogRISInventory, Error, TEXT("Invalid GearChangeStep."));
+            UE_LOG(LogRISInventory, Error, TEXT("UnequipGear (SkipQueue=true): Invalid GearChangeStep %d."), static_cast<int32>(Step));
             break;
     }
 }
 
 
-void UGearManagerComponent::EquipGear(FGameplayTag Slot, const UItemStaticData* NewItemData, FTaggedItemBundle PreviousItem, bool SkipAnim, EGearChangeStep Step)
+void UGearManagerComponent::InterruptGearChange_Server_Implementation(float DelayUntilNextGearChange, bool InterruptMontages)
+{
+	InterruptGearChange_Multicast(DelayUntilNextGearChange, InterruptMontages);
+}
+
+void UGearManagerComponent::InterruptGearChange_Multicast_Implementation(float DelayUntilNextGearChange, bool InterruptMontages)
+{
+	if (!bHasActiveTransaction && PendingGearChanges.IsEmpty())
+	{
+		return;
+	}
+	
+	FGearChangeTransaction& NextAction = PendingGearChanges[0];
+
+	if (NextAction.NextStep == EGearChangeStep::Apply) // If we are waiting for an animation to finish
+	{
+		if (Owner && InterruptMontages)
+		{
+			UAnimInstance* AnimInstance = Owner->GetMesh() ? Owner->GetMesh()->GetAnimInstance() : nullptr;
+			if (AnimInstance && AnimInstance->IsAnyMontagePlaying()) {
+				// Check if the active montage is one of our equip/unequip montages if needed,
+				// otherwise just stop:
+				AnimInstance->Montage_Stop(0.1f); // Short blend out
+			}
+		}
+
+		// Cancel GearChangeCommitHandle
+		if (GetWorld()->GetTimerManager().IsTimerActive(GearChangeCommitHandle))
+		{
+			GetWorld()->GetTimerManager().ClearTimer(GearChangeCommitHandle);
+		}
+		
+		if (DelayUntilNextGearChange <= 0)
+			ProcessNextGearChange();
+		else
+			GetWorld()->GetTimerManager().SetTimer(GearChangeCommitHandle, this, &UGearManagerComponent::ProcessNextGearChange, DelayUntilNextGearChange, false);
+	}
+}
+
+void UGearManagerComponent::EquipGear(FGameplayTag Slot, const UItemStaticData* NewItemData, FTaggedItemBundle PreviousItem, EGearChangeStep Step)
 {
     if (!NewItemData)
     {
@@ -575,7 +638,7 @@ void UGearManagerComponent::EquipGear(FGameplayTag Slot, const UItemStaticData* 
         {
             FGearChangeTransaction Transaction;
             Transaction.ChangeType = EPendingGearChangeType::Equip;
-            Transaction.NextStep = SkipAnim ? EGearChangeStep::Apply : EGearChangeStep::PlayAnim;
+            Transaction.NextStep = EGearChangeStep::PlayAnim;
             Transaction.Slot = Slot;
             Transaction.NewItemData = NewItemData;
             QueueGearChange(Transaction);
@@ -597,7 +660,7 @@ void UGearManagerComponent::EquipGear(FGameplayTag Slot, const UItemStaticData* 
         	// If the active weapon is unarmed then unequip it
         	if (GetActiveWeapon() == UnarmedWeaponActor)
 			{
-				UnequipGear(GearSlots[MainHandSlotIndex].SlotTag, DefaultUnarmedWeaponData, true, EGearChangeStep::Apply);
+				UnequipGear(GearSlots[MainHandSlotIndex].SlotTag, DefaultUnarmedWeaponData, EGearChangeStep::Apply, true);
 			}
         		
 	        if (UWeaponDefinition* WeaponData = NewItemData->GetItemDefinition<UWeaponDefinition>())
@@ -745,9 +808,7 @@ void UGearManagerComponent::RotateToAimLocation(FVector AimLocation)
 	if (bRotateToAttackDirection && !AimLocation.IsZero())
 	{
 		RotateToAttackTargetYaw = FRotationMatrix::MakeFromX(AimLocation - Owner->GetActorLocation()).Rotator().Yaw;
-
-		// Start rotation immediately on the next tick
-		GetWorld()->GetTimerManager().SetTimer(TimerHandle_RotationUpdate, this, &UGearManagerComponent::UpdateRotation, GetWorld()->GetDeltaSeconds(), true);
+		bIsRotatingToAimRotation = true; // Read on tick
 	}
 }
 
@@ -801,11 +862,11 @@ void UGearManagerComponent::ProcessNextGearChange()
 	switch (ActiveGearChange->ChangeType)
 	{
 	case EPendingGearChangeType::Equip:
-		EquipGear(ActiveGearChange->Slot, ActiveGearChange->NewItemData, FTaggedItemBundle(), false, ActiveGearChange->NextStep);
+		EquipGear(ActiveGearChange->Slot, ActiveGearChange->NewItemData, FTaggedItemBundle(), ActiveGearChange->NextStep);
 		ChangeDelay = ActiveGearChange->NextStep == EGearChangeStep::PlayAnim ? EquipDelay : 0.0f;
 		break;
 	case EPendingGearChangeType::Unequip:
-		UnequipGear(ActiveGearChange->Slot, ActiveGearChange->OldItemData, false, ActiveGearChange->NextStep);
+		UnequipGear(ActiveGearChange->Slot, ActiveGearChange->OldItemData, ActiveGearChange->NextStep, true);
 		ChangeDelay = ActiveGearChange->NextStep == EGearChangeStep::PlayAnim ? UnequipDelay : 0.0f;
 		break;
 	default:
@@ -836,23 +897,6 @@ void UGearManagerComponent::ProcessNextGearChange()
 		ProcessNextGearChange();
 	}
 	
-}
-
-void UGearManagerComponent::HandleInterruption()
-{
-    // Cancel timer
-    if (GearChangeCommitHandle.IsValid())
-    {
-        GetWorld()->GetTimerManager().ClearTimer(GearChangeCommitHandle);
-    }
-    
-    bIsInterrupted = true;
-    
-    // Reset state
-    bHasActiveTransaction = false;
-    
-    // Clear transaction queue if needed
-    PendingGearChanges.Empty();
 }
 
 void UGearManagerComponent::OnAttackTraceStateBeginEnd_Implementation(bool Started)
@@ -910,9 +954,8 @@ void UGearManagerComponent::Attack_Multicast_Implementation(FVector AimLocation,
 
 void UGearManagerComponent::UpdateRotation()
 {
-	if (!Owner)
+	if (!Owner || !bIsRotatingToAimRotation)
 	{
-		GetWorld()->GetTimerManager().ClearTimer(TimerHandle_RotationUpdate);
 		return;
 	}
 
@@ -936,7 +979,7 @@ void UGearManagerComponent::UpdateRotation()
 	// Check if the target yaw has been reached within a small error margin
 	if (NewQuat.Equals(TargetQuat, 0.01f))
 	{
-		GetWorld()->GetTimerManager().ClearTimer(TimerHandle_RotationUpdate);
+		bIsRotatingToAimRotation = false;
 	}
 }
 

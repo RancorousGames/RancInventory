@@ -86,7 +86,7 @@ public:
 	UFUNCTION(NetMulticast, Reliable)
 	void Equip_Multicast();
 	
-	UFUNCTION(BlueprintInternalUseOnly, BlueprintNativeEvent, Category = "Ranc Inventory | Weapon")
+	UFUNCTION(BlueprintNativeEvent, Category = "Ranc Inventory | Weapon")
 	void Equip_Impl();
 	
 

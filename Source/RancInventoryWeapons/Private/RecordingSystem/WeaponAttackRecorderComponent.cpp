@@ -77,7 +77,6 @@ void UWeaponAttackRecorderComponent::Initialize()
 
 bool UWeaponAttackRecorderComponent::InitializeRecordingSession(FAttackMontageData MontageData)
 {
-    UE_LOG(LogTemp, Warning, TEXT("Initializing recording session"));
     CurrentSession = FRecordingSession();
     CurrentSession.MontageData = MontageData;
 
@@ -87,6 +86,22 @@ bool UWeaponAttackRecorderComponent::InitializeRecordingSession(FAttackMontageDa
         return false;
     }
   
+    if (auto* WeaponDef = OwningWeapon->ItemData->GetItemDefinition<UWeaponDefinition>())
+    {
+        bool Found = false;
+        for (auto& AttackMon : WeaponDef->AttackMontages)
+        {
+            if (AttackMon.Montage == MontageData.Montage)
+            {
+                Found = true;
+            }
+        }
+
+        if (!Found) return false;
+    }
+    
+    UE_LOG(LogTemp, Warning, TEXT("Initializing recording session"));
+    
     // Get the weapon mesh
     OwningWeaponMesh = OwningWeapon->GetStaticMeshComponent();
 
