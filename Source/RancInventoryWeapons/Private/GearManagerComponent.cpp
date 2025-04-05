@@ -164,8 +164,6 @@ bool UGearManagerComponent::CanAttack_Implementation(FVector AimLocation, bool F
 
 	if (GetWorld()->GetTimeSeconds() - LastAttackTime > WeaponCooldown)
 	{
-		LastAttackTime = GetWorld()->GetTimeSeconds();
-
 		if (WeaponActor->CanAttack())
 		{
 			return true;
@@ -524,12 +522,14 @@ void UGearManagerComponent::UnequipGear(FGameplayTag Slot, const UItemStaticData
                 WeaponToUnequip->Holster();
                 OnWeaponHolstered.Broadcast(Slot, WeaponToUnequip);
 
-                WeaponToUnequip->Destroy();
-                if ((!DefaultUnarmedWeaponData || WeaponToUnequip->ItemData != DefaultUnarmedWeaponData) &&
-                	!MainhandSlotWeapon && !OffhandSlotWeapon && UnarmedWeaponActor)
-                {
-                    SelectUnarmed_Server();
-                }
+            	WeaponToUnequip->Destroy();
+            	if (DefaultUnarmedWeaponData != nullptr &&                               // Ensure an unarmed weapon is defined
+				 WeaponToUnequip->ItemData != DefaultUnarmedWeaponData &&            // Ensure we didn't just unequip the unarmed weapon itself
+				 MainhandSlotWeapon == nullptr && OffhandSlotWeapon == nullptr)      // Check if both slots are now empty
+            	{
+            		// We just removed the last regular weapon, revert to unarmed
+            		SelectUnarmed_Server();
+            	}
 
                 OnEquippedWeaponsChange.Broadcast();
             }
@@ -857,7 +857,7 @@ void UGearManagerComponent::HandleInterruption()
 
 void UGearManagerComponent::OnAttackTraceStateBeginEnd_Implementation(bool Started)
 {
-	if (!IsRunningDedicatedServer() && IsValid(ReplayedAttackData))
+	if (Started && !IsRunningDedicatedServer() && IsValid(ReplayedAttackData))
 		SendAttackTraceAimRPC_Client();
 }
 
@@ -897,11 +897,13 @@ void UGearManagerComponent::Attack_Multicast_Implementation(FVector AimLocation,
 	FAttackMontageData AttackMontage = WeaponActor->GetAttackMontage(MontageId);
 	OnAttackPerformed.Broadcast(AttackMontage);
 
+	LastAttackTime = GetWorld()->GetTimeSeconds();
+	
 	if (auto* RecordedAttack = AttackMontage.RecordedTraceSequence.Get())
 	{
 		PlayRecordedAttackSequence(RecordedAttack);
 	}
-
+	
 	PlayMontage(Owner, AttackMontage.Montage, AttackMontage.PlayRate, FName(""));
 }
 
@@ -983,7 +985,7 @@ void UGearManagerComponent::SetAimInformationRPC_Server_Implementation(FAttackAi
 	
 	ReceivedReplayAttackAimParams = AimParams;
 
-	if (FinalAimUpdate)
+	if (FinalAimUpdate && ReplayedAttackData)
 	{
 		if ((GetWorld()->GetTimeSeconds() - AttackStartTime) > ReplayedAttackData->FirstTraceDelay + 0.4f)
 		{

@@ -113,9 +113,8 @@ bool UWeaponAttackRecorderComponent::InitializeRecordingSession(FAttackMontageDa
     CurrentSession.CurrentIndex = 0;
     CurrentSession.PivotTransform = OwningCharacter->GetActorTransform(); // Get actors transform
     
-    FTransform PivotOffsetTransform;
-    PivotOffsetTransform.SetRotation(FQuat(OwningCharacter->GetActorRotation()));
-    CurrentSession.PivotTransform.AddToTranslation(PivotOffsetTransform.TransformPosition(OwningGearManager->ReplayAttackPivotLocationOffset));
+    CurrentSession.PivotOffsetTransform.SetRotation(FQuat(OwningCharacter->GetActorRotation()));
+    CurrentSession.PivotTransform.AddToTranslation(CurrentSession.PivotOffsetTransform.TransformPosition(OwningGearManager->ReplayAttackPivotLocationOffset));
     auto AimParams = OwningGearManager->GetAttackTraceAimParams();
 
     FQuat YawQuat = FQuat(FRotator(0.f, AimParams.AimYaw, 0.f));
@@ -266,6 +265,8 @@ void UWeaponAttackRecorderComponent::RecordAttackData(float DeltaTime)
     FWeaponAttackTimestamp Timestamp;
     Timestamp.Timestamp = CurrentSession.CurrentTime;
     Timestamp.OriginalIndex = CurrentSession.CurrentIndex;
+    
+    CurrentSession.PivotTransform.SetLocation(OwningCharacter->GetActorLocation() + CurrentSession.PivotOffsetTransform.TransformPosition(OwningGearManager->ReplayAttackPivotLocationOffset));
     
     // Record traces for each relevant socket
     for (const FName& SocketName : CurrentSession.RelevantSockets)

@@ -27,6 +27,7 @@ struct FRecordingSession
     float IntervalBetweenRecordings;
     float CurrentTime;
     FTransform PivotTransform;
+    FTransform PivotOffsetTransform;
     int32 CurrentIndex;
     UPROPERTY()
     UWeaponAttackData* AttackData;
