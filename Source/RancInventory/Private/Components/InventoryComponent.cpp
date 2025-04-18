@@ -19,6 +19,8 @@
 
 UInventoryComponent::UInventoryComponent(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
+    PrimaryComponentTick.bCanEverTick = false;
+	bReplicateUsingRegisteredSubObjectList = true;
 }
 
 void UInventoryComponent::InitializeComponent()
@@ -80,6 +82,7 @@ void UInventoryComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& 
 	DOREPLIFETIME_WITH_PARAMS_FAST(UInventoryComponent, TaggedSlotItemInstances, SharedParams);
 
 	DOREPLIFETIME(UInventoryComponent, AllUnlockedRecipes);
+	DOREPLIFETIME(UInventoryComponent, MyTestItemInstanceData);
 }
 
 int32 UInventoryComponent::ExtractItemImpl_IfServer(const FGameplayTag& ItemId, int32 Quantity,
@@ -1123,6 +1126,22 @@ void UInventoryComponent::DetectAndPublishContainerChanges()
 	{
 		TaggedItemsCache.Remove(Key);
 	}*/
+}
+
+void UInventoryComponent::SetMyTestItemInstanceData_Server_Implementation(bool Clear)
+{
+	
+		if (!Clear)
+		{
+			// Spawn using RF_Public 
+			MyTestItemInstanceData = NewObject<UTestItemInstanceData>(this);/*, UTestItemInstanceData::StaticClass(),	NAME_None, RF_Public);*/
+			AddReplicatedSubObject(MyTestItemInstanceData);
+		}
+		else
+		{
+			MyTestItemInstanceData = nullptr;
+		}
+	
 }
 
 bool UInventoryComponent::IsTaggedSlotCompatible(const FGameplayTag& ItemId, const FGameplayTag& SlotTag) const

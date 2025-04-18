@@ -7,6 +7,7 @@
 #include "Components/InventoryComponent.h"
 #include "Data/RecipeData.h"
 #include "Framework/DebugTestResult.h"
+#include "MockClasses/ItemHoldingCharacter.h"
 
 #define TestName "GameTests.RIS.RancInventoryComponent"
 
@@ -20,7 +21,7 @@ public:
 		: TestFixture(FName(*FString(TestName)))
 	{
 		URISSubsystem* Subsystem = TestFixture.GetSubsystem();
-		TempActor = TestFixture.GetWorld()->SpawnActor<AActor>();
+		TempActor = TestFixture.GetWorld()->SpawnActor<AItemHoldingCharacter>();
 		InventoryComponent = NewObject<UInventoryComponent>(TempActor);
 		TempActor->AddInstanceComponent(InventoryComponent);
 		InventoryComponent->UniversalTaggedSlots.Add(FUniversalTaggedSlot(LeftHandSlot));
@@ -1556,10 +1557,63 @@ public:
 
 	    return Res;
 	}
+	
+	bool TestIndirectOperations()
+	{
+		InventoryComponentTestContext Context(99);
+		auto* InventoryComponent = Context.InventoryComponent;
+		auto* Subsystem = Context.TestFixture.GetSubsystem();
+		InventoryComponent->MaxContainerSlotCount = 9;
+		FDebugTestResult Res = true;
+
+		// Add a variety of items to tagged slots
+		InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, LeftHandSlot, OneRock, true);
+		InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, RightHandSlot, ItemIdBrittleCopperKnife, 1, true);
+		InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, HelmetSlot, OneHelmet, true);
+		InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, ChestSlot, OneChestArmor, true);
+
+		// Destroy from generic inventory (which contains duplicates) and verify they are removed from tagged as well
+		InventoryComponent->DestroyItem_IfServer(OneRock, EItemChangeReason::ForceDestroyed);
+		Res &= Test->TestFalse(TEXT("Left hand slot should not contain a rock"), InventoryComponent->GetItemForTaggedSlot(LeftHandSlot).IsValid());
+		Res &= Test->TestTrue(TEXT("Generic inventory should not contain a rock"), InventoryComponent->GetContainerOnlyItemQuantity(ItemIdRock) == 0);
+
+		// Repeat for other items
+		InventoryComponent->DestroyItem_IfServer(ItemIdBrittleCopperKnife, 1, EItemChangeReason::ForceDestroyed);
+		Res &= Test->TestFalse(TEXT("Right hand slot should not contain a knife"), InventoryComponent->GetItemForTaggedSlot(RightHandSlot).IsValid());
+		Res &= Test->TestTrue(TEXT("Generic inventory should not contain a knife"), InventoryComponent->GetContainerOnlyItemQuantity(ItemIdBrittleCopperKnife) == 0);
+
+		InventoryComponent->DestroyItem_IfServer(OneHelmet, EItemChangeReason::ForceDestroyed);
+		Res &= Test->TestFalse(TEXT("Helmet slot should be empty after helmet destroy"), InventoryComponent->GetItemForTaggedSlot(HelmetSlot).IsValid());
+		Res &= Test->TestTrue(TEXT("Generic inventory should not contain a helmet"), InventoryComponent->GetContainerOnlyItemQuantity(ItemIdHelmet) == 0);
+
+		InventoryComponent->DestroyItem_IfServer(OneChestArmor, EItemChangeReason::ForceDestroyed);
+		Res &= Test->TestFalse(TEXT("Chest slot should be empty after armor destroy"), InventoryComponent->GetItemForTaggedSlot(ChestSlot).IsValid());
+		Res &= Test->TestTrue(TEXT("Generic inventory should not contain chest armor"), InventoryComponent->GetContainerOnlyItemQuantity(ItemIdChestArmor) == 0);
+
+		// Now try more complex cases
+		InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, LeftHandSlot, ItemIdRock, 3);
+		InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, RightHandSlot, ItemIdRock, 5);
+
+		InventoryComponent->DestroyItem_IfServer(OneRock, EItemChangeReason::ForceDestroyed);
+		int32 AmountContainedInBothHands = InventoryComponent->GetItemForTaggedSlot(LeftHandSlot).Quantity + InventoryComponent->GetItemForTaggedSlot(RightHandSlot).Quantity;
+		Res &= Test->TestEqual(TEXT("The hands should now contain combined 7 rocks"), AmountContainedInBothHands, 7);
+		Res &= Test->TestTrue(TEXT("Left hand should contain at least 2 rocks"), InventoryComponent->GetItemForTaggedSlot(LeftHandSlot).Quantity >= 2);
+		Res &= Test->TestTrue(TEXT("Right hand should contain at least 4 rocks"), InventoryComponent->GetItemForTaggedSlot(RightHandSlot).Quantity >= 4);
+
+		// Clear
+		InventoryComponent->Clear_IfServer();
+		
+		InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, RightHandSlot, OneHelmet, true);
+		InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, HelmetSlot, OneHelmet, true);
+
+		InventoryComponent->DestroyItem_IfServer(OneHelmet, EItemChangeReason::ForceDestroyed);
+		// Verify we emptied righth or helmet slot. Ideally we should have emptied the hand slot before the specialized helmet slot but this is fine for now
+		Res &= Test->TestTrue(TEXT("Right hand or helmet slot should be empty after helmet destroy"), !InventoryComponent->GetItemForTaggedSlot(RightHandSlot).IsValid() || !InventoryComponent->GetItemForTaggedSlot(HelmetSlot).IsValid());
+		Res &= Test->TestTrue(TEXT("Right hand or helmet slot should contain a helmet"), InventoryComponent->GetItemForTaggedSlot(HelmetSlot).ItemId.MatchesTag(ItemIdHelmet) || InventoryComponent->GetItemForTaggedSlot(RightHandSlot).ItemId.MatchesTag(ItemIdHelmet));
+		
+		return Res;
+	}
 };
-
-
-
 
 bool FRancInventoryComponentTest::RunTest(const FString& Parameters)
 {
@@ -1581,6 +1635,7 @@ bool FRancInventoryComponentTest::RunTest(const FString& Parameters)
 	Res &= TestScenarios.TestBlockingSlots();
 	Res &= TestScenarios.TestReceivableQuantity();
 	Res &= TestScenarios.TestEventBroadcasting();
+	Res &= TestScenarios.TestIndirectOperations();
 
 	return Res;
 }

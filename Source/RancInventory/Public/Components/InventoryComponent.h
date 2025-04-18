@@ -322,6 +322,14 @@ protected:
 	//// Client Prediction and Rollback ////
 	
 	TMap<FGameplayTag, FItemBundle> CachedTaggedSlotItems;
+
+
+	UFUNCTION(BlueprintCallable, Server, Reliable, Category = "RIS | Equipment")
+	void SetMyTestItemInstanceData_Server(bool Clear);
+	
+	UPROPERTY(Replicated, BlueprintReadWrite, EditAnywhere)
+	UTestItemInstanceData* MyTestItemInstanceData;
+
 	
 private:
 	UPROPERTY()

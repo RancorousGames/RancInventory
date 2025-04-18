@@ -129,25 +129,61 @@ struct FItemBundleWithInstanceData
     
     bool IsValid() const;
 
-    void DestroyQuantity(int32 Quantity);
+    void DestroyQuantity(int32 Quantity, AActor* Owner);
     
-    int32 ExtractQuantity(int32 InQuantity, TArray<UItemInstanceData*>& StateArrayToAppendTo);
+    int32 ExtractQuantity(int32 InQuantity, TArray<UItemInstanceData*>& StateArrayToAppendTo, AActor* Owner);
 
     FItemBundleWithInstanceData(){}
-    FItemBundleWithInstanceData(FItemBundle InItemInfo, const TArray<UItemInstanceData*>& InstanceData = TArray<UItemInstanceData*>())
+
+	FItemBundleWithInstanceData(FGameplayTag InItemId)
+    {
+    	ItemId = InItemId;
+    	Quantity = 0;
+    	InstanceData = TArray<UItemInstanceData*>();
+    }
+	
+    FItemBundleWithInstanceData(FItemBundle InItemInfo, const TArray<UItemInstanceData*>& InstanceData)
     {
         ItemId = InItemInfo.ItemId;
     	Quantity = InItemInfo.Quantity;
         this->InstanceData = InstanceData;
     }
 
-    FItemBundleWithInstanceData(FGameplayTag InItemId, int32 InQuantity, const TArray<UItemInstanceData*>& InstanceData = TArray<UItemInstanceData*>())
+    FItemBundleWithInstanceData(FGameplayTag InItemId, int32 InQuantity, const TArray<UItemInstanceData*>& InstanceData)
     {
         ItemId = InItemId;
     	Quantity = InQuantity;
         this->InstanceData = InstanceData;
     }
 
+	// WARNING: This constructor should only be used when it is certain that instance data is not needed for this item type
+	FItemBundleWithInstanceData(FGameplayTag InItemId, int32 InQuantity)
+	{
+    	ItemId = InItemId;
+    	Quantity = InQuantity;
+    	InstanceData = TArray<UItemInstanceData*>();
+
+    	//ensureMsgf(!URISSubsystem::GetItemDataById(InItemId)->ItemInstanceDataClass->IsValidLowLevel(),
+		//		   TEXT("FItemBundleWithInstanceData constructor called without valid ItemInstanceData"), *InItemId.ToString());
+	}
+	
+    // This overload will spawn the instance data
+	FItemBundleWithInstanceData(FGameplayTag InItemId, int32 InQuantity, TSubclassOf<UItemInstanceData> InstanceDataClass, AActor* OwnerOfSpawnedInstanceData)
+    {
+    	ItemId = InItemId;
+    	Quantity = InQuantity;
+
+    	for (int32 i = 0; i < InQuantity; ++i)
+		{
+			if (UItemInstanceData* NewInstanceData = NewObject<UItemInstanceData>(OwnerOfSpawnedInstanceData, InstanceDataClass))
+			{
+				NewInstanceData->SetFlags(RF_Transient); // Not saved to disk
+				InstanceData.Add(NewInstanceData);
+
+				OwnerOfSpawnedInstanceData->AddReplicatedSubObject(NewInstanceData);
+			}
+		}
+    }
     
     bool operator==(const FItemBundleWithInstanceData& Other) const
     {

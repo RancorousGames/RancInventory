@@ -23,3 +23,25 @@ public:
 protected:
 
 };
+
+UCLASS(Blueprintable, BlueprintType)
+class RANCINVENTORY_API UTestItemInstanceData : public UItemInstanceData
+{
+	GENERATED_BODY()
+
+public:
+	// Constructor
+	UTestItemInstanceData(){}
+	virtual ~UTestItemInstanceData() override {}
+
+	virtual bool IsSupportedForNetworking() const override
+	{
+		return true;
+	}
+
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	
+	UPROPERTY(Replicated, BlueprintReadWrite, EditAnywhere, Category = "Test")
+	int32 TestInt = 1;
+
+};

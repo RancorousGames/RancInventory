@@ -20,28 +20,6 @@ enum class EFoundState : uint8
 	NotFound UMETA(DisplayName = "Not Found")
 };
 
-UCLASS(Blueprintable, DefaultToInstanced, EditInlineNew, CollapseCategories, HideCategories = Object, Abstract)
-class UTestBaseClass : public UObject
-{
-	GENERATED_BODY()
-public:
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RIS | Classes | Data")
-	int32 TestInt = 0;
-};
-
-UCLASS(Blueprintable, editinlinenew)
-class  USubClassTest : public UTestBaseClass
-{
-	GENERATED_BODY()
-
-public:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Test")
-	FVector SubClassTest;
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Test")
-	FVector SubClassTestX;
-};
-
-
 UCLASS(NotBlueprintable, NotPlaceable, Category = "RIS | Classes | Data")
 class RANCINVENTORY_API UItemStaticData : public UPrimaryDataAsset
 {

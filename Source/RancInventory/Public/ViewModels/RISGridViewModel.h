@@ -137,6 +137,7 @@ public:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category=RIS)
     TMap<FGameplayTag, FTaggedItemBundle> ViewableTaggedSlots;
 
+	// This is used to sync with inventory component, not to be confused with ItemContainer.RequestedOperationsToServer
     UPROPERTY(VisibleAnywhere, Category=RIS)
     TArray<FRISExpectedOperation> OperationsToConfirm;
 

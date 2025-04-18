@@ -47,7 +47,7 @@ struct FGearSlotDefinition
 	
     // Transient properties to avoid serialization and replication of the component reference
     UPROPERTY(Transient)
-    UStaticMeshComponent* MeshComponent = nullptr;
+    TObjectPtr<UStaticMeshComponent> MeshComponent;
 };
 
 
@@ -240,19 +240,20 @@ public:
 	int32 ActiveWeaponIndex = 0;;
 	
 	UPROPERTY(VisibleAnywhere,BlueprintReadOnly, Category = "Ranc Inventory Weapons|Gear|State")
-	AWeaponActor* MainhandSlotWeapon = nullptr;
+	TObjectPtr<AWeaponActor> MainhandSlotWeapon = nullptr;
 
 	UPROPERTY(VisibleAnywhere,BlueprintReadOnly, Category = "Ranc Inventory Weapons|Gear|State")
-	AWeaponActor* OffhandSlotWeapon = nullptr;
+	TObjectPtr<AWeaponActor> OffhandSlotWeapon = nullptr;
 	
 	UPROPERTY(VisibleAnywhere,BlueprintReadOnly, Category = "Ranc Inventory Weapons|Gear|Internal")
 	ACharacter* Owner = nullptr;
 
-	UPROPERTY(Replicated, EditAnywhere,BlueprintReadWrite, Category = "Ranc Inventory Weapons|Gear|Internal")
+	// Only relevant on client
+	UPROPERTY(EditAnywhere,BlueprintReadWrite, Category = "Ranc Inventory Weapons|Gear|Internal")
 	TArray<const UItemStaticData*> SelectableWeaponsData;
 	
 	UPROPERTY(VisibleAnywhere,BlueprintReadOnly, Category = "Ranc Inventory Weapons|Gear|Internal")
-	AWeaponActor* UnarmedWeaponActor = nullptr;
+	TObjectPtr<AWeaponActor> UnarmedWeaponActor = nullptr;
 	
 	// Delayed gear change state. Note that the delayed change is triggered by the client as we dont rely on the server playing animations
 
@@ -303,7 +304,10 @@ public:
 
 	UFUNCTION()
 	void HandleItemRemovedFromSlot(const FGameplayTag& SlotTag, const UItemStaticData* Data, int32 Quantity, EItemChangeReason Reason);
-
+	
+	UFUNCTION()
+	void HandleItemRemovedFromGenericSlot(const UItemStaticData* ItemData, int32 Quantity, EItemChangeReason Reason);
+	
 	UFUNCTION(BlueprintNativeEvent, Category = "Ranc Inventory Weapons|Gear")
 	bool CanAttack(FVector AimLocation = FVector(0,0,0), bool ForceOffHand = false);
 	
@@ -324,24 +328,25 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Ranc Inventory Weapons|Gear")
 	void SelectNextActiveWeapon(bool bPlayMontage = true);
 
-	UFUNCTION(Server,Reliable)
-	void SelectNextActiveWeaponServer(bool bPlayMontage = true);
+	UFUNCTION(BlueprintCallable, Category = "Ranc Inventory Weapons|Gear")
+	void SelectPreviousActiveWeapon(bool bPlayMontage = true);
 
 	UFUNCTION(BlueprintCallable, Category = "Ranc Inventory Weapons|Gear")
-	void SelectPreviousWeapon(bool bPlayMontage = true);
+	void SelectActiveWeapon(int32 WeaponIndex, bool bPlayEquipMontage);
 
-	UFUNCTION(Server,Reliable)
-	void SelectPreviousActiveWeaponServer(bool bPlayMontage = true);
+	// Adds a weapon to the selectable weapons array, note that this is also done automatically when a weapon is first equipped
+	UFUNCTION(BlueprintCallable, Category = "Ranc Inventory Weapons|Gear")
+	void ManualAddSelectableWeapon(const UItemStaticData* ItemStaticData, int32 InsertionIndex = -1);
 	
 	UFUNCTION(BlueprintCallable, Category = "Ranc Inventory Weapons|Gear")
-	void SelectActiveWeapon(int32 WeaponIndex, bool bPlayEquipMontage, AWeaponActor* AlreadySpawnedWeapon = nullptr);
-
+	void RemoveSelectableWeapon(int32 WeaponIndexToRemove);
+	
 	/*
 	If bPlayEquipMontage is false then the swap will happen immediately
 	Otherwise the swap time will depend on configuration of GearChangeCommitAnimNotifyName
 	*/
 	UFUNCTION(Reliable, Server, BlueprintCallable, Category = "Ranc Inventory Weapons|Gear")
-	void SelectActiveWeapon_Server(int32 WeaponIndex, FGameplayTag ForcedSlot = FGameplayTag(), AWeaponActor* AlreadySpawnedWeapon = nullptr, EGearChangeStep Step = EGearChangeStep::Request);
+	void SelectActiveWeapon_Server(FGameplayTag ItemId, FGameplayTag ForcedSlot = FGameplayTag(), EGearChangeStep Step = EGearChangeStep::Request);
 
 	UFUNCTION(Reliable, Server, BlueprintCallable, Category = "Ranc Inventory Weapons|Gear")
 	void SelectUnarmed_Server();
@@ -453,7 +458,7 @@ protected:
 	FMontageData GetEquipMontage(const UGearDefinition* WeaponData) const;
 	FMontageData GetUnequipMontage(const UGearDefinition* WeaponData) const;
 	
-	UInventoryComponent* LinkedInventoryComponent = nullptr;
+	TObjectPtr<UInventoryComponent> LinkedInventoryComponent = nullptr;
 
 	// Last attack time
 	float LastAttackTime = 0.0f;

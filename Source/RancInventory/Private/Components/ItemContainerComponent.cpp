@@ -45,7 +45,8 @@ void UItemContainerComponent::InitializeComponent()
 	{
 		if (InitialItem.ItemData && InitialItem.ItemData->ItemId.IsValid())
 		{
-			ItemsVer.Items.Add(FItemBundleWithInstanceData(InitialItem.ItemData->ItemId, InitialItem.Quantity));
+			//ItemsVer.Items.Add(FItemBundleWithInstanceData(InitialItem.ItemData->ItemId, InitialItem.Quantity));
+			// TODO: Remove or implement instancedata creation
 		}
 	}
 
@@ -121,25 +122,56 @@ int32 UItemContainerComponent::AddItem_ServerImpl(TScriptInterface<IItemSource> 
 	int32 AmountToAdd = FMath::Min(AcceptableQuantity, RequestedQuantity);
 
 	FItemBundleWithInstanceData* ContainedItem = FindItemInstance(ItemId);
-
+	bool bCreatedNewBundle = false; // Flag if we created a new entry vs finding existing
 	if (!ContainedItem)
 	{
-		ItemsVer.Items.Add(FItemBundleWithInstanceData(ItemId, 0));
+		ItemsVer.Items.Add(FItemBundleWithInstanceData(ItemId));
 		ContainedItem = &ItemsVer.Items.Last();
+		bCreatedNewBundle = true;
 	}
-
+	
+	const int32 InstanceCountBeforeExtract = ContainedItem->InstanceData.Num();
 	AmountToAdd = Execute_ExtractItem_IfServer(ItemSourceObj, ItemId, AmountToAdd, EItemChangeReason::Transferred, ContainedItem->InstanceData);
+	
+	if (AmountToAdd <= 0)
+	{
+		if (bCreatedNewBundle) // Remove the bundle we added if nothing went into it
+			ItemsVer.Items.RemoveAt(ItemsVer.Items.Num() - 1);
 
+		return 0;
+	}
+	
 	ContainedItem->Quantity += AmountToAdd;
 	
+	// Verify that instancedata was transferred, otherwise create it
 	if (ItemData->ItemInstanceDataClass->IsValidLowLevel())
 	{
-		for (int i = 0; i < AmountToAdd; ++i)
+		const int32 InstanceCountAfterExtract = ContainedItem->InstanceData.Num();
+		if (InstanceCountAfterExtract > InstanceCountBeforeExtract)
 		{
-			ContainedItem->InstanceData.Add(NewObject<UItemInstanceData>(this, ItemData->ItemInstanceDataClass));
+			for (int32 i = InstanceCountBeforeExtract; i < InstanceCountAfterExtract; ++i)
+			{
+				if (UItemInstanceData* ExtractedInstanceData = ContainedItem->InstanceData[i])
+				{
+					GetOwner()->AddReplicatedSubObject(ExtractedInstanceData);
+				}
+			}
 		}
-	}
 
+		if (ContainedItem->Quantity != ContainedItem->InstanceData.Num())
+		{
+			for (int i = 0; i < AmountToAdd; ++i)
+			{
+				auto* NewInstanceData = NewObject<UItemInstanceData>(this, ItemData->ItemInstanceDataClass);
+				ContainedItem->InstanceData.Add(NewInstanceData);
+				GetOwner()->AddReplicatedSubObject(NewInstanceData);
+			}
+		}
+		
+		ensureMsgf(ContainedItem->InstanceData.Num() == 0 || ContainedItem->InstanceData.Num() == ContainedItem->Quantity,
+		TEXT("InstanceData count corrupt, found %u, expected %u or 0"), ContainedItem->InstanceData.Num(), ContainedItem->Quantity);
+	}
+	
 	if (!SuppressUpdate)
 	{
 		UpdateWeightAndSlots();
@@ -178,7 +210,8 @@ int32 UItemContainerComponent::DestroyItemImpl(const FGameplayTag& ItemId, int32
 
 	const int32 QuantityRemoved = FMath::Min(ContainedItem->Quantity, Quantity);
 
-	ContainedItem->DestroyQuantity(QuantityRemoved);
+	
+	ContainedItem->DestroyQuantity(QuantityRemoved, GetOwner()); // Also unregisters instance data as subobject
 
 	if (!ContainedItem->IsValid()) // If the quantity drops to zero or below, remove the item from the inventory
 	{
@@ -328,24 +361,22 @@ int32 UItemContainerComponent::DropAllItems_ServerImpl()
 }
 
 int32 UItemContainerComponent::ExtractItemFromContainer_IfServer(const FGameplayTag& ItemId, int32 Quantity, UItemContainerComponent* ContainerToExtractFrom, bool AllowPartial)
-{
+{		
+	if (GetOwnerRole() != ROLE_Authority && GetOwnerRole() != ROLE_None)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("RemoveItems called on non-authority!"));
+		return 0;
+	}
+	
 	if (!ContainerToExtractFrom)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("ExtractItemFromContainer called with null container!"));
 		return 0;
 	}
-	
-	if (ContainerToExtractFrom->GetOwnerRole() != ROLE_Authority)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("ExtractItemFromContainer called on non-authority!"));
-		return 0;
-	}
 
 	int32 ExtractableQuantity = ContainerToExtractFrom->GetContainedQuantity(ItemId);
 	if (!AllowPartial && ExtractableQuantity < Quantity) return 0;
-
-
-
+	
 	FItemBundleWithInstanceData* ItemInstance = FindItemInstance(ItemId);
 
 	if (!ItemInstance)
@@ -355,6 +386,13 @@ int32 UItemContainerComponent::ExtractItemFromContainer_IfServer(const FGameplay
 	}
 	
 	int32 QuantityExtracted = ContainerToExtractFrom->ExtractItemImpl_IfServer(ItemId, Quantity, EItemChangeReason::Transferred, ItemInstance->InstanceData, false);
+	for (int i = 0; i < ItemInstance->InstanceData.Num(); ++i)
+	{
+		if (UItemInstanceData* InstanceData = ItemInstance->InstanceData[i])
+		{
+			GetOwner()->AddReplicatedSubObject(InstanceData);
+		}
+	}
 	
 	ItemInstance->Quantity += QuantityExtracted;
 	
@@ -378,6 +416,12 @@ int32 UItemContainerComponent::ExtractItem_IfServer_Implementation(const FGamepl
 
 int32 UItemContainerComponent::ExtractItemImpl_IfServer(const FGameplayTag& ItemId, int32 Quantity, EItemChangeReason Reason, TArray<UItemInstanceData*>& StateArrayToAppendTo, bool SuppressUpdate)
 {
+	if (GetOwnerRole() != ROLE_Authority && GetOwnerRole() != ROLE_None)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("RemoveItems called on non-authority!"));
+		return 0;
+	}
+	
 	const UItemStaticData* ItemData = URISSubsystem::GetItemDataById(ItemId);
 	if (!ItemData)
 	{
@@ -393,7 +437,7 @@ int32 UItemContainerComponent::ExtractItemImpl_IfServer(const FGameplayTag& Item
 		return 0;
 	}
 
-	int32 ExtractCount = ContainedInstance->ExtractQuantity(Quantity, StateArrayToAppendTo);
+	int32 ExtractCount = ContainedInstance->ExtractQuantity(Quantity, StateArrayToAppendTo, GetOwner()); // Also unregisters instance data as subobject
 
 	if (!ContainedInstance->IsValid()) // If the quantity drops to zero or below, remove the item from the inventory
 	{
@@ -493,6 +537,8 @@ int32 UItemContainerComponent::GetQuantityContainerCanReceiveBySlots(const UItem
 int32 UItemContainerComponent::GetQuantityContainerCanReceiveByWeight(const UItemStaticData* ItemData) const
 {
 	// Calculate how many items can be added without exceeding the max weight
+	if (ItemData->ItemWeight <= 0) return INT32_MAX;
+	
 	int32 AcceptableQuantityByWeight = FMath::FloorToInt((MaxWeight - CurrentWeight) / ItemData->ItemWeight);
 	AcceptableQuantityByWeight = AcceptableQuantityByWeight > 0 ? AcceptableQuantityByWeight : 0;
 
@@ -595,8 +641,17 @@ void UItemContainerComponent::ClearImpl()
 	{
 		const UItemStaticData* ItemData = URISSubsystem::GetItemDataById(Item.ItemId);
 		OnItemRemovedFromContainer.Broadcast(ItemData, Item.Quantity, EItemChangeReason::ForceDestroyed);
-	}
 
+		for (UItemInstanceData* InstanceData : Item.InstanceData)
+		{
+			if (InstanceData)
+			{
+				GetOwner()->RemoveReplicatedSubObject(InstanceData);
+				InstanceData->ConditionalBeginDestroy();
+			}
+		}
+	}
+	
 	ItemsVer.Items.Reset();
 	UpdateWeightAndSlots();
 	DetectAndPublishChanges();

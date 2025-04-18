@@ -403,7 +403,7 @@ AWorldItem* URISSubsystem::SpawnWorldItem(UObject* WorldContextObject,
     if (WorldItem)
     {
         // Set up the world item
-        WorldItem->SetItem(FItemBundle(Item.ItemId, Item.Quantity));
+        WorldItem->SetItem(Item);
         // TODO
         // WorldItem->SetInstanceData(InstanceData);
     }

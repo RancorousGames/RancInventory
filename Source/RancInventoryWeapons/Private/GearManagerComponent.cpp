@@ -54,7 +54,6 @@ void UGearManagerComponent::GetLifetimeReplicatedProps(TArray<class FLifetimePro
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(UGearManagerComponent, ActiveWeaponIndex);
-	DOREPLIFETIME(UGearManagerComponent, SelectableWeaponsData);
 }
 
 // Called every frame
@@ -83,7 +82,7 @@ void UGearManagerComponent::Initialize()
 
 	LinkedInventoryComponent->OnItemAddedToTaggedSlot.AddDynamic(this, &UGearManagerComponent::HandleItemAddedToSlot);
 	LinkedInventoryComponent->OnItemRemovedFromTaggedSlot.AddDynamic(this, &UGearManagerComponent::HandleItemRemovedFromSlot);
-
+	LinkedInventoryComponent->OnItemRemovedFromContainer.AddDynamic(this, &UGearManagerComponent::HandleItemRemovedFromGenericSlot);
 	
 	for (int32 i = 0; i < GearSlots.Num(); ++i)
 	{
@@ -152,9 +151,17 @@ void UGearManagerComponent::HandleItemRemovedFromSlot(const FGameplayTag& SlotTa
 	}
 }
 
+void UGearManagerComponent::HandleItemRemovedFromGenericSlot(const UItemStaticData* ItemData, int32 Quantity, EItemChangeReason Reason)
+{
+	if (SelectableWeaponsData.Contains(ItemData) && !LinkedInventoryComponent->Contains(ItemData->ItemId, 1))
+	{
+		SelectableWeaponsData.Remove(ItemData);
+	}
+}
+
 bool UGearManagerComponent::CanAttack_Implementation(FVector AimLocation, bool ForceOffHand)
 {
-	auto* WeaponActor =  MainhandSlotWeapon;
+	auto WeaponActor =  MainhandSlotWeapon;
 	if (!WeaponActor || !WeaponActor->CanAttack() || ForceOffHand) WeaponActor = OffhandSlotWeapon;
 	
 	if (!IsValid(WeaponActor))
@@ -240,7 +247,6 @@ void UGearManagerComponent::RegisterSpawnedWeapon(AWeaponActor* WeaponActor)
 	int32 ExistingEntry = SelectableWeaponsData.Find(WeaponActor->ItemData);
 	if (ExistingEntry == INDEX_NONE)
 	{
-		// Note: This also modifies the local version of replicated SelectableWeaponsData on clients. The server will override it (but usually without changes)
 		if (SelectableWeaponsData.Num() == MaxSelectableWeaponCount)
 		{
 			UE_LOG(LogRISInventory, Display, TEXT("NumberOfWeaponsAcquired >= WeaponSlots, replaced earliest weapon"))
@@ -250,8 +256,7 @@ void UGearManagerComponent::RegisterSpawnedWeapon(AWeaponActor* WeaponActor)
 
 		SelectableWeaponsData.Add(WeaponActor->ItemData);
 	}
-	
-	ActiveWeaponIndex = ExistingEntry;
+	ActiveWeaponIndex = SelectableWeaponsData.Find(WeaponActor->ItemData);
 
 	AttachWeaponToOwner(WeaponActor, GearSlots[HandSlotIndex].AttachSocketName);
 
@@ -376,54 +381,55 @@ bool UGearManagerComponent::Check(AWeaponActor* InputWeaponActor) const
 	return true;
 }
 
-void UGearManagerComponent::SelectPreviousWeapon(bool bPlayMontage)
+void UGearManagerComponent::SelectActiveWeapon(int32 WeaponIndex, bool bPlayEquipMontage)
 {
-	if (!Owner->HasAuthority() && Owner->GetLocalRole() == ROLE_AutonomousProxy)
+	FGameplayTag ItemId = SelectableWeaponsData.IsValidIndex(WeaponIndex)
+										? SelectableWeaponsData[WeaponIndex]->ItemId
+										: FGameplayTag();
+	if (ItemId.IsValid())
+		SelectActiveWeapon_Server(ItemId, FGameplayTag(), bPlayEquipMontage ? EGearChangeStep::Request : EGearChangeStep::Apply);
+}
+
+void UGearManagerComponent::ManualAddSelectableWeapon(const UItemStaticData* ItemStaticData, int32 InsertionIndex)
+{
+	// Ensure this is not called on dedicated server
+	if (IsRunningDedicatedServer())
 	{
-		SelectPreviousActiveWeaponServer(bPlayMontage);
+		UE_LOG(LogRISInventory, Warning, TEXT("ManualAddSelectableWeapon() failed. This function should not be called on a dedicated server."))
+		return;
 	}
-	else if (Owner->HasAuthority())
+	
+	if (!ItemStaticData || InsertionIndex > MaxSelectableWeaponCount)
 	{
-		SelectPreviousActiveWeaponServer(bPlayMontage);
+		UE_LOG(LogRISInventory, Warning, TEXT("ManualAddSelectableWeapon() failed. ItemStaticData is nullptr or InsertionIndex is out of range."))
+		return;
+	}
+	
+	if (InsertionIndex < 0)
+	{
+		SelectableWeaponsData.Add(ItemStaticData);
+	}
+	else
+	{
+		SelectableWeaponsData.Insert(ItemStaticData, InsertionIndex);
 	}
 }
 
-void UGearManagerComponent::SelectPreviousActiveWeaponServer_Implementation(bool bPlayMontage)
+void UGearManagerComponent::RemoveSelectableWeapon(int32 WeaponIndexToRemove)
 {
-	// todo
-
-
-	/*	int32 NumberOfWeapons = WeaponPerSlot.Num();
-	
-		if (NumberOfWeapons <= 1) //No weapon to change
-		{
-			return;
-		}
-	
-		int32 NextWeaponSlot = (ActiveWeaponSlot - 1);
-	
-		if (NextWeaponSlot < 0)
-		{
-			NextWeaponSlot = NumberOfWeapons - 1;
-		}
-		else
-		{
-			//NextWeaponSlot % NumberOfWeapons; 
-		}
-	
-		SetActiveEquipSlot(NextWeaponSlot, bPlayMontage);*/
+	if (SelectableWeaponsData.IsValidIndex(WeaponIndexToRemove))
+	{
+		SelectableWeaponsData.RemoveAt(WeaponIndexToRemove);
+	}
+	else
+	{
+		UE_LOG(LogRISInventory, Warning, TEXT("RemoveSelectableWeapon() failed. WeaponIndexToRemove is out of range."))
+	}
 }
 
-void UGearManagerComponent::SelectActiveWeapon(int32 WeaponIndex, bool bPlayEquipMontage, AWeaponActor* AlreadySpawnedWeapon)
+void UGearManagerComponent::SelectActiveWeapon_Server_Implementation(FGameplayTag ItemId, FGameplayTag ForcedSlot, EGearChangeStep Step)
 {
-	SelectActiveWeapon_Server(WeaponIndex, FGameplayTag(), AlreadySpawnedWeapon, bPlayEquipMontage ? EGearChangeStep::Request : EGearChangeStep::Apply);
-}
-
-void UGearManagerComponent::SelectActiveWeapon_Server_Implementation(int32 WeaponIndex, FGameplayTag ForcedSlot, AWeaponActor* AlreadySpawnedWeapon, EGearChangeStep Step)
-{
-	const UItemStaticData* ItemData = SelectableWeaponsData.IsValidIndex(WeaponIndex)
-		                                    ? SelectableWeaponsData[WeaponIndex]
-		                                    : nullptr;
+	const UItemStaticData* ItemData = URISSubsystem::GetItemDataById(ItemId);
 
 	if (!ItemData)
 	{
@@ -687,28 +693,18 @@ void UGearManagerComponent::EquipGear(FGameplayTag Slot, const UItemStaticData* 
 
 void UGearManagerComponent::SelectNextActiveWeapon(bool bPlayMontage)
 {
-	if (!Owner->HasAuthority() && Owner->GetLocalRole() == ROLE_AutonomousProxy)
-	{
-		SelectNextActiveWeaponServer(bPlayMontage);
-	}
-	else if (Owner->HasAuthority())
-	{
-		SelectNextActiveWeaponServer(bPlayMontage);
-	}
-}
-
-void UGearManagerComponent::SelectNextActiveWeaponServer_Implementation(bool bPlayMontage)
-{
-	if (SelectableWeaponsData.Num() == 0)
-	{
-		UE_LOG(LogRISInventory, Warning, TEXT("No weapons to select!"))
-		return;
-	}
-
 	const int32 NextWeaponIndex = (ActiveWeaponIndex + 1) % SelectableWeaponsData.Num();
 	
-	SelectActiveWeapon_Server(NextWeaponIndex, FGameplayTag(), nullptr, bPlayMontage ? EGearChangeStep::Request : EGearChangeStep::Apply);
+	SelectActiveWeapon(NextWeaponIndex, bPlayMontage);
 }
+
+void UGearManagerComponent::SelectPreviousActiveWeapon(bool bPlayMontage)
+{
+	const int32 PrevWeaponIndex = (ActiveWeaponIndex - 1 + SelectableWeaponsData.Num()) % SelectableWeaponsData.Num();
+	
+	SelectActiveWeapon(PrevWeaponIndex, bPlayMontage);
+}
+
 
 bool UGearManagerComponent::IsWeaponVisible(AWeaponActor* InputWeaponActor)
 {
@@ -921,7 +917,7 @@ void UGearManagerComponent::TryAttack_Server_Implementation(FVector AimLocation,
 {
 	if (CanAttack(AimLocation, ForceOffHand))
 	{
-		auto* WeaponActor =  MainhandSlotWeapon;
+		auto WeaponActor =  MainhandSlotWeapon;
 		if (!WeaponActor || !WeaponActor->CanAttack() || ForceOffHand) WeaponActor = OffhandSlotWeapon;
 	
 		int32 MontageId = MontageIdOverride >= 0 ? MontageIdOverride : WeaponActor->GetAttackMontageId();

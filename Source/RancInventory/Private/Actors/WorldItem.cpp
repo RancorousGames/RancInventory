@@ -13,6 +13,7 @@
 void AWorldItem::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
+	bReplicateUsingRegisteredSubObjectList = true;
 }
 
 void AWorldItem::BeginPlay()
@@ -33,15 +34,27 @@ void AWorldItem::SetItem(const FItemBundleWithInstanceData& NewItem)
 
 void AWorldItem::OnRep_Item()
 {
-	if (GetClass()->HasAnyClassFlags(CLASS_CompiledFromBlueprint) || !GetClass()->HasAnyClassFlags(CLASS_Native))
-	{
+	//if (GetClass()->HasAnyClassFlags(CLASS_CompiledFromBlueprint) || !GetClass()->HasAnyClassFlags(CLASS_Native))
+	//{
 		Initialize();
-	}
+	//}
 }
 
 void AWorldItem::Initialize()
 {	
 	ItemData = URISSubsystem::GetItemDataById(RepresentedItem.ItemId);
+
+	if (!ItemData)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("AWorldItem::Initialize: ItemData is null for ItemId: %s"), *RepresentedItem.ItemId.ToString());
+		return;
+	}
+
+	for (UItemInstanceData* InstanceData : RepresentedItem.InstanceData)
+	{
+		if (InstanceData)
+			AddReplicatedSubObject(InstanceData);
+	}
 
 	SetMobility(EComponentMobility::Movable);
 	auto* mesh = GetStaticMeshComponent();
@@ -112,8 +125,7 @@ int32 AWorldItem::ExtractItem_IfServer_Implementation(
 
     // Adjust the represented item's quantity
     RepresentedItem.Quantity -= QuantityToExtract;
-
-    // Create instance data if needed
+	
     if (RepresentedItem.InstanceData.Num() > 0 && QuantityToExtract > 0)
     {
         for (int32 i = 0; i < QuantityToExtract; ++i)
@@ -122,7 +134,9 @@ int32 AWorldItem::ExtractItem_IfServer_Implementation(
             {
                 // Transfer the last instance from RepresentedItem to the output array
                 int32 LastIndex = RepresentedItem.InstanceData.Num() - 1;
-                StateArrayToAppendTo.Add(RepresentedItem.InstanceData[LastIndex]);
+            	auto* InstanceData = RepresentedItem.InstanceData[LastIndex];
+            	RemoveReplicatedSubObject(InstanceData);
+                StateArrayToAppendTo.Add(InstanceData);
                 RepresentedItem.InstanceData.RemoveAt(LastIndex);
             }
         }

@@ -69,7 +69,7 @@ public:
 	UFUNCTION(BlueprintPure, Category=RIS)
     bool HasWeightCapacityForItems(const FGameplayTag& ItemId, int32 Quantity) const;
 
-	/* Returns an item id and quantity exists among ALL items in the container */
+	/* Returns an item id and at least a quantity exists among ALL items in the container */
     UFUNCTION(BlueprintPure, Category=RIS)
     bool Contains(const FGameplayTag& ItemId, int32 Quantity = 1) const;
 

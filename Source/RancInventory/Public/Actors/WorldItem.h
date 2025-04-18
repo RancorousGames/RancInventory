@@ -28,7 +28,6 @@ public:
 	void OnRep_Item();
 	
 	virtual void Initialize();
-
 	
 	UFUNCTION(BlueprintImplementableEvent, meta=(DisplayName = "Initialize"))
 	void ReceiveInitialize();

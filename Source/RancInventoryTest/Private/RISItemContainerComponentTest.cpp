@@ -2,6 +2,7 @@
 
 #include "RISItemContainerComponentTest.h"
 
+#include "EngineUtils.h"
 #include "LimitedTestItemSource.h"
 #include "NativeGameplayTags.h"
 #include "Misc/AutomationTest.h"
@@ -9,6 +10,7 @@
 #include "Components/ItemContainerComponent.h"
 #include "Framework/DebugTestResult.h"
 #include "Framework/TestDelegateForwardHelper.h"
+#include "MockClasses/ItemHoldingCharacter.h"
 
 #define TestName "GameTests.RIS.RancItemContainer"
 
@@ -23,7 +25,7 @@ public:
 		: TestFixture(FName(*FString(TestName)))
 	{
 		URISSubsystem* Subsystem = TestFixture.GetSubsystem();
-		TempActor = TestFixture.GetWorld()->SpawnActor<AActor>();
+		TempActor = TestFixture.GetWorld()->SpawnActor<AItemHoldingCharacter>();
 		ItemContainerComponent = NewObject<UItemContainerComponent>(TempActor);
 
 		ItemContainerComponent->MaxContainerSlotCount = MaxItems;
@@ -425,6 +427,253 @@ public:
 		
 		return Res;
 	}
+
+		static bool TestInstanceDataTransferBetweenContainers(FRancItemContainerComponentTest* Test)
+	{
+		// --- Setup ---
+		FItemContainerTestContext ContextA(10, 50);
+		FItemContainerTestContext ContextB(10, 50); // Second container
+		auto* Subsystem = ContextA.TestFixture.GetSubsystem();
+		FDebugTestResult Res = true;
+
+		const float TestDurability = 55.f;
+
+		// --- Test ---
+		// 1. Add Brittle Knife (with instance data) to Container A from Subsystem (infinite source)
+		int32 Added = ContextA.ItemContainerComponent->AddItem_IfServer(Subsystem, ItemIdBrittleCopperKnife, 1, false);
+		Res &= Test->TestEqual(TEXT("[Transfer] Should add 1 knife to Container A"), Added, 1);
+
+		// 2. Verify Instance Data creation and registration in Container A
+		TArray<UItemInstanceData*> ItemStateA = ContextA.ItemContainerComponent->GetItemState(ItemIdBrittleCopperKnife);
+		Res &= Test->TestEqual(TEXT("[Transfer] Container A should have 1 instance data entry for the knife"), ItemStateA.Num(), 1);
+		if (ItemStateA.Num() == 1)
+		{
+			UItemDurabilityTestInstanceData* DurabilityDataA = Cast<UItemDurabilityTestInstanceData>(ItemStateA[0]);
+			Res &= Test->TestNotNull(TEXT("[Transfer] Instance data in A should be castable to Durability type"), DurabilityDataA);
+			if (DurabilityDataA)
+			{
+				// Modify the data
+				DurabilityDataA->Durability = TestDurability;
+				// Check registration
+				Res &= Test->TestTrue(TEXT("[Transfer] Instance data should be registered subobject with Owner A"),
+				                      ContextA.TempActor->IsReplicatedSubObjectRegistered(DurabilityDataA));
+			}
+		}
+
+		// 3. Transfer the knife from Container A to Container B
+		UItemInstanceData* InstancePtrBeforeTransfer = ItemStateA.Num() > 0 ? ItemStateA[0] : nullptr; // Keep pointer for later check
+		int32 Transferred = ContextB.ItemContainerComponent->ExtractItemFromContainer_IfServer(
+			ItemIdBrittleCopperKnife, 1, ContextA.ItemContainerComponent, false);
+		Res &= Test->TestEqual(TEXT("[Transfer] Should transfer 1 knife from A to B"), Transferred, 1);
+
+		// 4. Verify Item state in Container A after transfer
+		Res &= Test->TestEqual(TEXT("[Transfer] Container A should have 0 knives after transfer"),
+		                       ContextA.ItemContainerComponent->GetContainedQuantity(ItemIdBrittleCopperKnife), 0);
+		ItemStateA = ContextA.ItemContainerComponent->GetItemState(ItemIdBrittleCopperKnife);
+		Res &= Test->TestEqual(TEXT("[Transfer] Container A should have 0 instance data entries after transfer"), ItemStateA.Num(), 0);
+		if (InstancePtrBeforeTransfer)
+		{
+			Res &= Test->TestFalse(TEXT("[Transfer] Instance data should NOT be registered subobject with Owner A after transfer"),
+			                       ContextA.TempActor->IsReplicatedSubObjectRegistered(InstancePtrBeforeTransfer));
+		}
+
+		// 5. Verify Item state and Instance Data in Container B after transfer
+		Res &= Test->TestEqual(TEXT("[Transfer] Container B should have 1 knife after transfer"),
+		                       ContextB.ItemContainerComponent->GetContainedQuantity(ItemIdBrittleCopperKnife), 1);
+		TArray<UItemInstanceData*> ItemStateB = ContextB.ItemContainerComponent->GetItemState(ItemIdBrittleCopperKnife);
+		Res &= Test->TestEqual(TEXT("[Transfer] Container B should have 1 instance data entry after transfer"), ItemStateB.Num(), 1);
+		if (ItemStateB.Num() == 1)
+		{
+			UItemDurabilityTestInstanceData* DurabilityDataB = Cast<UItemDurabilityTestInstanceData>(ItemStateB[0]);
+			Res &= Test->TestNotNull(TEXT("[Transfer] Instance data in B should be castable to Durability type"), DurabilityDataB);
+			if (DurabilityDataB)
+			{
+				Res &= Test->TestEqual(TEXT("[Transfer] Durability value should be preserved after transfer"), DurabilityDataB->Durability, TestDurability);
+				Res &= Test->TestTrue(TEXT("[Transfer] Instance data should be registered subobject with Owner B after transfer"),
+				                      ContextB.TempActor->IsReplicatedSubObjectRegistered(DurabilityDataB));
+
+				// Also verify the pointer itself was transferred (not a copy)
+				Res &= Test->TestTrue(TEXT("[Transfer] Instance data pointer should be the same object transferred"), DurabilityDataB == InstancePtrBeforeTransfer);
+			}
+		}
+
+		// 6. Add a rock (no instance data) and transfer it - ensure no instance data appears
+		Added = ContextA.ItemContainerComponent->AddItem_IfServer(Subsystem, ItemIdRock, 1, false);
+		Res &= Test->TestEqual(TEXT("[Transfer] Should add 1 rock to Container A"), Added, 1);
+		Transferred = ContextB.ItemContainerComponent->ExtractItemFromContainer_IfServer(ItemIdRock, 1, ContextA.ItemContainerComponent, false);
+		Res &= Test->TestEqual(TEXT("[Transfer] Should transfer 1 rock from A to B"), Transferred, 1);
+		ItemStateB = ContextB.ItemContainerComponent->GetItemState(ItemIdRock);
+		Res &= Test->TestEqual(TEXT("[Transfer] Container B should have 0 instance data entries for the rock"), ItemStateB.Num(), 0);
+
+		return Res;
+	}
+
+
+	static bool TestInstanceDataDropPickupAndDestruction(FRancItemContainerComponentTest* Test)
+	{
+		// --- Setup ---
+		FItemContainerTestContext ContextA(10, 50);
+		FItemContainerTestContext ContextB(10, 50); // For picking up
+		auto* Subsystem = ContextA.TestFixture.GetSubsystem();
+		FDebugTestResult Res = true;
+		const float TestDurabilityDrop = 77.f;
+		const float TestDurabilityDestroy1 = 33.f;
+		const float TestDurabilityDestroy2 = 44.f;
+
+		// --- Part 1: Drop and Pickup ---
+
+		// 1. Add knife to Container A, set durability
+		int32 Added = ContextA.ItemContainerComponent->AddItem_IfServer(Subsystem, ItemIdBrittleCopperKnife, 1, false);
+		Res &= Test->TestEqual(TEXT("[DropPickup] Should add 1 knife to Container A"), Added, 1);
+		UItemDurabilityTestInstanceData* DurabilityDataA = nullptr;
+		TArray<UItemInstanceData*> ItemStateA = ContextA.ItemContainerComponent->GetItemState(ItemIdBrittleCopperKnife);
+		if (ItemStateA.Num() == 1) DurabilityDataA = Cast<UItemDurabilityTestInstanceData>(ItemStateA[0]);
+		Res &= Test->TestNotNull(TEXT("[DropPickup] Instance data A created"), DurabilityDataA);
+		if (DurabilityDataA) DurabilityDataA->Durability = TestDurabilityDrop;
+
+		UItemInstanceData* InstancePtrBeforeDrop = DurabilityDataA;
+		Res &= Test->TestTrue(TEXT("[DropPickup] Instance should be registered with Owner A before drop"),
+		                      ContextA.TempActor->IsReplicatedSubObjectRegistered(InstancePtrBeforeDrop));
+
+		// 2. Drop the knife
+		int32 Dropped = ContextA.ItemContainerComponent->DropItems(ItemIdBrittleCopperKnife, 1);
+		Res &= Test->TestEqual(TEXT("[DropPickup] DropItems should report 1 item dropped"), Dropped, 1); // Client guess, but check anyway
+		Res &= Test->TestEqual(TEXT("[DropPickup] Container A should have 0 knives after drop"),
+		                       ContextA.ItemContainerComponent->GetContainedQuantity(ItemIdBrittleCopperKnife), 0);
+		Res &= Test->TestFalse(TEXT("[DropPickup] Instance should NOT be registered with Owner A after drop"),
+		                       ContextA.TempActor->IsReplicatedSubObjectRegistered(InstancePtrBeforeDrop));
+
+		// 3. Find the spawned AWorldItem
+		AWorldItem* DroppedWorldItem = nullptr;
+		UWorld* World = ContextA.TestFixture.GetWorld();
+		for (TActorIterator<AWorldItem> It(World); It; ++It)
+		{
+			if (It->RepresentedItem.ItemId == ItemIdBrittleCopperKnife)
+			{
+				DroppedWorldItem = *It;
+				break;
+			}
+		}
+		Res &= Test->TestNotNull(TEXT("[DropPickup] Should find spawned AWorldItem for the knife"), DroppedWorldItem);
+
+		// 4. Verify WorldItem state and instance data
+		UItemDurabilityTestInstanceData* DurabilityDataWorld = nullptr;
+		if (DroppedWorldItem)
+		{
+			Res &= Test->TestEqual(TEXT("[DropPickup] WorldItem should represent 1 knife"), DroppedWorldItem->GetContainedQuantity(ItemIdBrittleCopperKnife), 1);
+			TArray<UItemInstanceData*>& WorldItemState = DroppedWorldItem->RepresentedItem.InstanceData;
+			Res &= Test->TestEqual(TEXT("[DropPickup] WorldItem should have 1 instance data entry"), WorldItemState.Num(), 1);
+			if (WorldItemState.Num() == 1)
+			{
+				DurabilityDataWorld = Cast<UItemDurabilityTestInstanceData>(WorldItemState[0]);
+				Res &= Test->TestNotNull(TEXT("[DropPickup] Instance data in WorldItem should be castable"), DurabilityDataWorld);
+				if (DurabilityDataWorld)
+				{
+					Res &= Test->TestEqual(TEXT("[DropPickup] Durability should be preserved in WorldItem"), DurabilityDataWorld->Durability, TestDurabilityDrop);
+					Res &= Test->TestTrue(TEXT("[DropPickup] Instance should be registered with WorldItem actor"),
+					                      DroppedWorldItem->IsReplicatedSubObjectRegistered(DurabilityDataWorld));
+					// Check pointer transfer
+					Res &= Test->TestTrue(TEXT("[DropPickup] WorldItem instance data pointer should be the same object"), DurabilityDataWorld == InstancePtrBeforeDrop);
+				}
+			}
+		}
+
+		// 5. Pick up the item into Container B
+		UItemInstanceData* InstancePtrBeforePickup = DurabilityDataWorld;
+		Added = ContextB.ItemContainerComponent->AddItem_IfServer(DroppedWorldItem, ItemIdBrittleCopperKnife, 1, false);
+		Res &= Test->TestEqual(TEXT("[DropPickup] Should add 1 knife to Container B from WorldItem"), Added, 1);
+
+		// 6. Verify WorldItem state after pickup
+		if (DroppedWorldItem)
+		{
+			// WorldItem's ExtractItem should have removed the instance data and quantity
+			Res &= Test->TestEqual(TEXT("[DropPickup] WorldItem should have 0 knives after pickup"), DroppedWorldItem->GetContainedQuantity(ItemIdBrittleCopperKnife), 0);
+			Res &= Test->TestEqual(TEXT("[DropPickup] WorldItem should have 0 instance data entries after pickup"), DroppedWorldItem->RepresentedItem.InstanceData.Num(), 0);
+			if (InstancePtrBeforePickup)
+			{
+				Res &= Test->TestFalse(TEXT("[DropPickup] Instance should NOT be registered with WorldItem after pickup"),
+				                       DroppedWorldItem->IsReplicatedSubObjectRegistered(InstancePtrBeforePickup));
+			}
+			// In a real game, the WorldItem might destroy itself here. We'll just leave it empty for the test.
+			DroppedWorldItem->Destroy(); // Clean up actor
+		}
+
+		// 7. Verify Container B state after pickup
+		Res &= Test->TestEqual(TEXT("[DropPickup] Container B should have 1 knife after pickup"),
+		                       ContextB.ItemContainerComponent->GetContainedQuantity(ItemIdBrittleCopperKnife), 1);
+		TArray<UItemInstanceData*> ItemStateB = ContextB.ItemContainerComponent->GetItemState(ItemIdBrittleCopperKnife);
+		Res &= Test->TestEqual(TEXT("[DropPickup] Container B should have 1 instance data entry after pickup"), ItemStateB.Num(), 1);
+		if (ItemStateB.Num() == 1)
+		{
+			UItemDurabilityTestInstanceData* DurabilityDataB = Cast<UItemDurabilityTestInstanceData>(ItemStateB[0]);
+			Res &= Test->TestNotNull(TEXT("[DropPickup] Instance data in B should be castable"), DurabilityDataB);
+			if (DurabilityDataB)
+			{
+				Res &= Test->TestEqual(TEXT("[DropPickup] Durability should be preserved in Container B after pickup"), DurabilityDataB->Durability, TestDurabilityDrop);
+				Res &= Test->TestTrue(TEXT("[DropPickup] Instance should be registered with Owner B after pickup"),
+				                      ContextB.TempActor->IsReplicatedSubObjectRegistered(DurabilityDataB));
+				// Check pointer transfer
+				Res &= Test->TestTrue(TEXT("[DropPickup] Container B instance data pointer should be the same object"), DurabilityDataB == InstancePtrBeforePickup);
+			}
+		}
+
+		// --- Part 2: Creation and Destruction ---
+		ContextA.ItemContainerComponent->Clear_IfServer(); // Start fresh for destruction tests
+		TArray<UItemInstanceData*> PointersToDestroy;
+
+		// 8. Add multiple knives
+		Added = ContextA.ItemContainerComponent->AddItem_IfServer(Subsystem, ItemIdBrittleCopperKnife, 3, true);
+		Res &= Test->TestEqual(TEXT("[Destroy] Should add 3 knives"), Added, 3);
+		ItemStateA = ContextA.ItemContainerComponent->GetItemState(ItemIdBrittleCopperKnife);
+		Res &= Test->TestEqual(TEXT("[Destroy] Should have 3 instance data entries"), ItemStateA.Num(), 3);
+		if (ItemStateA.Num() == 3)
+		{
+			Cast<UItemDurabilityTestInstanceData>(ItemStateA[0])->Durability = TestDurabilityDestroy1;
+			Cast<UItemDurabilityTestInstanceData>(ItemStateA[1])->Durability = TestDurabilityDestroy2;
+			Cast<UItemDurabilityTestInstanceData>(ItemStateA[2])->Durability = 99.f; // The one we expect to keep initially
+			PointersToDestroy.Add(ItemStateA[1]); // Track pointers for registration checks later
+			PointersToDestroy.Add(ItemStateA[2]);
+			Res &= Test->TestTrue(TEXT("[Destroy] Instance 0 should be registered"), ContextA.TempActor->IsReplicatedSubObjectRegistered(ItemStateA[0]));
+			Res &= Test->TestTrue(TEXT("[Destroy] Instance 1 should be registered"), ContextA.TempActor->IsReplicatedSubObjectRegistered(ItemStateA[1]));
+			Res &= Test->TestTrue(TEXT("[Destroy] Instance 2 should be registered"), ContextA.TempActor->IsReplicatedSubObjectRegistered(ItemStateA[2]));
+		}
+
+		// 9. Destroy two knives
+		int32 Destroyed = ContextA.ItemContainerComponent->DestroyItem_IfServer(ItemIdBrittleCopperKnife, 2, EItemChangeReason::Removed, true);
+		Res &= Test->TestEqual(TEXT("[Destroy] Should destroy 2 knives"), Destroyed, 2);
+		Res &= Test->TestEqual(TEXT("[Destroy] Should have 1 knife remaining"), ContextA.ItemContainerComponent->GetContainedQuantity(ItemIdBrittleCopperKnife), 1);
+		ItemStateA = ContextA.ItemContainerComponent->GetItemState(ItemIdBrittleCopperKnife);
+		Res &= Test->TestEqual(TEXT("[Destroy] Should have 1 instance data entry remaining"), ItemStateA.Num(), 1);
+
+		// 10. Verify the last two instance data entries were destroyed and unregistered
+		Res &= Test->TestFalse(TEXT("[Destroy] Destroyed Instance 0 should NOT be registered"), ContextA.TempActor->IsReplicatedSubObjectRegistered(PointersToDestroy[0]));
+		Res &= Test->TestFalse(TEXT("[Destroy] Destroyed Instance 1 should NOT be registered"), ContextA.TempActor->IsReplicatedSubObjectRegistered(PointersToDestroy[1]));
+		if (ItemStateA.Num() == 1)
+		{
+			UItemDurabilityTestInstanceData* RemainingData = Cast<UItemDurabilityTestInstanceData>(ItemStateA[0]);
+			Res &= Test->TestNotNull(TEXT("[Destroy] Remaining instance data should be valid"), RemainingData);
+			if (RemainingData)
+			{
+				// DestroyQuantity pops from the end, so the first one added should remain.
+				Res &= Test->TestEqual(TEXT("[Destroy] Remaining instance data should have correct durability"), RemainingData->Durability, TestDurabilityDestroy1);
+				Res &= Test->TestTrue(TEXT("[Destroy] Remaining instance data should still be registered"), ContextA.TempActor->IsReplicatedSubObjectRegistered(RemainingData));
+			}
+		}
+
+		// 11. Destroy the last knife
+		UItemInstanceData* LastInstancePtr = ItemStateA.Num() > 0 ? ItemStateA[0] : nullptr;
+		Destroyed = ContextA.ItemContainerComponent->DestroyItem_IfServer(ItemIdBrittleCopperKnife, 1, EItemChangeReason::Removed, true);
+		Res &= Test->TestEqual(TEXT("[Destroy] Should destroy the last knife"), Destroyed, 1);
+		Res &= Test->TestEqual(TEXT("[Destroy] Should have 0 knives remaining"), ContextA.ItemContainerComponent->GetContainedQuantity(ItemIdBrittleCopperKnife), 0);
+		ItemStateA = ContextA.ItemContainerComponent->GetItemState(ItemIdBrittleCopperKnife);
+		Res &= Test->TestEqual(TEXT("[Destroy] Should have 0 instance data entries remaining"), ItemStateA.Num(), 0);
+		if (LastInstancePtr)
+		{
+			Res &= Test->TestFalse(TEXT("[Destroy] Last instance should NOT be registered after destruction"), ContextA.TempActor->IsReplicatedSubObjectRegistered(LastInstancePtr));
+		}
+
+		return Res;
+	}
 };
 
 bool FRancItemContainerComponentTest::RunTest(const FString& Parameters)
@@ -437,6 +686,8 @@ bool FRancItemContainerComponentTest::RunTest(const FString& Parameters)
 	Res &= FItemContainerTestScenarios::TestMiscFunctions(this);
 	Res &= FItemContainerTestScenarios::TestSetAddItemValidationCallback(this);
 	Res &= FItemContainerTestScenarios::TestExtractItems(this);
-
+	
+	Res &= FItemContainerTestScenarios::TestInstanceDataTransferBetweenContainers(this);
+	Res &= FItemContainerTestScenarios::TestInstanceDataDropPickupAndDestruction(this);
 	return Res;
 }

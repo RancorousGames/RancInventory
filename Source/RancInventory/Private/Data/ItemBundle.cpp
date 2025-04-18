@@ -1,5 +1,6 @@
 #include "Data/ItemBundle.h"
-
+#include "Core/RISSubsystem.h"
+#include "Data/ItemStaticData.h"
 
 const FItemBundle FItemBundle::EmptyItemInstance(FGameplayTag(), 0);
 
@@ -12,7 +13,7 @@ bool FItemBundleWithInstanceData::IsValid() const
 	return ItemId.IsValid() && Quantity > 0 && (InstanceData.Num() == Quantity || (InstanceData.Num() == 0));
 }
 
-void FItemBundleWithInstanceData::DestroyQuantity(int32 InQuantity)
+void FItemBundleWithInstanceData::DestroyQuantity(int32 InQuantity, AActor* Owner)
 {
 	// Prevent underflow - only destroy up to available quantity
 	
@@ -24,14 +25,22 @@ void FItemBundleWithInstanceData::DestroyQuantity(int32 InQuantity)
 		// TODO: Prioritized destruction
 		if (NumToDestroy > 0)
 		{
-			InstanceData.RemoveAt(InstanceData.Num() - NumToDestroy, NumToDestroy);
+			for (int32 i = 0; i < NumToDestroy; ++i)
+			{
+				UItemInstanceData* InstanceDataToDestroy = InstanceData.Pop();
+				if (InstanceDataToDestroy)
+				{
+					InstanceDataToDestroy->ConditionalBeginDestroy();
+					Owner->RemoveReplicatedSubObject(InstanceDataToDestroy);
+				}
+			}
 		}
 	}
    
 	Quantity -= NumToDestroy;
 }
 
-int32 FItemBundleWithInstanceData::ExtractQuantity(int32 InQuantity, TArray<UItemInstanceData*>& StateArrayToAppendTo)
+int32 FItemBundleWithInstanceData::ExtractQuantity(int32 InQuantity, TArray<UItemInstanceData*>& StateArrayToAppendTo, AActor* Owner)
 {
 	const int32 numToExtract = FMath::Min(InQuantity, Quantity);
    
@@ -45,6 +54,15 @@ int32 FItemBundleWithInstanceData::ExtractQuantity(int32 InQuantity, TArray<UIte
 		if (DynamicDataCount > 0)
 		{
 			StateArrayToAppendTo.Append(InstanceData.GetData() + startIndex, DynamicDataCount);
+
+			for (int32 i = 0; i < DynamicDataCount; ++i)
+			{
+				if (UItemInstanceData* InstanceDataToDestroy = InstanceData[startIndex + i])
+				{
+					Owner->RemoveReplicatedSubObject(InstanceDataToDestroy);
+				}
+			}
+			
 			InstanceData.RemoveAt(startIndex, DynamicDataCount);
 			Quantity = InstanceData.Num();
 		}

@@ -2,6 +2,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "MockClasses/ATestWeaponActor.h"
 #include "ItemDurabilityTestInstanceData.h"
 #include "Engine/Engine.h"
 #include "Engine/GameInstance.h"
@@ -35,6 +36,7 @@ UE_DEFINE_GAMEPLAY_TAG(ItemIdSpecialHelmet, "Test.Items.IDs.SpecialHelmet");
 UE_DEFINE_GAMEPLAY_TAG(ItemIdChestArmor, "Test.Items.IDs.ChestArmor");
 UE_DEFINE_GAMEPLAY_TAG(ItemIdGiantBoulder, "Test.Items.IDs.GiantBoulder");
 UE_DEFINE_GAMEPLAY_TAG(ItemIdBlockingOneHandedItem, "Test.Items.IDs.ItemIdBlockingOneHandedItem");
+UE_DEFINE_GAMEPLAY_TAG(ItemIdUnarmed, "Test.Items.IDs.Unarmed");
 UE_DEFINE_GAMEPLAY_TAG(ItemIdBrittleCopperKnife, "Test.Items.IDs.BrittleCopperKnife");
 UE_DEFINE_GAMEPLAY_TAG(ItemIdShortbow, "Test.Items.IDs.Shortbow");
 UE_DEFINE_GAMEPLAY_TAG(ItemIdLongbow, "Test.Items.IDs.Longbow");
@@ -117,6 +119,7 @@ public:
 		MakeshiftWeaponDefinition->Cooldown = 1.0f;
 		MakeshiftWeaponDefinition->HandCompatability = EHandCompatibility::BothHands;
 		MakeshiftWeaponDefinition->IsLowPriority = true;
+		MakeshiftWeaponDefinition->WeaponActorClass = ATestWeaponActor::StaticClass();
 		RockData->ItemDefinitions.Add(MakeshiftWeaponDefinition);
 
 		UItemStaticData* SticksData = NewObject<UItemStaticData>();
@@ -158,7 +161,29 @@ public:
 		ChestData->ItemWeight = 5;
 		ChestData->ItemCategories.AddTag(ChestSlot);
 		Subsystem->HardcodeItem(ItemIdChestArmor, ChestData);
-
+		
+		UItemStaticData* UnarmedData = NewObject<UItemStaticData>();
+		UnarmedData->ItemId = ItemIdUnarmed;
+		UnarmedData->ItemName = FName("Unarmed");
+		UnarmedData->ItemDescription = FText::FromString("Unarmed");
+		UnarmedData->ItemPrimaryType = ItemTypeResource;
+		UnarmedData->MaxStackSize = 1;
+		UnarmedData->ItemWeight = 0.1;
+		UnarmedData->ItemCategories.AddTag(ItemTypeTwoHanded);
+		UnarmedData->ItemCategories.AddTag(LeftHandSlot);
+		UnarmedData->ItemCategories.AddTag(RightHandSlot); 
+		
+		UWeaponDefinition* UnarmedDefinition = NewObject<UWeaponDefinition>();
+		UnarmedDefinition->WeaponType = ItemTypeTwoHanded;
+		UnarmedDefinition->Damage = 1;
+		UnarmedDefinition->Range = 1;
+		UnarmedDefinition->Cooldown = 1.0f;
+		UnarmedDefinition->HandCompatability = EHandCompatibility::BothHands;
+		UnarmedDefinition->IsLowPriority = true;
+		UnarmedDefinition->WeaponActorClass = ATestWeaponActor::StaticClass();
+		UnarmedData->ItemDefinitions.Add(UnarmedDefinition);
+		Subsystem->HardcodeItem(ItemIdUnarmed, UnarmedData);
+		
 		UItemStaticData* SpearData = NewObject<UItemStaticData>();
 		SpearData->ItemId = ItemIdSpear;
 		SpearData->ItemName = FName("Spear");
@@ -177,6 +202,7 @@ public:
 		SpearWeaponDefinition->Cooldown = 1.0f;
 		SpearWeaponDefinition->HandCompatability = EHandCompatibility::TwoHanded;
 		SpearData->ItemDefinitions.Add(SpearWeaponDefinition);
+		SpearWeaponDefinition->WeaponActorClass = ATestWeaponActor::StaticClass();
 		Subsystem->HardcodeItem(ItemIdSpear, SpearData);
 
 		UItemStaticData* GiantBoulderData = NewObject<UItemStaticData>();
@@ -200,7 +226,7 @@ public:
 		BrittleCopperKnife->ItemDefinitions.Add(MakeshiftWeaponDefinition);
 		BrittleCopperKnife->ItemCategories.AddTag(LeftHandSlot);
 		BrittleCopperKnife->ItemCategories.AddTag(RightHandSlot);
-		BrittleCopperKnife->ItemInstanceDataClass = UItemDurabilityTestInstanceData::StaticClass();
+		BrittleCopperKnife->ItemInstanceDataClass = UItemDurabilityTestInstanceData::StaticClass();		
 
 		UItemStaticData* ShortbowData = NewObject<UItemStaticData>();
 		ShortbowData->ItemId = ItemIdShortbow;
@@ -219,6 +245,7 @@ public:
 		ShortBowWeaponDefinition->Cooldown = 1.0f;
 		ShortBowWeaponDefinition->HandCompatability = EHandCompatibility::OnlyOffhand;
 		ShortbowData->ItemDefinitions.Add(ShortBowWeaponDefinition);
+		ShortBowWeaponDefinition->WeaponActorClass = ATestWeaponActor::StaticClass();
 		Subsystem->HardcodeItem(ItemIdShortbow, ShortbowData);
 
 		
@@ -240,6 +267,7 @@ public:
 		LongbowWeaponDefinition->Cooldown = 1.0f;
 		LongbowWeaponDefinition->HandCompatability = EHandCompatibility::TwoHandedOffhand;
 		LongbowData->ItemDefinitions.Add(LongbowWeaponDefinition);
+		LongbowWeaponDefinition->WeaponActorClass = ATestWeaponActor::StaticClass();
 		Subsystem->HardcodeItem(ItemIdLongbow, LongbowData);
 
 		Subsystem->HardcodeItem(ItemIdBrittleCopperKnife, BrittleCopperKnife);
