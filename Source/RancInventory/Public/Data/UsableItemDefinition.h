@@ -8,7 +8,7 @@
 /**
  * Base class for defining usable items, allowing inline creation in editor.
  */
-UCLASS(Blueprintable, Abstract, EditInlineNew)
+UCLASS(Abstract)
 class RANCINVENTORY_API UUsableItemDefinition : public UItemDefinitionBase
 {
 	GENERATED_BODY()

@@ -5,14 +5,14 @@
 #include "CoreMinimal.h"
 #include "UObject/Object.h"
 #include "RISNetworkingData.h"
-#include "RISGridViewModel.generated.h"
+#include "InventoryGridViewModel.generated.h"
 
 class UInventoryComponent;
 class RancInventoryComponent;
 
 
 UCLASS(Blueprintable)
-class RANCINVENTORY_API URISGridViewModel : public UObject
+class RANCINVENTORY_API UInventoryGridViewModel : public UObject
 {
     GENERATED_BODY()
 

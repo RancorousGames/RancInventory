@@ -28,14 +28,28 @@ void AWorldItem::BeginPlay()
 
 void AWorldItem::SetItem(const FItemBundleWithInstanceData& NewItem)
 {
+	if (IsValid(ItemData))
+	{
+		UE_LOG(LogTemp, Error, TEXT("AWorldItem::SetItem: WorldItem attempted changed after initialization from %s to %s"),
+			*ItemData->ItemId.ToString(), *NewItem.ItemId.ToString());
+		return;
+	}
+	
 	RepresentedItem = NewItem;
 	Initialize();
 }
 
 void AWorldItem::OnRep_Item()
 {
+	if (IsValid(ItemData))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("AWorldItem::OnRep_Item: WorldItem being changed after initialization from %s to %s"),
+			*ItemData->ItemId.ToString(), *RepresentedItem.ItemId.ToString());
+	}
+
+	// Not sure why I added this check, remove if nothing is broken
 	//if (GetClass()->HasAnyClassFlags(CLASS_CompiledFromBlueprint) || !GetClass()->HasAnyClassFlags(CLASS_Native))
-	//{
+	//{ 
 		Initialize();
 	//}
 }
@@ -53,7 +67,10 @@ void AWorldItem::Initialize()
 	for (UItemInstanceData* InstanceData : RepresentedItem.InstanceData)
 	{
 		if (InstanceData)
+		{
+			InstanceData->Initialize(false, this, nullptr);
 			AddReplicatedSubObject(InstanceData);
+		}
 	}
 
 	SetMobility(EComponentMobility::Movable);
@@ -69,7 +86,6 @@ void AWorldItem::Initialize()
 	}
 	else
 	{
-		// cube
 		const FString CubePath = TEXT("StaticMesh'/Engine/BasicShapes/Cube.Cube'");
 		mesh->SetStaticMesh(Cast<UStaticMesh>(StaticLoadObject(UStaticMesh::StaticClass(), NULL, *CubePath)));
 		mesh->SetWorldScale3D(FVector(0.2f, 0.2f, 0.2f));

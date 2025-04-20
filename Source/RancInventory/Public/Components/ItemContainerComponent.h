@@ -125,7 +125,7 @@ public:
     /* Max number of slots contained items are allowed to take up.
      * Note: The inventory doesn't actually store items in slots, it just uses it to calculate whether items can be added */
     UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Ranc Inventory", meta = (ClampMin = "1", UIMin = "1"))
-    int32 MaxContainerSlotCount = MAX_int32;
+    int32 MaxSlotCount = MAX_int32;
 	
 	/* Set whether the container should be configured to a diablo-like jigsaw style
 	 * Note that the inventory/container doesn't actually respect the jigsaw puzzle, only the number of slots.
@@ -219,4 +219,25 @@ private:
 	
     UFUNCTION()
     void OnRep_Items();
+
+public:
+	FORCEINLINE TArray<FItemBundleWithInstanceData>::RangedForIteratorType begin()
+	{
+		return ItemsVer.Items.begin();
+	}
+
+	FORCEINLINE TArray<FItemBundleWithInstanceData>::RangedForConstIteratorType begin() const
+	{
+		return ItemsVer.Items.begin();
+	}
+
+	FORCEINLINE TArray<FItemBundleWithInstanceData>::RangedForIteratorType end()
+	{
+		return ItemsVer.Items.end();
+	}
+
+	FORCEINLINE TArray<FItemBundleWithInstanceData>::RangedForConstIteratorType end() const
+	{
+		return ItemsVer.Items.end();
+	}
 };

@@ -9,7 +9,7 @@
 #include "Framework/DebugTestResult.h"
 #include "MockClasses/ItemHoldingCharacter.h"
 
-#define TestName "GameTests.RIS.RancInventoryComponent"
+#define TestName "GameTests.RIS.InventoryComponent"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRancInventoryComponentTest, TestName,
                                  EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -28,7 +28,7 @@ public:
 		InventoryComponent->UniversalTaggedSlots.Add(FUniversalTaggedSlot(RightHandSlot, LeftHandSlot, ItemTypeTwoHanded, ItemTypeTwoHanded));
 		InventoryComponent->SpecializedTaggedSlots.Add(HelmetSlot);
 		InventoryComponent->SpecializedTaggedSlots.Add(ChestSlot);
-		InventoryComponent->MaxContainerSlotCount = 9;
+		InventoryComponent->MaxSlotCount = 9;
 		InventoryComponent->MaxWeight = CarryCapacity;
 		InventoryComponent->RegisterComponent();
 		TestFixture.InitializeTestItems();
@@ -193,7 +193,7 @@ public:
 		InventoryComponentTestContext Context(100); // Sufficient capacity initially
 		auto* InventoryComponent = Context.InventoryComponent;
 		auto* Subsystem = Context.TestFixture.GetSubsystem();
-		InventoryComponent->MaxContainerSlotCount = 9; // Reset slots for clarity
+		InventoryComponent->MaxSlotCount = 9; // Reset slots for clarity
 		FDebugTestResult Res = true;
 		UGlobalInventoryEventListener* Listener = NewObject<UGlobalInventoryEventListener>();
 		Listener->SubscribeToInventoryComponent(InventoryComponent);
@@ -249,7 +249,7 @@ public:
 		InventoryComponent->Clear_IfServer();
 		Listener->Clear();
 		InventoryComponent->MaxWeight = 100;
-		InventoryComponent->MaxContainerSlotCount = 9;
+		InventoryComponent->MaxSlotCount = 9;
         // Setup: Spear to RightHand (blocking LeftHand)
         InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, RightHandSlot, OneSpear, true);
 		Res &= Test->TestTrue(TEXT("[RemoveAnyItem] Left hand should be blocked (with item)"), InventoryComponent->IsTaggedSlotBlocked(LeftHandSlot));
@@ -920,7 +920,7 @@ public:
 		InventoryComponentTestContext Context(20);
 		auto* InventoryComponent = Context.InventoryComponent;
 		auto* Subsystem = Context.TestFixture.GetSubsystem();
-		InventoryComponent->MaxContainerSlotCount = 2;
+		InventoryComponent->MaxSlotCount = 2;
 
 		FDebugTestResult Res = true;
 		// Create item instances with specified quantities and weights
@@ -1291,7 +1291,7 @@ public:
 		InventoryComponentTestContext Context(20);
 		auto* InventoryComponent = Context.InventoryComponent;
 		auto* Subsystem = Context.TestFixture.GetSubsystem();
-		InventoryComponent->MaxContainerSlotCount = 2; // restrict generic slots
+		InventoryComponent->MaxSlotCount = 2; // restrict generic slots
 
 		FDebugTestResult Res = true;
 
@@ -1428,7 +1428,7 @@ public:
 		InventoryComponentTestContext Context(20);
 		auto* InventoryComponent = Context.InventoryComponent;
 		auto* Subsystem = Context.TestFixture.GetSubsystem();
-		InventoryComponent->MaxContainerSlotCount = 2; // restrict generic slots
+		InventoryComponent->MaxSlotCount = 2; // restrict generic slots
 
 		FDebugTestResult Res = true;
 
@@ -1451,7 +1451,7 @@ public:
 	    InventoryComponentTestContext Context(20);
 	    auto* InventoryComponent = Context.InventoryComponent;
 	    auto* Subsystem = Context.TestFixture.GetSubsystem();
-	    InventoryComponent->MaxContainerSlotCount = 2;
+	    InventoryComponent->MaxSlotCount = 2;
 	    FDebugTestResult Res = true;
 	    UGlobalInventoryEventListener* Listener = NewObject<UGlobalInventoryEventListener>();
 	    Listener->SubscribeToInventoryComponent(InventoryComponent);
@@ -1563,7 +1563,7 @@ public:
 		InventoryComponentTestContext Context(99);
 		auto* InventoryComponent = Context.InventoryComponent;
 		auto* Subsystem = Context.TestFixture.GetSubsystem();
-		InventoryComponent->MaxContainerSlotCount = 9;
+		InventoryComponent->MaxSlotCount = 9;
 		FDebugTestResult Res = true;
 
 		// Add a variety of items to tagged slots

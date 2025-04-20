@@ -12,11 +12,48 @@
 #include "Framework/TestDelegateForwardHelper.h"
 #include "MockClasses/ItemHoldingCharacter.h"
 
-#define TestName "GameTests.RIS.RancItemContainer"
-
-#define TestName "GameTests.RIS.RancItemContainer"
+#define TestName "GameTests.RIS.ItemContainerComponent"
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRancItemContainerComponentTest, TestName,
                                  EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+URecursiveContainerInstanceData* GetRecursiveInstanceData(const FItemBundleWithInstanceData& Bundle)
+{
+	if (Bundle.InstanceData.IsValidIndex(0))
+	{
+		return Cast<URecursiveContainerInstanceData>(Bundle.InstanceData[0]);
+	}
+	return nullptr;
+}
+
+// Helper to safely get the UItemContainerComponent managed by a Recursive Container Instance Data
+UItemContainerComponent* GetRecursiveContainerComponent(const FItemBundleWithInstanceData& Bundle)
+{
+	if (URecursiveContainerInstanceData* InstanceData = GetRecursiveInstanceData(Bundle))
+	{
+		return InstanceData->RepresentedContainer;
+	}
+	return nullptr;
+}
+
+// Helper to find a component of a specific class on an actor
+template <typename T>
+T* FindComponent(AActor* Actor)
+{
+	if (!Actor) return nullptr;
+	return Actor->FindComponentByClass<T>();
+}
+
+// Helper to find ALL components of a specific class on an actor
+template <typename T>
+TArray<T*> FindAllComponents(AActor* Actor)
+{
+	TArray<T*> Components;
+	if (Actor)
+	{
+		Actor->GetComponents<T>(Components);
+	}
+	return Components;
+}
 
 class FItemContainerTestContext
 {
@@ -28,7 +65,7 @@ public:
 		TempActor = TestFixture.GetWorld()->SpawnActor<AItemHoldingCharacter>();
 		ItemContainerComponent = NewObject<UItemContainerComponent>(TempActor);
 
-		ItemContainerComponent->MaxContainerSlotCount = MaxItems;
+		ItemContainerComponent->MaxSlotCount = MaxItems;
 		ItemContainerComponent->MaxWeight = CarryCapacity;
 
 		ItemContainerComponent->RegisterComponent();
@@ -84,7 +121,7 @@ public:
 
 		// Test adding an item when not enough slots are available but under weight limit
 		Context.ItemContainerComponent->Clear_IfServer(); // Clear the inventory
-		Context.ItemContainerComponent->MaxContainerSlotCount = 2;
+		Context.ItemContainerComponent->MaxSlotCount = 2;
 		Context.ItemContainerComponent->AddItem_IfServer(Subsystem, ItemIdRock, 10, false);
 		// Fill two slots with 5 rocks each
 		AddedQuantity = Context.ItemContainerComponent->AddItem_IfServer(Subsystem, OneRock, false);
@@ -122,7 +159,7 @@ public:
 		Res &= Test->TestEqual(
 			TEXT("Total used slot count should be 2"), Context.ItemContainerComponent->UsedContainerSlotCount, 2);
 
-		Context.ItemContainerComponent->MaxContainerSlotCount = 3; // add one more slot
+		Context.ItemContainerComponent->MaxSlotCount = 3; // add one more slot
 		// Test attempting to add an unstackable item that exceeds the weight limit
 		AddedQuantity = Context.ItemContainerComponent->AddItem_IfServer(
 			Subsystem, GiantBoulder, false);
@@ -674,7 +711,354 @@ public:
 
 		return Res;
 	}
+
+	    static bool TestRecursiveContainerLifecycle(FRancItemContainerComponentTest* Test)
+    {
+        // --- Setup ---
+        // Use contexts with unique names to avoid potential world/subsystem conflicts if run in parallel later
+        FItemContainerTestContext ContextA(10, 50); ContextA.TempActor->Rename(TEXT("ActorA"));
+        FItemContainerTestContext ContextB(10, 50); ContextB.TempActor->Rename(TEXT("ActorB"));
+        FItemContainerTestContext ContextC(10, 50); ContextC.TempActor->Rename(TEXT("ActorC"));
+        auto* Subsystem = ContextA.TestFixture.GetSubsystem();
+        FDebugTestResult Res = true;
+
+        const int32 BackpackDefaultSlots = 5;
+        const float BackpackDefaultWeight = 10.0f;
+        const int32 PurseDefaultSlots = 2;
+        const float PurseDefaultWeight = 1.0f;
+        const float KnifeDurability = 88.f;
+
+        // --- Test Steps ---
+
+        // 1. Add Backpack to Container A
+        int32 Added = ContextA.ItemContainerComponent->AddItem_IfServer(Subsystem, ItemIdBackpack, 1, false);
+        Res &= Test->TestEqual(TEXT("[Recursive] 1. Add Backpack: Added Quantity"), Added, 1);
+        FItemBundleWithInstanceData BackpackBundleA = ContextA.ItemContainerComponent->FindItemById(ItemIdBackpack);
+        Res &= Test->TestTrue(TEXT("[Recursive] 1. Add Backpack: Bundle Valid"), BackpackBundleA.IsValid());
+
+        // 2. Verify Instance Data and Sub-Component Creation (A)
+        URecursiveContainerInstanceData* BackpackInstanceA = GetRecursiveInstanceData(BackpackBundleA);
+        Res &= Test->TestNotNull(TEXT("[Recursive] 2. Verify Creation (A): Instance Data Exists"), BackpackInstanceA);
+        if (!BackpackInstanceA) return false; // Stop test if instance data failed
+
+        // Manually set capacity (since Initialize doesn't read static data yet)
+        BackpackInstanceA->MaxSlotCount = BackpackDefaultSlots;
+        BackpackInstanceA->MaxWeight = BackpackDefaultWeight;
+        // Call initialize manually - This should ideally happen automatically when the instance is created/added
+        // For now, we simulate it post-addition. You might need to adjust UItemContainerComponent::AddItem_ServerImpl
+        // or the FItemBundleWithInstanceData constructor to call Initialize if appropriate.
+        BackpackInstanceA->Initialize(true, nullptr, ContextA.ItemContainerComponent);
+
+        UItemContainerComponent* SubContainerA = BackpackInstanceA->RepresentedContainer;
+        Res &= Test->TestNotNull(TEXT("[Recursive] 2. Verify Creation (A): Sub-Component Exists"), SubContainerA);
+        if (!SubContainerA) return false; // Stop test if sub-component failed
+
+        Res &= Test->TestEqual(TEXT("[Recursive] 2. Verify Creation (A): Sub-Component Owner"), SubContainerA->GetOwner(), ContextA.TempActor);
+        Res &= Test->TestTrue(TEXT("[Recursive] 2. Verify Creation (A): Sub-Component Registered"), SubContainerA->IsRegistered());
+        // Initial capacity might not be set by Initialize yet, check based on manual set above
+        Res &= Test->TestEqual(TEXT("[Recursive] 2. Verify Creation (A): Sub-Component Max Slots"), SubContainerA->MaxSlotCount, BackpackDefaultSlots);
+        Res &= Test->TestEqual(TEXT("[Recursive] 2. Verify Creation (A): Sub-Component Max Weight"), SubContainerA->MaxWeight, BackpackDefaultWeight);
+        Res &= Test->TestTrue(TEXT("[Recursive] 2. Verify Creation (A): Instance points to Sub-Component"), BackpackInstanceA->RepresentedContainer == SubContainerA);
+        Res &= Test->TestTrue(TEXT("[Recursive] 2. Verify Creation (A): Backpack Instance Registered"), ContextA.TempActor->IsReplicatedSubObjectRegistered(BackpackInstanceA));
+
+
+        // 3. Add Items INSIDE Backpack (Sub-Container A)
+        Added = SubContainerA->AddItem_IfServer(Subsystem, ItemIdRock, 3, false); // Add 3 Rocks (Weight 3)
+        Res &= Test->TestEqual(TEXT("[Recursive] 3. Add Inside (A): Rocks Added Quantity"), Added, 3);
+        Added = SubContainerA->AddItem_IfServer(Subsystem, ItemIdBrittleCopperKnife, 1, false); // Add 1 Knife (Weight 3)
+        Res &= Test->TestEqual(TEXT("[Recursive] 3. Add Inside (A): Knife Added Quantity"), Added, 1);
+
+        // 4. Verify Contents of Sub-Container A
+        Res &= Test->TestEqual(TEXT("[Recursive] 4. Verify Contents (A): Rock Quantity"), SubContainerA->GetContainedQuantity(ItemIdRock), 3);
+        Res &= Test->TestEqual(TEXT("[Recursive] 4. Verify Contents (A): Knife Quantity"), SubContainerA->GetContainedQuantity(ItemIdBrittleCopperKnife), 1);
+        Res &= Test->TestEqual(TEXT("[Recursive] 4. Verify Contents (A): Sub-Container Weight"), SubContainerA->GetCurrentWeight(), 6.0f); // 3*1 + 3*1
+        Res &= Test->TestFalse(TEXT("[Recursive] 4. Verify Contents (A): Primary Container has Rocks"), ContextA.ItemContainerComponent->Contains(ItemIdRock));
+        Res &= Test->TestFalse(TEXT("[Recursive] 4. Verify Contents (A): Primary Container has Knife"), ContextA.ItemContainerComponent->Contains(ItemIdBrittleCopperKnife));
+
+        // Set and Verify Knife Instance Data (Inside Backpack A)
+        FItemBundleWithInstanceData KnifeBundleA = SubContainerA->FindItemById(ItemIdBrittleCopperKnife);
+        UItemDurabilityTestInstanceData* KnifeInstanceA = KnifeBundleA.InstanceData.Num() > 0 ? Cast<UItemDurabilityTestInstanceData>(KnifeBundleA.InstanceData[0]) : nullptr;
+        Res &= Test->TestNotNull(TEXT("[Recursive] 4. Verify Contents (A): Knife Instance Exists"), KnifeInstanceA);
+        if (KnifeInstanceA)
+        {
+            KnifeInstanceA->Durability = KnifeDurability;
+            Res &= Test->TestTrue(TEXT("[Recursive] 4. Verify Contents (A): Knife Instance Registered"), ContextA.TempActor->IsReplicatedSubObjectRegistered(KnifeInstanceA));
+        }
+
+        // 5. Transfer Backpack from Container A to Container B
+        UItemContainerComponent* PtrSubContainerA_BeforeTransfer = SubContainerA; // Keep pointer
+        URecursiveContainerInstanceData* PtrInstanceA_BeforeTransfer = BackpackInstanceA;
+        UItemDurabilityTestInstanceData* PtrKnifeInstanceA_BeforeTransfer = KnifeInstanceA;
+
+        int32 Transferred = ContextB.ItemContainerComponent->ExtractItemFromContainer_IfServer(ItemIdBackpack, 1, ContextA.ItemContainerComponent, false);
+        Res &= Test->TestEqual(TEXT("[Recursive] 5. Transfer A->B: Transferred Quantity"), Transferred, 1);
+
+        // 6. Verify State After Transfer (A->B)
+        // Container A Checks
+        Res &= Test->TestFalse(TEXT("[Recursive] 6. Verify Post-Transfer (A): Backpack Exists"), ContextA.ItemContainerComponent->Contains(ItemIdBackpack));
+        // Check if component was destroyed - might take a frame, check registration and owner
+        TArray<UItemContainerComponent*> ComponentsOnA = FindAllComponents<UItemContainerComponent>(ContextA.TempActor);
+        bool OldSubStillOnA = ComponentsOnA.Contains(PtrSubContainerA_BeforeTransfer);
+        Res &= Test->TestFalse(TEXT("[Recursive] 6. Verify Post-Transfer (A): Old Sub-Component Still on Actor A"), OldSubStillOnA);
+        Res &= Test->TestFalse(TEXT("[Recursive] 6. Verify Post-Transfer (A): Old Backpack Instance Registered"), ContextA.TempActor->IsReplicatedSubObjectRegistered(PtrInstanceA_BeforeTransfer));
+        if (PtrKnifeInstanceA_BeforeTransfer)
+            Res &= Test->TestFalse(TEXT("[Recursive] 6. Verify Post-Transfer (A): Old Knife Instance Registered"), ContextA.TempActor->IsReplicatedSubObjectRegistered(PtrKnifeInstanceA_BeforeTransfer));
+
+
+        // Container B Checks
+        FItemBundleWithInstanceData BackpackBundleB = ContextB.ItemContainerComponent->FindItemById(ItemIdBackpack);
+        Res &= Test->TestTrue(TEXT("[Recursive] 6. Verify Post-Transfer (B): Backpack Exists"), BackpackBundleB.IsValid());
+        URecursiveContainerInstanceData* BackpackInstanceB = GetRecursiveInstanceData(BackpackBundleB);
+        Res &= Test->TestNotNull(TEXT("[Recursive] 6. Verify Post-Transfer (B): New Backpack Instance Exists"), BackpackInstanceB);
+        Res &= Test->TestTrue(TEXT("[Recursive] 6. Verify Post-Transfer (B): New Backpack Instance Registered"), ContextB.TempActor->IsReplicatedSubObjectRegistered(BackpackInstanceB));
+        if (!BackpackInstanceB) return false;
+
+        // Manually call Initialize again - this reflects the need for the transfer logic to call it.
+        BackpackInstanceB->Initialize(true, nullptr, ContextB.ItemContainerComponent);
+
+        UItemContainerComponent* SubContainerB = BackpackInstanceB->RepresentedContainer;
+        Res &= Test->TestNotNull(TEXT("[Recursive] 6. Verify Post-Transfer (B): New Sub-Component Exists"), SubContainerB);
+        if (!SubContainerB) return false;
+
+        Res &= Test->TestEqual(TEXT("[Recursive] 6. Verify Post-Transfer (B): New Sub-Component Owner"), SubContainerB->GetOwner(), ContextB.TempActor);
+        Res &= Test->TestTrue(TEXT("[Recursive] 6. Verify Post-Transfer (B): New Sub-Component Registered"), SubContainerB->IsRegistered());
+        Res &= Test->TestEqual(TEXT("[Recursive] 6. Verify Post-Transfer (B): New Sub-Component Max Slots"), SubContainerB->MaxSlotCount, BackpackDefaultSlots);
+        Res &= Test->TestEqual(TEXT("[Recursive] 6. Verify Post-Transfer (B): New Sub-Component Max Weight"), SubContainerB->MaxWeight, BackpackDefaultWeight);
+        Res &= Test->TestTrue(TEXT("[Recursive] 6. Verify Post-Transfer (B): Instance points to New Sub-Component"), BackpackInstanceB->RepresentedContainer == SubContainerB);
+
+        // Verify Contents Transferred to SubContainerB
+        Res &= Test->TestEqual(TEXT("[Recursive] 6. Verify Post-Transfer (B): Rock Quantity in New Sub"), SubContainerB->GetContainedQuantity(ItemIdRock), 3);
+        Res &= Test->TestEqual(TEXT("[Recursive] 6. Verify Post-Transfer (B): Knife Quantity in New Sub"), SubContainerB->GetContainedQuantity(ItemIdBrittleCopperKnife), 1);
+        Res &= Test->TestEqual(TEXT("[Recursive] 6. Verify Post-Transfer (B): New Sub-Container Weight"), SubContainerB->GetCurrentWeight(), 6.0f);
+
+        // Verify Knife Instance Data Transferred
+        FItemBundleWithInstanceData KnifeBundleB = SubContainerB->FindItemById(ItemIdBrittleCopperKnife);
+        UItemDurabilityTestInstanceData* KnifeInstanceB = KnifeBundleB.InstanceData.Num() > 0 ? Cast<UItemDurabilityTestInstanceData>(KnifeBundleB.InstanceData[0]) : nullptr;
+        Res &= Test->TestNotNull(TEXT("[Recursive] 6. Verify Post-Transfer (B): Knife Instance Exists in New Sub"), KnifeInstanceB);
+        if (KnifeInstanceB)
+        {
+            Res &= Test->TestEqual(TEXT("[Recursive] 6. Verify Post-Transfer (B): Knife Durability Preserved"), KnifeInstanceB->Durability, KnifeDurability);
+            Res &= Test->TestTrue(TEXT("[Recursive] 6. Verify Post-Transfer (B): Knife Instance Registered on Actor B"), ContextB.TempActor->IsReplicatedSubObjectRegistered(KnifeInstanceB));
+            Res &= Test->TestEqual(TEXT("[Recursive] 6. Verify Post-Transfer (B): Knife Instance Pointer Same"), KnifeInstanceB, PtrKnifeInstanceA_BeforeTransfer); // Pointer check
+        }
+
+        // 7. Drop Backpack from Container B
+        UItemContainerComponent* PtrSubContainerB_BeforeDrop = SubContainerB;
+        URecursiveContainerInstanceData* PtrInstanceB_BeforeDrop = BackpackInstanceB;
+        UItemDurabilityTestInstanceData* PtrKnifeInstanceB_BeforeDrop = KnifeInstanceB;
+
+        int32 Dropped = ContextB.ItemContainerComponent->DropItems(ItemIdBackpack, 1);
+        Res &= Test->TestEqual(TEXT("[Recursive] 7. Drop B->World: Dropped Quantity"), Dropped, 1);
+
+        // 8. Verify State After Drop (B->World)
+        // Container B Checks
+        Res &= Test->TestFalse(TEXT("[Recursive] 8. Verify Post-Drop (B): Backpack Exists"), ContextB.ItemContainerComponent->Contains(ItemIdBackpack));
+        TArray<UItemContainerComponent*> ComponentsOnB = FindAllComponents<UItemContainerComponent>(ContextB.TempActor);
+        bool OldSubStillOnB = ComponentsOnB.Contains(PtrSubContainerB_BeforeDrop);
+        Res &= Test->TestFalse(TEXT("[Recursive] 8. Verify Post-Drop (B): Old Sub-Component Still on Actor B"), OldSubStillOnB);
+        Res &= Test->TestFalse(TEXT("[Recursive] 8. Verify Post-Drop (B): Old Backpack Instance Registered"), ContextB.TempActor->IsReplicatedSubObjectRegistered(PtrInstanceB_BeforeDrop));
+        if (PtrKnifeInstanceB_BeforeDrop)
+            Res &= Test->TestFalse(TEXT("[Recursive] 8. Verify Post-Drop (B): Old Knife Instance Registered"), ContextB.TempActor->IsReplicatedSubObjectRegistered(PtrKnifeInstanceB_BeforeDrop));
+
+        // WorldItem Checks
+        AWorldItem* DroppedWorldItem = nullptr;
+        UWorld* World = ContextB.TestFixture.GetWorld(); // Use any context's world
+        for (TActorIterator<AWorldItem> It(World); It; ++It)
+        {
+            if (It->RepresentedItem.ItemId == ItemIdBackpack)
+            {
+                DroppedWorldItem = *It;
+                break;
+            }
+        }
+        Res &= Test->TestNotNull(TEXT("[Recursive] 8. Verify Post-Drop (World): WorldItem Found"), DroppedWorldItem);
+        if (!DroppedWorldItem) return false;
+
+        FItemBundleWithInstanceData BackpackBundleWorld = DroppedWorldItem->RepresentedItem;
+        Res &= Test->TestTrue(TEXT("[Recursive] 8. Verify Post-Drop (World): Backpack Bundle Valid"), BackpackBundleWorld.IsValid());
+        URecursiveContainerInstanceData* BackpackInstanceWorld = GetRecursiveInstanceData(BackpackBundleWorld);
+        Res &= Test->TestNotNull(TEXT("[Recursive] 8. Verify Post-Drop (World): Backpack Instance Exists"), BackpackInstanceWorld);
+        Res &= Test->TestTrue(TEXT("[Recursive] 8. Verify Post-Drop (World): Backpack Instance Registered on WorldItem"), DroppedWorldItem->IsReplicatedSubObjectRegistered(BackpackInstanceWorld));
+        if (!BackpackInstanceWorld) return false;
+
+        // Manually call Initialize for WorldItem
+        BackpackInstanceWorld->Initialize(false, DroppedWorldItem, nullptr);
+
+        UItemContainerComponent* SubContainerWorld = BackpackInstanceWorld->RepresentedContainer;
+        Res &= Test->TestNotNull(TEXT("[Recursive] 8. Verify Post-Drop (World): Sub-Component Exists"), SubContainerWorld);
+        if (!SubContainerWorld) return false;
+
+        Res &= Test->TestTrue(TEXT("[Recursive] 8. Verify Post-Drop (World): Sub-Component Owner is WorldItem"), SubContainerWorld->GetOwner() == DroppedWorldItem);
+        Res &= Test->TestTrue(TEXT("[Recursive] 8. Verify Post-Drop (World): Sub-Component Registered"), SubContainerWorld->IsRegistered());
+        Res &= Test->TestEqual(TEXT("[Recursive] 8. Verify Post-Drop (World): Sub-Component Max Slots"), SubContainerWorld->MaxSlotCount, BackpackDefaultSlots);
+        Res &= Test->TestEqual(TEXT("[Recursive] 8. Verify Post-Drop (World): Sub-Component Max Weight"), SubContainerWorld->MaxWeight, BackpackDefaultWeight);
+        Res &= Test->TestTrue(TEXT("[Recursive] 8. Verify Post-Drop (World): Instance points to Sub-Component"), BackpackInstanceWorld->RepresentedContainer == SubContainerWorld);
+
+        // Verify Contents in WorldItem's SubContainer
+        Res &= Test->TestEqual(TEXT("[Recursive] 8. Verify Post-Drop (World): Rock Quantity in Sub"), SubContainerWorld->GetContainedQuantity(ItemIdRock), 3);
+        Res &= Test->TestEqual(TEXT("[Recursive] 8. Verify Post-Drop (World): Knife Quantity in Sub"), SubContainerWorld->GetContainedQuantity(ItemIdBrittleCopperKnife), 1);
+        FItemBundleWithInstanceData KnifeBundleWorld = SubContainerWorld->FindItemById(ItemIdBrittleCopperKnife);
+        UItemDurabilityTestInstanceData* KnifeInstanceWorld = KnifeBundleWorld.InstanceData.Num() > 0 ? Cast<UItemDurabilityTestInstanceData>(KnifeBundleWorld.InstanceData[0]) : nullptr;
+        Res &= Test->TestNotNull(TEXT("[Recursive] 8. Verify Post-Drop (World): Knife Instance Exists in Sub"), KnifeInstanceWorld);
+        if (KnifeInstanceWorld)
+        {
+            Res &= Test->TestEqual(TEXT("[Recursive] 8. Verify Post-Drop (World): Knife Durability Preserved"), KnifeInstanceWorld->Durability, KnifeDurability);
+            Res &= Test->TestTrue(TEXT("[Recursive] 8. Verify Post-Drop (World): Knife Instance Registered on WorldItem"), DroppedWorldItem->IsReplicatedSubObjectRegistered(KnifeInstanceWorld));
+            Res &= Test->TestEqual(TEXT("[Recursive] 8. Verify Post-Drop (World): Knife Instance Pointer Same"), KnifeInstanceWorld, PtrKnifeInstanceB_BeforeDrop); // Pointer check
+        }
+
+        // 9. Pick Up Backpack from World into Container C
+        UItemContainerComponent* PtrSubContainerWorld_BeforePickup = SubContainerWorld;
+        URecursiveContainerInstanceData* PtrInstanceWorld_BeforePickup = BackpackInstanceWorld;
+        UItemDurabilityTestInstanceData* PtrKnifeInstanceWorld_BeforePickup = KnifeInstanceWorld;
+
+        Added = ContextC.ItemContainerComponent->AddItem_IfServer(DroppedWorldItem, ItemIdBackpack, 1, false);
+        Res &= Test->TestEqual(TEXT("[Recursive] 9. Pickup World->C: Added Quantity"), Added, 1);
+
+        // 10. Verify State After Pickup (World->C)
+        // WorldItem Checks
+        if (DroppedWorldItem) // Should still be valid but potentially empty/pending kill
+        {
+             Res &= Test->TestEqual(TEXT("[Recursive] 10. Verify Post-Pickup (World): Item Quantity"), DroppedWorldItem->GetContainedQuantity(ItemIdBackpack), 0);
+             TArray<UItemContainerComponent*> ComponentsOnWorld = FindAllComponents<UItemContainerComponent>(DroppedWorldItem);
+             bool OldSubStillOnWorld = ComponentsOnWorld.Contains(PtrSubContainerWorld_BeforePickup);
+             Res &= Test->TestFalse(TEXT("[Recursive] 10. Verify Post-Pickup (World): Old Sub-Component Still on WorldItem"), OldSubStillOnWorld);
+             Res &= Test->TestFalse(TEXT("[Recursive] 10. Verify Post-Pickup (World): Old Backpack Instance Registered"), DroppedWorldItem->IsReplicatedSubObjectRegistered(PtrInstanceWorld_BeforePickup));
+             if (PtrKnifeInstanceWorld_BeforePickup)
+                  Res &= Test->TestFalse(TEXT("[Recursive] 10. Verify Post-Pickup (World): Old Knife Instance Registered"), DroppedWorldItem->IsReplicatedSubObjectRegistered(PtrKnifeInstanceWorld_BeforePickup));
+             DroppedWorldItem->Destroy(); // Clean up the actor
+        }
+
+        // Container C Checks
+        FItemBundleWithInstanceData BackpackBundleC = ContextC.ItemContainerComponent->FindItemById(ItemIdBackpack);
+        Res &= Test->TestTrue(TEXT("[Recursive] 10. Verify Post-Pickup (C): Backpack Exists"), BackpackBundleC.IsValid());
+        URecursiveContainerInstanceData* BackpackInstanceC = GetRecursiveInstanceData(BackpackBundleC);
+        Res &= Test->TestNotNull(TEXT("[Recursive] 10. Verify Post-Pickup (C): New Backpack Instance Exists"), BackpackInstanceC);
+        Res &= Test->TestTrue(TEXT("[Recursive] 10. Verify Post-Pickup (C): New Backpack Instance Registered"), ContextC.TempActor->IsReplicatedSubObjectRegistered(BackpackInstanceC));
+        if(!BackpackInstanceC) return false;
+
+        // Manual Initialize
+        BackpackInstanceC->Initialize(true, nullptr, ContextC.ItemContainerComponent);
+
+        UItemContainerComponent* SubContainerC = BackpackInstanceC->RepresentedContainer;
+        Res &= Test->TestNotNull(TEXT("[Recursive] 10. Verify Post-Pickup (C): New Sub-Component Exists"), SubContainerC);
+         if(!SubContainerC) return false;
+
+        Res &= Test->TestEqual(TEXT("[Recursive] 10. Verify Post-Pickup (C): New Sub-Component Owner"), SubContainerC->GetOwner(), ContextC.TempActor);
+        Res &= Test->TestTrue(TEXT("[Recursive] 10. Verify Post-Pickup (C): New Sub-Component Registered"), SubContainerC->IsRegistered());
+        Res &= Test->TestEqual(TEXT("[Recursive] 10. Verify Post-Pickup (C): Rock Quantity in New Sub"), SubContainerC->GetContainedQuantity(ItemIdRock), 3);
+        Res &= Test->TestEqual(TEXT("[Recursive] 10. Verify Post-Pickup (C): Knife Quantity in New Sub"), SubContainerC->GetContainedQuantity(ItemIdBrittleCopperKnife), 1);
+        FItemBundleWithInstanceData KnifeBundleC = SubContainerC->FindItemById(ItemIdBrittleCopperKnife);
+        UItemDurabilityTestInstanceData* KnifeInstanceC = KnifeBundleC.InstanceData.Num() > 0 ? Cast<UItemDurabilityTestInstanceData>(KnifeBundleC.InstanceData[0]) : nullptr;
+        Res &= Test->TestNotNull(TEXT("[Recursive] 10. Verify Post-Pickup (C): Knife Instance Exists in New Sub"), KnifeInstanceC);
+        if (KnifeInstanceC)
+        {
+            Res &= Test->TestEqual(TEXT("[Recursive] 10. Verify Post-Pickup (C): Knife Durability Preserved"), KnifeInstanceC->Durability, KnifeDurability);
+            Res &= Test->TestTrue(TEXT("[Recursive] 10. Verify Post-Pickup (C): Knife Instance Registered on Actor C"), ContextC.TempActor->IsReplicatedSubObjectRegistered(KnifeInstanceC));
+            Res &= Test->TestEqual(TEXT("[Recursive] 10. Verify Post-Pickup (C): Knife Instance Pointer Same"), KnifeInstanceC, PtrKnifeInstanceWorld_BeforePickup); // Pointer check
+        }
+
+        // 11. Nested Test: Backpack in A -> Add Purse to Backpack -> Add Rocks to Purse -> Transfer Backpack A->B
+        ContextA.ItemContainerComponent->Clear_IfServer(); // Reset A & B
+        ContextB.ItemContainerComponent->Clear_IfServer();
+
+        // Add backpack to A, initialize
+        ContextA.ItemContainerComponent->AddItem_IfServer(Subsystem, ItemIdBackpack, 1, false);
+        BackpackBundleA = ContextA.ItemContainerComponent->FindItemById(ItemIdBackpack);
+        BackpackInstanceA = GetRecursiveInstanceData(BackpackBundleA);
+        BackpackInstanceA->MaxSlotCount = BackpackDefaultSlots; BackpackInstanceA->MaxWeight = BackpackDefaultWeight;
+        BackpackInstanceA->Initialize(true, nullptr, ContextA.ItemContainerComponent);
+        SubContainerA = BackpackInstanceA->RepresentedContainer;
+        Res &= Test->TestNotNull(TEXT("[Nested] 11. Setup: SubContainerA valid"), SubContainerA);
+        if (!SubContainerA) return false;
+
+        // Add Coin Purse INSIDE Backpack A
+        Added = SubContainerA->AddItem_IfServer(Subsystem, ItemIdCoinPurse, 1, false);
+        Res &= Test->TestEqual(TEXT("[Nested] 11. Setup: Added Purse to Backpack"), Added, 1);
+        FItemBundleWithInstanceData PurseBundleA = SubContainerA->FindItemById(ItemIdCoinPurse);
+        Res &= Test->TestTrue(TEXT("[Nested] 11. Setup: Purse Bundle valid"), PurseBundleA.IsValid());
+        URecursiveContainerInstanceData* PurseInstanceA = GetRecursiveInstanceData(PurseBundleA);
+        Res &= Test->TestNotNull(TEXT("[Nested] 11. Setup: Purse Instance valid"), PurseInstanceA);
+        if (!PurseInstanceA) return false;
+
+        // Initialize Purse Instance Data
+        PurseInstanceA->MaxSlotCount = PurseDefaultSlots; PurseInstanceA->MaxWeight = PurseDefaultWeight;
+        // Initialize needs owner info. The 'OwningContainer' for the purse instance is SubContainerA
+        PurseInstanceA->Initialize(true, nullptr, SubContainerA);
+        UItemContainerComponent* SubContainerPurseA = PurseInstanceA->RepresentedContainer;
+        Res &= Test->TestNotNull(TEXT("[Nested] 11. Setup: SubContainerPurseA valid"), SubContainerPurseA);
+        Res &= Test->TestEqual(TEXT("[Nested] 11. Setup: SubContainerPurseA owner"), SubContainerPurseA->GetOwner(), ContextA.TempActor); // Still owned by Actor A
+        if (!SubContainerPurseA) return false;
+
+        // Add Rocks INSIDE Coin Purse A
+        Added = SubContainerPurseA->AddItem_IfServer(Subsystem, ItemIdRock, 1, false); // 1 Rock (Weight 1)
+        Res &= Test->TestEqual(TEXT("[Nested] 11. Setup: Added Rocks to Purse"), Added, 1);
+        Res &= Test->TestEqual(TEXT("[Nested] 11. Setup: Purse Content Quantity"), SubContainerPurseA->GetContainedQuantity(ItemIdRock), 1);
+        Res &= Test->TestEqual(TEXT("[Nested] 11. Setup: Purse Weight"), SubContainerPurseA->GetCurrentWeight(), 1.0f);
+        Res &= Test->TestFalse(TEXT("[Nested] 11. Setup: Backpack contains Rocks"), SubContainerA->Contains(ItemIdRock));
+
+        // Transfer Backpack (containing purse containing rocks) from A to B
+        ContextB.ItemContainerComponent->ExtractItemFromContainer_IfServer(ItemIdBackpack, 1, ContextA.ItemContainerComponent, false);
+
+        // Verify Nested Structure on B
+        BackpackBundleB = ContextB.ItemContainerComponent->FindItemById(ItemIdBackpack);
+        BackpackInstanceB = GetRecursiveInstanceData(BackpackBundleB);
+         if (!BackpackInstanceB) return false;
+        BackpackInstanceB->Initialize(true, nullptr, ContextB.ItemContainerComponent); // Manually initialize
+        SubContainerB = BackpackInstanceB->RepresentedContainer;
+        Res &= Test->TestNotNull(TEXT("[Nested] 11. Verify Transfer: SubContainerB valid"), SubContainerB);
+        Res &= Test->TestEqual(TEXT("[Nested] 11. Verify Transfer: SubContainerB owner"), SubContainerB->GetOwner(), ContextB.TempActor);
+        if (!SubContainerB) return false;
+
+        // Verify Purse exists inside Backpack B
+        FItemBundleWithInstanceData PurseBundleB = SubContainerB->FindItemById(ItemIdCoinPurse);
+        Res &= Test->TestTrue(TEXT("[Nested] 11. Verify Transfer: Purse Bundle valid in B"), PurseBundleB.IsValid());
+        URecursiveContainerInstanceData* PurseInstanceB = GetRecursiveInstanceData(PurseBundleB);
+        Res &= Test->TestNotNull(TEXT("[Nested] 11. Verify Transfer: Purse Instance valid in B"), PurseInstanceB);
+        if (!PurseInstanceB) return false;
+
+        // Manually initialize Purse on B
+        PurseInstanceB->Initialize(true, nullptr, SubContainerB);
+        UItemContainerComponent* SubContainerPurseB = PurseInstanceB->RepresentedContainer;
+        Res &= Test->TestNotNull(TEXT("[Nested] 11. Verify Transfer: SubContainerPurseB valid"), SubContainerPurseB);
+        Res &= Test->TestEqual(TEXT("[Nested] 11. Verify Transfer: SubContainerPurseB owner"), SubContainerPurseB->GetOwner(), ContextB.TempActor); // Now owned by Actor B
+        if (!SubContainerPurseB) return false;
+
+        // Verify Rocks exist inside Purse B
+        Res &= Test->TestEqual(TEXT("[Nested] 11. Verify Transfer: Rock Quantity in Purse B"), SubContainerPurseB->GetContainedQuantity(ItemIdRock), 1);
+        Res &= Test->TestEqual(TEXT("[Nested] 11. Verify Transfer: Purse B Weight"), SubContainerPurseB->GetCurrentWeight(), 1.0f);
+        Res &= Test->TestFalse(TEXT("[Nested] 11. Verify Transfer: Backpack B contains Rocks"), SubContainerB->Contains(ItemIdRock));
+
+        // 12. Destruction Test
+        ContextA.ItemContainerComponent->Clear_IfServer(); // Reset A
+        // Add backpack to A, initialize
+        ContextA.ItemContainerComponent->AddItem_IfServer(Subsystem, ItemIdBackpack, 1, false);
+        BackpackBundleA = ContextA.ItemContainerComponent->FindItemById(ItemIdBackpack);
+        BackpackInstanceA = GetRecursiveInstanceData(BackpackBundleA);
+        BackpackInstanceA->MaxSlotCount = BackpackDefaultSlots; BackpackInstanceA->MaxWeight = BackpackDefaultWeight;
+        BackpackInstanceA->Initialize(true, nullptr, ContextA.ItemContainerComponent);
+        SubContainerA = BackpackInstanceA->RepresentedContainer;
+        Res &= Test->TestNotNull(TEXT("[Destroy] 12. Setup: SubContainerA valid"), SubContainerA);
+        if (!SubContainerA) return false;
+        UItemContainerComponent* PtrSubContainerA_BeforeDestroy = SubContainerA;
+
+        // Destroy the backpack item
+        int32 Destroyed = ContextA.ItemContainerComponent->DestroyItem_IfServer(ItemIdBackpack, 1, EItemChangeReason::Removed, true);
+        Res &= Test->TestEqual(TEXT("[Destroy] 12. Verify: Destroyed Quantity"), Destroyed, 1);
+        Res &= Test->TestFalse(TEXT("[Destroy] 12. Verify: Backpack Exists"), ContextA.ItemContainerComponent->Contains(ItemIdBackpack));
+
+        // Verify the sub-component associated with the backpack is gone
+        TArray<UItemContainerComponent*> ComponentsOnA_AfterDestroy = FindAllComponents<UItemContainerComponent>(ContextA.TempActor);
+        bool SubStillOnA_AfterDestroy = ComponentsOnA_AfterDestroy.Contains(PtrSubContainerA_BeforeDestroy);
+        // Note: Destruction might be deferred, check if it's unregistered or !IsValid
+        Res &= Test->TestFalse(TEXT("[Destroy] 12. Verify: Old Sub-Component Still on Actor A after destroy"), SubStillOnA_AfterDestroy);
+         // Ideally check PtrSubContainerA_BeforeDestroy->IsPendingKill() or similar if needed
+
+
+        return Res;
+    }
 };
+
 
 bool FRancItemContainerComponentTest::RunTest(const FString& Parameters)
 {
@@ -689,5 +1073,6 @@ bool FRancItemContainerComponentTest::RunTest(const FString& Parameters)
 	
 	Res &= FItemContainerTestScenarios::TestInstanceDataTransferBetweenContainers(this);
 	Res &= FItemContainerTestScenarios::TestInstanceDataDropPickupAndDestruction(this);
+    Res &= FItemContainerTestScenarios::TestRecursiveContainerLifecycle(this);
 	return Res;
 }

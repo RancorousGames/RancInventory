@@ -1,6 +1,6 @@
 ﻿// Copyright Rancorous Games, 2024
 
-#include "ViewModels/RISGridViewModel.h"
+#include "ViewModels/InventoryGridViewModel.h"
 
 #include "LogRancInventorySystem.h"
 #include "Components/InventoryComponent.h"
@@ -8,7 +8,7 @@
 
 class UInventoryComponent;
 
-void URISGridViewModel::Initialize_Implementation(UInventoryComponent* InventoryComponent, int32 NumSlots,  bool bPreferEmptyUniversalSlots)
+void UInventoryGridViewModel::Initialize_Implementation(UInventoryComponent* InventoryComponent, int32 NumSlots,  bool bPreferEmptyUniversalSlots)
 {
 	if (IsInitialized)
 		return;
@@ -33,12 +33,12 @@ void URISGridViewModel::Initialize_Implementation(UInventoryComponent* Inventory
 		ViewableGridSlots.Add(FItemBundle());
 	}
 
-	LinkedInventoryComponent->OnItemAddedToContainer.AddDynamic(this, &URISGridViewModel::HandleItemAdded);
-	LinkedInventoryComponent->OnItemRemovedFromContainer.AddDynamic(this, &URISGridViewModel::HandleItemRemoved);
+	LinkedInventoryComponent->OnItemAddedToContainer.AddDynamic(this, &UInventoryGridViewModel::HandleItemAdded);
+	LinkedInventoryComponent->OnItemRemovedFromContainer.AddDynamic(this, &UInventoryGridViewModel::HandleItemRemoved);
 	LinkedInventoryComponent->OnItemAddedToTaggedSlot.
-	                          AddDynamic(this, &URISGridViewModel::HandleTaggedItemAdded);
+	                          AddDynamic(this, &UInventoryGridViewModel::HandleTaggedItemAdded);
 	LinkedInventoryComponent->OnItemRemovedFromTaggedSlot.AddDynamic(
-		this, &URISGridViewModel::HandleTaggedItemRemoved);
+		this, &UInventoryGridViewModel::HandleTaggedItemRemoved);
 
 
 	TArray<FItemBundleWithInstanceData> Items = LinkedInventoryComponent->GetAllContainerItems();
@@ -95,19 +95,19 @@ void URISGridViewModel::Initialize_Implementation(UInventoryComponent* Inventory
 }
 
 
-bool URISGridViewModel::IsSlotEmpty(int32 SlotIndex) const
+bool UInventoryGridViewModel::IsSlotEmpty(int32 SlotIndex) const
 {
 	return !ViewableGridSlots.IsValidIndex(SlotIndex) || !ViewableGridSlots[SlotIndex].ItemId.IsValid();
 }
 
 
-bool URISGridViewModel::IsTaggedSlotEmpty(const FGameplayTag& SlotTag) const
+bool UInventoryGridViewModel::IsTaggedSlotEmpty(const FGameplayTag& SlotTag) const
 {
 	return !ViewableTaggedSlots.Contains(SlotTag) || !ViewableTaggedSlots[SlotTag].ItemId.IsValid();
 }
 
 
-FItemBundle URISGridViewModel::GetItem(int32 SlotIndex) const
+FItemBundle UInventoryGridViewModel::GetItem(int32 SlotIndex) const
 {
 	if (ViewableGridSlots.IsValidIndex(SlotIndex))
 	{
@@ -119,7 +119,7 @@ FItemBundle URISGridViewModel::GetItem(int32 SlotIndex) const
 }
 
 
-int32 URISGridViewModel::DropItem(FGameplayTag TaggedSlot, int32 SlotIndex, int32 Quantity)
+int32 UInventoryGridViewModel::DropItem(FGameplayTag TaggedSlot, int32 SlotIndex, int32 Quantity)
 {
 	if (!LinkedInventoryComponent ||
 		(TaggedSlot.IsValid() && !ViewableTaggedSlots.Contains(TaggedSlot)) ||
@@ -159,7 +159,7 @@ int32 URISGridViewModel::DropItem(FGameplayTag TaggedSlot, int32 SlotIndex, int3
 	return DroppedCount;
 }
 
-int32 URISGridViewModel::UseItem(FGameplayTag TaggedSlot, int32 SlotIndex)
+int32 UInventoryGridViewModel::UseItem(FGameplayTag TaggedSlot, int32 SlotIndex)
 {
 	if (!LinkedInventoryComponent ||
 		(TaggedSlot.IsValid() && !ViewableTaggedSlots.Contains(TaggedSlot)) ||
@@ -178,7 +178,7 @@ int32 URISGridViewModel::UseItem(FGameplayTag TaggedSlot, int32 SlotIndex)
 	return 0;
 }
 
-bool URISGridViewModel::MoveItem_Implementation(FGameplayTag SourceTaggedSlot,
+bool UInventoryGridViewModel::MoveItem_Implementation(FGameplayTag SourceTaggedSlot,
 												 int32 SourceSlotIndex,
 												 FGameplayTag TargetTaggedSlot,
 												 int32 TargetSlotIndex)
@@ -187,7 +187,7 @@ bool URISGridViewModel::MoveItem_Implementation(FGameplayTag SourceTaggedSlot,
 	return MoveItem_Impl(SourceTaggedSlot, SourceSlotIndex, TargetTaggedSlot, TargetSlotIndex, 0, false);
 }
 
-bool URISGridViewModel::SplitItem_Implementation(FGameplayTag SourceTaggedSlot,
+bool UInventoryGridViewModel::SplitItem_Implementation(FGameplayTag SourceTaggedSlot,
 												  int32 SourceSlotIndex,
 												  FGameplayTag TargetTaggedSlot,
 												  int32 TargetSlotIndex,
@@ -197,7 +197,7 @@ bool URISGridViewModel::SplitItem_Implementation(FGameplayTag SourceTaggedSlot,
 	return MoveItem_Impl(SourceTaggedSlot, SourceSlotIndex, TargetTaggedSlot, TargetSlotIndex, Quantity, true);
 }
 
-bool URISGridViewModel::TryUnblockingMove(FGameplayTag TargetTaggedSlot, FGameplayTag ItemId)
+bool UInventoryGridViewModel::TryUnblockingMove(FGameplayTag TargetTaggedSlot, FGameplayTag ItemId)
 {
 	bool Unblocked = true;
 	if (auto* BlockingSlot = LinkedInventoryComponent->WouldItemMoveIndirectlyViolateBlocking(TargetTaggedSlot, URISSubsystem::GetItemDataById(ItemId)))
@@ -213,7 +213,7 @@ bool URISGridViewModel::TryUnblockingMove(FGameplayTag TargetTaggedSlot, FGamepl
 	return Unblocked;
 }
 
-bool URISGridViewModel::MoveItem_Impl(FGameplayTag SourceTaggedSlot,
+bool UInventoryGridViewModel::MoveItem_Impl(FGameplayTag SourceTaggedSlot,
                                       int32 SourceSlotIndex,
                                       FGameplayTag TargetTaggedSlot,
                                       int32 TargetSlotIndex,
@@ -371,7 +371,7 @@ bool URISGridViewModel::MoveItem_Impl(FGameplayTag SourceTaggedSlot,
     return true;
 }
 
-bool URISGridViewModel::CanSlotReceiveItem_Implementation(const FGameplayTag& ItemId, int32 Quantity, int32 SlotIndex) const
+bool UInventoryGridViewModel::CanSlotReceiveItem_Implementation(const FGameplayTag& ItemId, int32 Quantity, int32 SlotIndex) const
 {
 	if (!ViewableGridSlots.IsValidIndex(SlotIndex))
 	{
@@ -398,7 +398,7 @@ bool URISGridViewModel::CanSlotReceiveItem_Implementation(const FGameplayTag& It
 	return false; // Different item types or slot not stackable
 }
 
-bool URISGridViewModel::CanTaggedSlotReceiveItem_Implementation(const FGameplayTag& ItemId, int32 Quantity, const FGameplayTag& SlotTag, bool CheckContainerLimits) const
+bool UInventoryGridViewModel::CanTaggedSlotReceiveItem_Implementation(const FGameplayTag& ItemId, int32 Quantity, const FGameplayTag& SlotTag, bool CheckContainerLimits) const
 {
 	bool BasicCheck = LinkedInventoryComponent->IsTaggedSlotCompatible(ItemId, SlotTag) && !LinkedInventoryComponent->IsTaggedSlotBlocked(SlotTag) && (!CheckContainerLimits || LinkedInventoryComponent->
 		CanContainerReceiveItems(ItemId, Quantity));
@@ -422,7 +422,7 @@ bool URISGridViewModel::CanTaggedSlotReceiveItem_Implementation(const FGameplayT
 	return false;
 }
 
-void URISGridViewModel::HandleItemAdded_Implementation(const UItemStaticData* ItemData, int32 Quantity, EItemChangeReason Reason)
+void UInventoryGridViewModel::HandleItemAdded_Implementation(const UItemStaticData* ItemData, int32 Quantity, EItemChangeReason Reason)
 {
 	// Iterate in reverse to safely remove items
 	for (int32 i = OperationsToConfirm.Num() - 1; i >= 0; --i)
@@ -475,7 +475,7 @@ void URISGridViewModel::HandleItemAdded_Implementation(const UItemStaticData* It
 	}
 }
 
-void URISGridViewModel::HandleTaggedItemAdded_Implementation(const FGameplayTag& SlotTag, const UItemStaticData* ItemData, int32 Quantity, FTaggedItemBundle PreviousItem, EItemChangeReason Reason)
+void UInventoryGridViewModel::HandleTaggedItemAdded_Implementation(const FGameplayTag& SlotTag, const UItemStaticData* ItemData, int32 Quantity, FTaggedItemBundle PreviousItem, EItemChangeReason Reason)
 {
 	for (int32 i = OperationsToConfirm.Num() - 1; i >= 0; --i)
 	{
@@ -497,7 +497,7 @@ void URISGridViewModel::HandleTaggedItemAdded_Implementation(const FGameplayTag&
 	OnTaggedSlotUpdated.Broadcast(SlotTag);
 }
 
-void URISGridViewModel::HandleItemRemoved_Implementation(const UItemStaticData* ItemData, int32 Quantity, EItemChangeReason Reason)
+void UInventoryGridViewModel::HandleItemRemoved_Implementation(const UItemStaticData* ItemData, int32 Quantity, EItemChangeReason Reason)
 {
 	for (int32 i = OperationsToConfirm.Num() - 1; i >= 0; --i)
 	{
@@ -546,7 +546,7 @@ void URISGridViewModel::HandleItemRemoved_Implementation(const UItemStaticData* 
 	}
 }
 
-void URISGridViewModel::HandleTaggedItemRemoved_Implementation(const FGameplayTag& SlotTag, const UItemStaticData* ItemData, int32 Quantity, EItemChangeReason Reason)
+void UInventoryGridViewModel::HandleTaggedItemRemoved_Implementation(const FGameplayTag& SlotTag, const UItemStaticData* ItemData, int32 Quantity, EItemChangeReason Reason)
 {
 	for (int32 i = OperationsToConfirm.Num() - 1; i >= 0; --i)
 	{
@@ -581,18 +581,18 @@ void URISGridViewModel::HandleTaggedItemRemoved_Implementation(const FGameplayTa
 	}
 }
 
-void URISGridViewModel::ForceFullUpdate_Implementation()
+void UInventoryGridViewModel::ForceFullUpdate_Implementation()
 {
 	// TODO: Implement this, we prefer not to just call initialize as that will loose all slot mappings
 }
 
-FTaggedItemBundle& URISGridViewModel::GetItemForTaggedSlot(const FGameplayTag& SlotTag) const
+FTaggedItemBundle& UInventoryGridViewModel::GetItemForTaggedSlot(const FGameplayTag& SlotTag) const
 {
 	// cast away constness to allow for modification
 	return const_cast<FTaggedItemBundle&>(ViewableTaggedSlots.FindChecked(SlotTag));
 }
 
-bool URISGridViewModel::AssertViewModelSettled() const
+bool UInventoryGridViewModel::AssertViewModelSettled() const
 {
 	// Check operations to confirm
 	bool bAllSlotsSettled = OperationsToConfirm.Num() == 0;
@@ -654,7 +654,7 @@ bool URISGridViewModel::AssertViewModelSettled() const
 	return bAllSlotsSettled && bAllSlotsQuantitiesMatched && bAllTaggedSlotsTagMatched;
 }
 
-void URISGridViewModel::PickupItem(AWorldItem* WorldItem, EPreferredSlotPolicy PreferTaggedSlots, bool DestroyAfterPickup)
+void UInventoryGridViewModel::PickupItem(AWorldItem* WorldItem, EPreferredSlotPolicy PreferTaggedSlots, bool DestroyAfterPickup)
 {
 	if (WorldItem == nullptr || !WorldItem->IsValidLowLevel())
 	{
@@ -666,7 +666,7 @@ void URISGridViewModel::PickupItem(AWorldItem* WorldItem, EPreferredSlotPolicy P
 }
 
 
-int32 URISGridViewModel::FindSlotIndexForItem_Implementation(const FGameplayTag& ItemId, int32 Quantity)
+int32 UInventoryGridViewModel::FindSlotIndexForItem_Implementation(const FGameplayTag& ItemId, int32 Quantity)
 {
 	const UItemStaticData* ItemData = URISSubsystem::GetItemDataById(ItemId);
 
@@ -691,7 +691,7 @@ int32 URISGridViewModel::FindSlotIndexForItem_Implementation(const FGameplayTag&
 	return FirstEmptySlot;
 }
 
-FGameplayTag URISGridViewModel::FindTaggedSlotForItem(const FGameplayTag& ItemId, int32 Quanitity) const
+FGameplayTag UInventoryGridViewModel::FindTaggedSlotForItem(const FGameplayTag& ItemId, int32 Quanitity) const
 {
 	// Validate
 	if (!ItemId.IsValid()) return FGameplayTag::EmptyTag;
@@ -754,7 +754,7 @@ FGameplayTag URISGridViewModel::FindTaggedSlotForItem(const FGameplayTag& ItemId
 	return FallbackSlot;
 }
 
-bool URISGridViewModel::MoveItemToAnyTaggedSlot_Implementation(const FGameplayTag& SourceTaggedSlot, int32 SourceSlotIndex)
+bool UInventoryGridViewModel::MoveItemToAnyTaggedSlot_Implementation(const FGameplayTag& SourceTaggedSlot, int32 SourceSlotIndex)
 {
 	if (!LinkedInventoryComponent || (!SourceTaggedSlot.IsValid() && !ViewableGridSlots.IsValidIndex(SourceSlotIndex)))
 	{

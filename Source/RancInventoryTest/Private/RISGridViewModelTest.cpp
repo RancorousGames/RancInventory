@@ -5,7 +5,7 @@
 #include "NativeGameplayTags.h"
 #include "Components\InventoryComponent.h"
 #include "Misc/AutomationTest.h"
-#include "ViewModels\RISGridViewModel.h"
+#include "ViewModels\InventoryGridViewModel.h"
 #include "RISInventoryTestSetup.cpp"
 #include "Core/RISSubsystem.h"
 #include "Framework/DebugTestResult.h"
@@ -28,11 +28,11 @@ public:
 		InventoryComponent->UniversalTaggedSlots.Add(FUniversalTaggedSlot(LeftHandSlot, RightHandSlot,ItemTypeTwoHandedOffhand, ItemTypeOffHandOnly));
 		InventoryComponent->SpecializedTaggedSlots.Add(HelmetSlot);
 		InventoryComponent->SpecializedTaggedSlots.Add(ChestSlot);
-		InventoryComponent->MaxContainerSlotCount = NumSlots;
+		InventoryComponent->MaxSlotCount = NumSlots;
 		InventoryComponent->MaxWeight = CarryCapacity;
 		InventoryComponent->RegisterComponent();
 
-		ViewModel = NewObject<URISGridViewModel>();
+		ViewModel = NewObject<UInventoryGridViewModel>();
 		ViewModel->Initialize(InventoryComponent, NumSlots, PreferUniversalSlots);
 		TestFixture.InitializeTestItems();
 	}
@@ -49,7 +49,7 @@ public:
 	UWorld* World;
 	AActor* TempActor;
 	UInventoryComponent* InventoryComponent;
-	URISGridViewModel* ViewModel;
+	UInventoryGridViewModel* ViewModel;
 };
 	
 class FGridViewModelTestScenarios

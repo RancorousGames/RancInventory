@@ -17,11 +17,26 @@ class RANCINVENTORY_API URecursiveContainerInstanceData : public UItemInstanceDa
 public:
 	// Constructor
 	URecursiveContainerInstanceData(){}
-	virtual ~URecursiveContainerInstanceData() override {}
+	virtual ~URecursiveContainerInstanceData() override;
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
+	// Will create a new container component and assign it to the RecursiveContainer property.
+	virtual void Initialize_Implementation(bool OwnedByContainer, AWorldItem* OwningWorldItem, UItemContainerComponent* OwningContainer) override;
+
+	virtual void OnDestroy_Implementation() override;
 	
-	UPROPERTY(Replicated, BlueprintReadOnly, EditAnywhere, Category = "Test")
-	TObjectPtr<UItemContainerComponent> RecursiveContainer;
+	UPROPERTY(Replicated, BlueprintReadOnly, VisibleAnywhere, Category = "RIS")
+	TObjectPtr<UItemContainerComponent> RepresentedContainer;
+
+	
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "RIS")
+	int32 MaxSlotCount = 4;
+	
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "RIS")
+	float MaxWeight = 100.0f;
+	
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "RIS")
+	TSubclassOf<UItemContainerComponent> ContainerClassToSpawn = nullptr; 
 };
 

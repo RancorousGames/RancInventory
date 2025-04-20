@@ -5,6 +5,9 @@
 #include "UObject/NoExportTypes.h"
 #include "ItemInstanceData.generated.h"
 
+class AWorldItem;
+class UItemContainerComponent;
+
 /**
  * Abstract base class for replicated item instance data.
  */
@@ -18,6 +21,14 @@ public:
 	UItemInstanceData(){}
 	virtual ~UItemInstanceData() override {}
 
+	// This function is called when the item instance data is created with a reference to its initial owner
+	// AND it is called whenever ownership is changed
+	UFUNCTION(BlueprintNativeEvent, Category = "RIS")
+	void Initialize(bool OwnedByComponent, AWorldItem* OwningWorldItem, UItemContainerComponent* OwningContainer);
+	
+	UFUNCTION(BlueprintNativeEvent, Category = "RIS")
+	void OnDestroy();
+	
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 protected:

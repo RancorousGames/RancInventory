@@ -70,7 +70,7 @@ void UInventoryComponent::UpdateWeightAndSlots()
 		}
 	}
 
-	ensureMsgf(UsedContainerSlotCount <= MaxContainerSlotCount, TEXT("Used slot count is higher than max slot count!"));
+	ensureMsgf(UsedContainerSlotCount <= MaxSlotCount, TEXT("Used slot count is higher than max slot count!"));
 }
 
 void UInventoryComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const

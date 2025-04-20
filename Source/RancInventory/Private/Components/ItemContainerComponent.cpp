@@ -153,6 +153,7 @@ int32 UItemContainerComponent::AddItem_ServerImpl(TScriptInterface<IItemSource> 
 			{
 				if (UItemInstanceData* ExtractedInstanceData = ContainedItem->InstanceData[i])
 				{
+					ExtractedInstanceData->Initialize(true, nullptr, this);
 					GetOwner()->AddReplicatedSubObject(ExtractedInstanceData);
 				}
 			}
@@ -160,10 +161,12 @@ int32 UItemContainerComponent::AddItem_ServerImpl(TScriptInterface<IItemSource> 
 
 		if (ContainedItem->Quantity != ContainedItem->InstanceData.Num())
 		{
+			// Instance data was not extracted so create it
 			for (int i = 0; i < AmountToAdd; ++i)
 			{
 				auto* NewInstanceData = NewObject<UItemInstanceData>(this, ItemData->ItemInstanceDataClass);
 				ContainedItem->InstanceData.Add(NewInstanceData);
+				NewInstanceData->Initialize(true, nullptr, this);
 				GetOwner()->AddReplicatedSubObject(NewInstanceData);
 			}
 		}
@@ -390,6 +393,7 @@ int32 UItemContainerComponent::ExtractItemFromContainer_IfServer(const FGameplay
 	{
 		if (UItemInstanceData* InstanceData = ItemInstance->InstanceData[i])
 		{
+			InstanceData->Initialize(true, nullptr, this);
 			GetOwner()->AddReplicatedSubObject(InstanceData);
 		}
 	}
@@ -527,7 +531,7 @@ int32 UItemContainerComponent::GetQuantityContainerCanReceiveBySlots(const UItem
 		SlotsTakenPerStack = ItemData->JigsawSizeX * ItemData->JigsawSizeY;
 	}
 
-	const int32 AvailableSlots = MaxContainerSlotCount - UsedContainerSlotCount;
+	const int32 AvailableSlots = MaxSlotCount - UsedContainerSlotCount;
 	const int32 AcceptableQuantityBySlotCount = (AvailableSlots / SlotsTakenPerStack) * ItemData->MaxStackSize + ItemQuantityTillNextFullSlot;
 
 	return AcceptableQuantityBySlotCount;

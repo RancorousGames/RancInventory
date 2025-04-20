@@ -31,6 +31,7 @@ void FItemBundleWithInstanceData::DestroyQuantity(int32 InQuantity, AActor* Owne
 				if (InstanceDataToDestroy)
 				{
 					InstanceDataToDestroy->ConditionalBeginDestroy();
+					InstanceDataToDestroy->OnDestroy();
 					Owner->RemoveReplicatedSubObject(InstanceDataToDestroy);
 				}
 			}
@@ -73,4 +74,14 @@ int32 FItemBundleWithInstanceData::ExtractQuantity(int32 InQuantity, TArray<UIte
 	}
    
 	return numToExtract;
+}
+
+FItemBundleWithInstanceData::FItemBundleWithInstanceData(FGameplayTag InItemId, int32 InQuantity)
+{
+	ItemId = InItemId;
+	Quantity = InQuantity;
+	InstanceData = TArray<UItemInstanceData*>();
+
+	//ensureMsgf(!URISSubsystem::GetItemDataById(InItemId) || !URISSubsystem::GetItemDataById(InItemId)->ItemInstanceDataClass->IsValidLowLevel(),
+	//		   TEXT("FItemBundleWithInstanceData constructor called without valid ItemInstanceData"), *InItemId.ToString());
 }

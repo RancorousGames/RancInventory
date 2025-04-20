@@ -13,6 +13,7 @@
 #include "Core/RISSubsystem.h"
 #include "Data/ItemBundle.h"
 #include "Data/ItemStaticData.h"
+#include "Data/RecursiveContainerInstanceData.h"
 
 // Define Gameplay Tags
 UE_DEFINE_GAMEPLAY_TAG(LeftHandSlot, "Test.Gameplay.Hands.LeftHand");
@@ -27,6 +28,7 @@ UE_DEFINE_GAMEPLAY_TAG(ItemTypeTwoHandedOffhand, "Test.Gameplay.Items.Types.TwoH
 UE_DEFINE_GAMEPLAY_TAG(ItemTypeOffHandOnly, "Test.Gameplay.Items.Types.OffHandOnly");
 UE_DEFINE_GAMEPLAY_TAG(ItemTypeMakeshiftWeapon, "Test.Gameplay.Items.Types.MakeshiftWeapon");
 UE_DEFINE_GAMEPLAY_TAG(ItemTypeRangedWeapon, "Test.Gameplay.Items.Types.RangedWeapon");
+UE_DEFINE_GAMEPLAY_TAG(ItemTypeContainer, "Test.Gameplay.Items.Types.Container");
 
 UE_DEFINE_GAMEPLAY_TAG(ItemIdRock, "Test.Items.IDs.Rock");
 UE_DEFINE_GAMEPLAY_TAG(ItemIdSticks, "Test.Items.IDs.Sticks");
@@ -40,6 +42,8 @@ UE_DEFINE_GAMEPLAY_TAG(ItemIdUnarmed, "Test.Items.IDs.Unarmed");
 UE_DEFINE_GAMEPLAY_TAG(ItemIdBrittleCopperKnife, "Test.Items.IDs.BrittleCopperKnife");
 UE_DEFINE_GAMEPLAY_TAG(ItemIdShortbow, "Test.Items.IDs.Shortbow");
 UE_DEFINE_GAMEPLAY_TAG(ItemIdLongbow, "Test.Items.IDs.Longbow");
+UE_DEFINE_GAMEPLAY_TAG(ItemIdBackpack, "Test.Items.IDs.Backpack");
+UE_DEFINE_GAMEPLAY_TAG(ItemIdCoinPurse, "Test.Items.IDs.CoinPurse");
 
 // Macros for commonly used item bundles
 #define ONE_SPEAR ItemIdSpear, 1
@@ -271,6 +275,30 @@ public:
 		Subsystem->HardcodeItem(ItemIdLongbow, LongbowData);
 
 		Subsystem->HardcodeItem(ItemIdBrittleCopperKnife, BrittleCopperKnife);
+
+		// Recursive containers
+		UItemStaticData* BackpackData = NewObject<UItemStaticData>();
+		BackpackData->ItemId = ItemIdBackpack;
+		BackpackData->ItemName = FName("Backpack");
+		BackpackData->ItemDescription = FText::FromString("A simple backpack to carry more items.");
+		BackpackData->ItemPrimaryType = ItemTypeContainer;
+		BackpackData->MaxStackSize = 1; 
+		BackpackData->ItemWeight = 1.5f;
+		BackpackData->ItemCategories.AddTag(ItemTypeContainer);
+		BackpackData->ItemInstanceDataClass = URecursiveContainerInstanceData::StaticClass();
+		Subsystem->HardcodeItem(ItemIdBackpack, BackpackData);
+		
+		UItemStaticData* CoinPurseData = NewObject<UItemStaticData>();
+		CoinPurseData->ItemId = ItemIdCoinPurse;
+		CoinPurseData->ItemName = FName("Coin Purse");
+		CoinPurseData->ItemDescription = FText::FromString("A small purse for coins or tiny items.");
+		CoinPurseData->ItemPrimaryType = ItemTypeContainer;
+		CoinPurseData->MaxStackSize = 1;
+		CoinPurseData->ItemWeight = 0.2f;
+		CoinPurseData->ItemCategories.AddTag(ItemTypeContainer);
+		CoinPurseData->ItemInstanceDataClass = URecursiveContainerInstanceData::StaticClass(); 
+
+		Subsystem->HardcodeItem(ItemIdCoinPurse, CoinPurseData);
 	}
 
 private:

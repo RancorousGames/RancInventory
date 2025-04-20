@@ -10,7 +10,7 @@
 #include "ItemBundle.generated.h"
 
 USTRUCT(BlueprintType, Category = "RIS | Structs")
-struct FItemBundle
+struct RANCINVENTORY_API FItemBundle
 {
 	GENERATED_BODY()
 
@@ -55,7 +55,7 @@ struct FItemBundle
 
 
 USTRUCT(BlueprintType, Category = "RIS | Structs")
-struct FTaggedItemBundle
+struct RANCINVENTORY_API FTaggedItemBundle
 {
     GENERATED_BODY()
 
@@ -112,7 +112,7 @@ struct FTaggedItemBundle
 };
 
 USTRUCT(BlueprintType, Category = "RIS | Structs")
-struct FItemBundleWithInstanceData
+struct RANCINVENTORY_API FItemBundleWithInstanceData
 {
     GENERATED_BODY()
 
@@ -157,16 +157,8 @@ struct FItemBundleWithInstanceData
     }
 
 	// WARNING: This constructor should only be used when it is certain that instance data is not needed for this item type
-	FItemBundleWithInstanceData(FGameplayTag InItemId, int32 InQuantity)
-	{
-    	ItemId = InItemId;
-    	Quantity = InQuantity;
-    	InstanceData = TArray<UItemInstanceData*>();
+	FItemBundleWithInstanceData(FGameplayTag InItemId, int32 InQuantity);
 
-    	//ensureMsgf(!URISSubsystem::GetItemDataById(InItemId)->ItemInstanceDataClass->IsValidLowLevel(),
-		//		   TEXT("FItemBundleWithInstanceData constructor called without valid ItemInstanceData"), *InItemId.ToString());
-	}
-	
     // This overload will spawn the instance data
 	FItemBundleWithInstanceData(FGameplayTag InItemId, int32 InQuantity, TSubclassOf<UItemInstanceData> InstanceDataClass, AActor* OwnerOfSpawnedInstanceData)
     {
@@ -202,7 +194,7 @@ struct FItemBundleWithInstanceData
 };
 
 // Class to wrap any of the above item bundle types in a unified type since we cant use inheritance
-struct FGenericItemBundle
+struct RANCINVENTORY_API FGenericItemBundle
 {
     using BundleVariant = std::variant<FItemBundle*, FTaggedItemBundle*, FItemBundleWithInstanceData*, std::monostate>;
     

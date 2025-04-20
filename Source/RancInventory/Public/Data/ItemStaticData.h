@@ -20,7 +20,7 @@ enum class EFoundState : uint8
 	NotFound UMETA(DisplayName = "Not Found")
 };
 
-UCLASS(NotBlueprintable, NotPlaceable, Category = "RIS | Classes | Data")
+UCLASS(Blueprintable, Category = "RIS | Classes | Data")
 class RANCINVENTORY_API UItemStaticData : public UPrimaryDataAsset
 {
 	GENERATED_BODY()
@@ -34,19 +34,19 @@ public:
 		return FPrimaryAssetId(TEXT("RancInventory_ItemData"), *(ItemId.ToString()));
 	}
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS", meta = (AssetBundles = "Data"))
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS")
 	FGameplayTag ItemId;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS", meta = (AssetBundles = "Data"))
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS")
 	FName ItemName;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS", meta = (AssetBundles = "Data", MultiLine = "true"))
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS", meta = (MultiLine = "true"))
 	FText ItemDescription;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS", meta = (AssetBundles = "Data"))
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS")
 	FGameplayTag ItemPrimaryType;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS", meta = (AssetBundles = "Data"))
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS")
 	int32 MaxStackSize = 1;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS",
@@ -68,7 +68,7 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS", meta = (AssetBundles = "UI"))
 	TSoftObjectPtr<UTexture2D> ItemIcon;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS", meta = (AssetBundles = "Data"))
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS")
 	FGameplayTagContainer ItemCategories;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS", meta = (AssetBundles = "Data"))

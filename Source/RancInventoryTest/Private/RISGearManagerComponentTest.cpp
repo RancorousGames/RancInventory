@@ -9,7 +9,7 @@
 #include "Framework/DebugTestResult.h"
 #include "GameFramework/Character.h"
 
-#define TestName "GameTests.RIS.RancGearManager"
+#define TestName "GameTests.RIS.GearManager"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRancGearManagerComponentTest, TestName,
                                  EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -50,7 +50,7 @@ public:
 		InventoryComponent->UniversalTaggedSlots.Add(FUniversalTaggedSlot(RightHandSlot, LeftHandSlot, ItemTypeTwoHanded, ItemTypeTwoHanded));
 		InventoryComponent->SpecializedTaggedSlots.Add(HelmetSlot);
 		InventoryComponent->SpecializedTaggedSlots.Add(ChestSlot);
-		InventoryComponent->MaxContainerSlotCount = NumSlots;
+		InventoryComponent->MaxSlotCount = NumSlots;
 		InventoryComponent->MaxWeight = CarryCapacity;
 		InventoryComponent->RegisterComponent();
 
