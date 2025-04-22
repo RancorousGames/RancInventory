@@ -45,13 +45,13 @@ public:
     UFUNCTION(BlueprintCallable, BlueprintPure, Category="InventoryViewModel")
     bool IsTaggedSlotEmpty(const FGameplayTag& SlotTag) const;
 
-    /** Retrieves the item bundle for a given tagged slot. Returns a reference for potential modification (use carefully). */
+    /** Retrieves the item bundle for a given tagged slot. Returns a reference for potential modification */
     UFUNCTION(BlueprintCallable, BlueprintPure, Category="InventoryViewModel")
-    const FTaggedItemBundle& GetItemForTaggedSlot(const FGameplayTag& SlotTag) const; // Keep const for getter
+    const FItemBundle& GetItemForTaggedSlot(const FGameplayTag& SlotTag) const; // Keep const for getter
 
     /** Retrieves a modifiable reference to the item bundle for a given tagged slot. Use with caution. */
     UFUNCTION(BlueprintCallable, Category="InventoryViewModel")
-    FTaggedItemBundle& GetMutableItemForTaggedSlot(const FGameplayTag& SlotTag);
+    FItemBundle& GetMutableItemForTaggedSlot(const FGameplayTag& SlotTag);
 
     /** Attempts to drop a quantity of an item from a tagged slot. */
     UFUNCTION(BlueprintCallable, Category="InventoryViewModel")
@@ -149,7 +149,7 @@ protected:
 
     /** Map representing the visual state of the tagged slots. */
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="InventoryViewModel|Internal")
-    TMap<FGameplayTag, FTaggedItemBundle> ViewableTaggedSlots;
+    TMap<FGameplayTag, FItemBundle> ViewableTaggedSlots;
 
      virtual void BeginDestroy() override;
 };

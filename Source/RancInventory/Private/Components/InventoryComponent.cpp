@@ -86,7 +86,6 @@ void UInventoryComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& 
 	DOREPLIFETIME_WITH_PARAMS_FAST(UInventoryComponent, TaggedSlotItemInstances, SharedParams);
 
 	DOREPLIFETIME(UInventoryComponent, AllUnlockedRecipes);
-	DOREPLIFETIME(UInventoryComponent, MyTestItemInstanceData);
 }
 
 int32 UInventoryComponent::ExtractItemImpl_IfServer(const FGameplayTag& ItemId, int32 Quantity,
@@ -1621,7 +1620,7 @@ int32 UInventoryComponent::DropAllItems_ServerImpl()
 }
 
 int32 UInventoryComponent::DestroyItemImpl(const FGameplayTag& ItemId, int32 Quantity, EItemChangeReason Reason,
-                                           bool AllowPartial, bool UpdateAfter, bool SendEventAfter)
+                                           bool AllowPartial, bool UpdateAfter, bool SendEventAfter, int32 ItemToDestroyUniqueId)
 {
 	const int32 DestroyedCount = Super::DestroyItemImpl(ItemId, Quantity, Reason, AllowPartial, UpdateAfter,
 	                                                    SendEventAfter);

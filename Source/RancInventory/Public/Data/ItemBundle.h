@@ -135,39 +135,25 @@ struct RANCINVENTORY_API FItemBundleWithInstanceId
 	
 	bool IsValid() const
 	{
-		return Tag.IsValid() && ItemId.IsValid() && Quantity > 0;
+		return ItemId.IsValid() && Quantity > 0;
 	}
     
-	FTaggedItemBundle(){}
-	FTaggedItemBundle(FGameplayTag InTag, FItemBundle InItemInfo)
+	FItemBundleWithInstanceId(){}
+	FItemBundleWithInstanceId(FGameplayTag InTag, FItemBundle InItemInfo)
 	{
 		ItemId = InItemInfo.ItemId;
 		Quantity = InItemInfo.Quantity;
-		Tag = InTag;
-	}
-
-	FTaggedItemBundle(FGameplayTag InTag, FGameplayTag InItemId, int32 InQuantity)
-	{
-		FItemBundle bundle = FItemBundle(InItemId, InQuantity);
-		ItemId = bundle.ItemId;
-		Quantity = bundle.Quantity;
-		Tag = InTag;
 	}
 
     
 	bool operator==(const FTaggedItemBundle& Other) const
 	{
-		return Tag == Other.Tag && ItemId == Other.ItemId && Quantity == Other.Quantity;
+		return ItemId == Other.ItemId && Quantity == Other.Quantity;
 	}
 
 	bool operator!=(const FTaggedItemBundle& Other) const
 	{
 		return !(*this == Other);
-	}
-
-	bool operator<(const FTaggedItemBundle& Other) const
-	{
-		return Tag.ToString() < Other.Tag.ToString();
 	}
 };
 

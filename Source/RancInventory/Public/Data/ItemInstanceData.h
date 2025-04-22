@@ -32,5 +32,5 @@ public:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "RIS")
-	int32 UniqueId = 0;
+	int32 UniqueInstanceId = 0;
 };

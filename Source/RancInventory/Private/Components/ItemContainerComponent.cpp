@@ -192,7 +192,7 @@ int32 UItemContainerComponent::AddItem_ServerImpl(TScriptInterface<IItemSource> 
 
 int32 UItemContainerComponent::DestroyItem_IfServer(const FGameplayTag& ItemId, int32 Quantity, EItemChangeReason Reason, bool AllowPartial, int32 ItemToDestroyInstanceId)
 {
-	return DestroyItemImpl(ItemId, Quantity, Reason, AllowPartial, true, ItemToDestroyInstanceId);
+	return DestroyItemImpl(ItemId, Quantity, Reason, AllowPartial, true, true, ItemToDestroyInstanceId);
 }
 
 int32 UItemContainerComponent::DestroyItemImpl(const FGameplayTag& ItemId, int32 Quantity, EItemChangeReason Reason, bool AllowPartial, bool UpdateAfter, bool SendEventAfter, int32 ItemToDestroyInstanceId)
@@ -701,7 +701,7 @@ FItemBundleWithInstanceData* UItemContainerComponent::FindItemInstance(const FGa
 			(ItemToFindInstanceId == -1 ||
 			Item.InstanceData.FindByPredicate([ItemToFindInstanceId](const UItemInstanceData* InstanceData)
 			{
-				return InstanceData && InstanceData->GetInstanceId() == ItemToFindInstanceId;
+				return InstanceData && InstanceData->UniqueInstanceId == ItemToFindInstanceId;
 			})))
 		{
 			return &Item;

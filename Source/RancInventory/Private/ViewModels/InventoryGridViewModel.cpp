@@ -50,12 +50,12 @@ void UInventoryGridViewModel::InitializeInventory_Implementation(UInventoryCompo
     LinkedInventoryComponent->OnItemAddedToTaggedSlot.AddDynamic(this, &UInventoryGridViewModel::HandleTaggedItemAdded);
     LinkedInventoryComponent->OnItemRemovedFromTaggedSlot.AddDynamic(this, &UInventoryGridViewModel::HandleTaggedItemRemoved);
 
-    // Initialize Tagged Slots map structure
+    // Initialize Tagged Slots map structure with empty FItemBundle
     for (const FUniversalTaggedSlot& UniTag : LinkedInventoryComponent->UniversalTaggedSlots)
     {
         // Ensure tag is valid before adding
         if(UniTag.Slot.IsValid()) {
-            ViewableTaggedSlots.Add(UniTag.Slot, FTaggedItemBundle(UniTag.Slot, FGameplayTag(), 0));
+            ViewableTaggedSlots.Add(UniTag.Slot, FItemBundle(FGameplayTag(), 0));
         } else {
              UE_LOG(LogRISInventory, Warning, TEXT("InitializeInventory: Found invalid tag in UniversalTaggedSlots."));
         }
@@ -63,7 +63,7 @@ void UInventoryGridViewModel::InitializeInventory_Implementation(UInventoryCompo
     for (const FGameplayTag& Tag : LinkedInventoryComponent->SpecializedTaggedSlots)
     {
          if(Tag.IsValid()) {
-            ViewableTaggedSlots.Add(Tag, FTaggedItemBundle(Tag, FGameplayTag(), 0));
+            ViewableTaggedSlots.Add(Tag, FItemBundle(FGameplayTag(), 0));
          } else {
              UE_LOG(LogRISInventory, Warning, TEXT("InitializeInventory: Found invalid tag in SpecializedTaggedSlots."));
          }
@@ -75,14 +75,14 @@ void UInventoryGridViewModel::InitializeInventory_Implementation(UInventoryCompo
     {
         if (ViewableTaggedSlots.Contains(TaggedItem.Tag))
         {
-            ViewableTaggedSlots[TaggedItem.Tag] = TaggedItem; // Overwrite initial empty entry
+            ViewableTaggedSlots[TaggedItem.Tag] = FItemBundle(TaggedItem.ItemId, TaggedItem.Quantity);
         }
         else
         {
             UE_LOG(LogRISInventory, Warning, TEXT("InitializeInventory: Tagged item %s found in component but tag %s is not registered in ViewableTaggedSlots."), *TaggedItem.ItemId.ToString(), *TaggedItem.Tag.ToString());
             // Optionally add it anyway? Depends on desired strictness.
              if(TaggedItem.Tag.IsValid()) {
-                 ViewableTaggedSlots.Add(TaggedItem.Tag, TaggedItem);
+                 ViewableTaggedSlots.Add(TaggedItem.Tag, FItemBundle(TaggedItem.ItemId, TaggedItem.Quantity)); // Add FItemBundle part
              }
         }
     }
@@ -107,34 +107,35 @@ void UInventoryGridViewModel::BeginDestroy()
 
 bool UInventoryGridViewModel::IsTaggedSlotEmpty(const FGameplayTag& SlotTag) const
 {
-    const FTaggedItemBundle* Found = ViewableTaggedSlots.Find(SlotTag);
+    // Check FItemBundle::IsValid()
+    const FItemBundle* Found = ViewableTaggedSlots.Find(SlotTag);
     return !Found || !Found->IsValid();
 }
 
-const FTaggedItemBundle& UInventoryGridViewModel::GetItemForTaggedSlot(const FGameplayTag& SlotTag) const
+const FItemBundle& UInventoryGridViewModel::GetItemForTaggedSlot(const FGameplayTag& SlotTag) const
 {
-    const FTaggedItemBundle* Found = ViewableTaggedSlots.Find(SlotTag);
-    if (Found)
+    // Returns FItemBundle
+    if (const FItemBundle* Found = ViewableTaggedSlots.Find(SlotTag))
     {
         return *Found;
     }
     // Return a static empty instance to avoid crashes on lookup failure
-    static const FTaggedItemBundle EmptyTaggedBundle = FTaggedItemBundle::EmptyItemInstance;
     UE_LOG(LogRISInventory, Warning, TEXT("GetItemForTaggedSlot: SlotTag %s not found."), *SlotTag.ToString());
-    return EmptyTaggedBundle;
+    return FItemBundle::EmptyItemInstance;
 }
 
-FTaggedItemBundle& UInventoryGridViewModel::GetMutableItemForTaggedSlot(const FGameplayTag& SlotTag)
+FItemBundle& UInventoryGridViewModel::GetMutableItemForTaggedSlot(const FGameplayTag& SlotTag)
 {
-     FTaggedItemBundle* Found = ViewableTaggedSlots.Find(SlotTag);
+    // Returns FItemBundle reference
+    FItemBundle* Found = ViewableTaggedSlots.Find(SlotTag);
     if (Found)
     {
         return *Found;
     }
      // This is dangerous, but required by original code. Consider alternatives.
      UE_LOG(LogRISInventory, Error, TEXT("GetMutableItemForTaggedSlot: SlotTag %s not found. Returning potentially unsafe reference."), *SlotTag.ToString());
-     // Add default if not found to allow modification? Risky.
-     return ViewableTaggedSlots.Add(SlotTag, FTaggedItemBundle(SlotTag, FGameplayTag(), 0));
+     // Add default FItemBundle if not found to allow modification? Risky.
+     return ViewableTaggedSlots.Add(SlotTag, FItemBundle(FGameplayTag(), 0));
 }
 
 int32 UInventoryGridViewModel::DropItemFromTaggedSlot(FGameplayTag TaggedSlot, int32 Quantity)
@@ -142,11 +143,12 @@ int32 UInventoryGridViewModel::DropItemFromTaggedSlot(FGameplayTag TaggedSlot, i
 	 if (!LinkedInventoryComponent || !TaggedSlot.IsValid() || Quantity <= 0)
         return 0;
 
-     const FTaggedItemBundle* SourceSlotItemPtr = ViewableTaggedSlots.Find(TaggedSlot);
+     // Find the FItemBundle visually
+     const FItemBundle* SourceSlotItemPtr = ViewableTaggedSlots.Find(TaggedSlot);
     if (!SourceSlotItemPtr || !SourceSlotItemPtr->IsValid())
         return 0; // Slot is empty or doesn't exist
 
-    const FTaggedItemBundle& SourceSlotItem = *SourceSlotItemPtr;
+    const FItemBundle& SourceSlotItem = *SourceSlotItemPtr; // Now FItemBundle
     int32 QuantityToDrop = FMath::Min(Quantity, SourceSlotItem.Quantity);
      if (QuantityToDrop <= 0) return 0;
 
@@ -157,11 +159,11 @@ int32 UInventoryGridViewModel::DropItemFromTaggedSlot(FGameplayTag TaggedSlot, i
     // Update visual state based on prediction
     if (DroppedCount > 0) // Assume server might succeed
     {
-        FTaggedItemBundle& MutableSlot = ViewableTaggedSlots[TaggedSlot]; // Get mutable reference
+        FItemBundle& MutableSlot = ViewableTaggedSlots[TaggedSlot]; // Get mutable FItemBundle reference
         MutableSlot.Quantity -= DroppedCount;
         if (MutableSlot.Quantity <= 0)
         {
-             MutableSlot.ItemId = FGameplayTag(); // Keep Tag, clear ItemId and Quantity
+             MutableSlot.ItemId = FGameplayTag(); // Clear ItemId and Quantity
              MutableSlot.Quantity = 0;
         }
         OnTaggedSlotUpdated.Broadcast(TaggedSlot);
@@ -190,11 +192,12 @@ int32 UInventoryGridViewModel::UseItemFromTaggedSlot(FGameplayTag TaggedSlot)
 	if (!LinkedInventoryComponent || !TaggedSlot.IsValid())
         return 0;
 
-     const FTaggedItemBundle* SourceSlotItemPtr = ViewableTaggedSlots.Find(TaggedSlot);
+    // Find the FItemBundle visually
+     const FItemBundle* SourceSlotItemPtr = ViewableTaggedSlots.Find(TaggedSlot);
     if (!SourceSlotItemPtr || !SourceSlotItemPtr->IsValid())
         return 0; // Slot is empty or doesn't exist
 
-    const FTaggedItemBundle& SourceSlotItem = *SourceSlotItemPtr;
+    const FItemBundle& SourceSlotItem = *SourceSlotItemPtr;
 
     // Predict visual change (if consumable) - similar logic to UseItemFromGrid
     const UItemStaticData* ItemData = URISSubsystem::GetItemDataById(SourceSlotItem.ItemId);
@@ -209,7 +212,7 @@ int32 UInventoryGridViewModel::UseItemFromTaggedSlot(FGameplayTag TaggedSlot)
      if (QuantityToConsume > 0) {
          OperationsToConfirm.Emplace(FRISExpectedOperation(RemoveTagged, TaggedSlot, SourceSlotItem.ItemId, QuantityToConsume));
          // Update visual state based on prediction
-         FTaggedItemBundle& MutableSlot = ViewableTaggedSlots[TaggedSlot];
+         FItemBundle& MutableSlot = ViewableTaggedSlots[TaggedSlot];
          MutableSlot.Quantity -= QuantityToConsume;
          if (MutableSlot.Quantity <= 0) {
              MutableSlot.ItemId = FGameplayTag();
@@ -229,11 +232,13 @@ int32 UInventoryGridViewModel::UseItemFromTaggedSlot(FGameplayTag TaggedSlot)
 
 bool UInventoryGridViewModel::SplitItem_Implementation(FGameplayTag SourceTaggedSlot, int32 SourceSlotIndex, FGameplayTag TargetTaggedSlot, int32 TargetSlotIndex, int32 Quantity)
 {
+    // Uses FItemBundle from ViewableTaggedSlots via FGenericItemBundle
     return MoveItem_Internal(SourceTaggedSlot, SourceSlotIndex, TargetTaggedSlot, TargetSlotIndex, Quantity, true);
 }
 
 bool UInventoryGridViewModel::MoveItem_Implementation(FGameplayTag SourceTaggedSlot, int32 SourceSlotIndex, FGameplayTag TargetTaggedSlot, int32 TargetSlotIndex)
 {
+    // Uses FItemBundle from ViewableTaggedSlots via FGenericItemBundle
     return MoveItem_Internal(SourceTaggedSlot, SourceSlotIndex, TargetTaggedSlot, TargetSlotIndex, 0, false);
 }
 
@@ -398,7 +403,7 @@ bool UInventoryGridViewModel::TryUnblockingMove(FGameplayTag TargetTaggedSlot, F
      {
           // Find the item currently IN the slot that needs to be cleared
           FGameplayTag SlotToClear = BlockingInfo->UniversalSlotToBlock; // The slot that's causing the block
-          FTaggedItemBundle BlockingItem = GetItemForTaggedSlot(SlotToClear);
+          FItemBundle BlockingItem = GetItemForTaggedSlot(SlotToClear);
 
           if (BlockingItem.IsValid())
           {
@@ -468,11 +473,11 @@ bool UInventoryGridViewModel::CanTaggedSlotReceiveItem_Implementation(const FGam
     // Optional: Check overall container limits (weight/slots)
     if (CheckContainerLimits && !LinkedInventoryComponent->CanContainerReceiveItems(ItemId, Quantity)) return false;
 
-    // Check stacking within the specific tagged slot
-    const FTaggedItemBundle* TargetSlotItemPtr = ViewableTaggedSlots.Find(SlotTag);
+    // Check stacking within the specific tagged slot visually (using FItemBundle)
+    const FItemBundle* TargetSlotItemPtr = ViewableTaggedSlots.Find(SlotTag);
     if (!TargetSlotItemPtr) return false; // Slot doesn't exist visually
 
-    const FTaggedItemBundle& TargetSlotItem = *TargetSlotItemPtr;
+    const FItemBundle& TargetSlotItem = *TargetSlotItemPtr; 
     const bool bTargetSlotEmpty = !TargetSlotItem.IsValid();
 
     if (bTargetSlotEmpty) {
@@ -549,13 +554,11 @@ bool UInventoryGridViewModel::AssertViewModelSettled() const
                 ViewModelTotalQuantities.FindOrAdd(Slot.ItemId) += Slot.Quantity;
             }
         }
-        for (const auto& Pair : ViewableTaggedSlots)
+        for (const auto& Pair : ViewableTaggedSlots) // Pair is <FGameplayTag, FItemBundle>
         {
-            if (Pair.Value.IsValid())
+            if (Pair.Value.IsValid()) // Check FItemBundle
             {
                 ViewModelTotalQuantities.FindOrAdd(Pair.Value.ItemId) += Pair.Value.Quantity;
-                // While we are add it, double check tagged slot tag matching
-                ensureMsgf(Pair.Value.Tag == Pair.Key, TEXT("Tagged slot %s has mismatched tag %s."), *Pair.Key.ToString(), *Pair.Value.Tag.ToString());
             }
         }
 
@@ -635,12 +638,6 @@ bool UInventoryGridViewModel::AssertViewModelSettled() const
                                     *VMPair.Value.ItemId.ToString(), VMPair.Value.Quantity,
                                     *ActualItem->ItemId.ToString(), ActualItem->Quantity);
                    }
-                    // Check internal tag consistency
-                    if (VMPair.Value.Tag != VMPair.Key) {
-                         bTaggedConsistency = false;
-                         ensureMsgf(false, TEXT("Tagged slot internal Tag property mismatch in %s: Key is %s, Item.Tag is %s."), *VMPair.Key.ToString(), *VMPair.Key.ToString(), *VMPair.Value.Tag.ToString());
-                         UE_LOG(LogRISInventory, Warning, TEXT("Tagged slot internal Tag property mismatch in %s: Key is %s, Item.Tag is %s."), *VMPair.Key.ToString(), *VMPair.Key.ToString(), *VMPair.Value.Tag.ToString());
-                    }
               }
               // If both ActualItem is null and VMPair.Value is invalid, it's consistent (both empty).
          }
@@ -687,11 +684,13 @@ void UInventoryGridViewModel::HandleTaggedItemAdded_Implementation(const FGamepl
                        // No broadcast here, assume prediction broadcasted earlier. Re-broadcast if needed.
                   }
              } else {
-                  // Prediction was wrong item or slot didn't exist visually? Force update for this slot.
-                  UE_LOG(LogRISInventory, Warning, TEXT("Mismatch after confirming AddTagged for tag %s. Forcing slot update."), *SlotTag.ToString());
-                  FTaggedItemBundle ActualItem = LinkedInventoryComponent->GetItemForTaggedSlot(SlotTag);
-                   ViewableTaggedSlots.FindOrAdd(SlotTag) = ActualItem; // Force overwrite visual
-                   OnTaggedSlotUpdated.Broadcast(SlotTag);
+                // Prediction was wrong item or slot didn't exist visually? Force update for this slot.
+                UE_LOG(LogRISInventory, Warning, TEXT("Mismatch after confirming AddTagged for tag %s. Forcing slot update."), *SlotTag.ToString());
+                FTaggedItemBundle ActualItem = LinkedInventoryComponent->GetItemForTaggedSlot(SlotTag);
+                auto& ViewableItem = ViewableTaggedSlots.FindOrAdd(SlotTag);
+                ViewableItem.ItemId = ActualItem.ItemId;
+                ViewableItem.Quantity = ActualItem.Quantity;
+                OnTaggedSlotUpdated.Broadcast(SlotTag);
              }
 
             return;
@@ -702,19 +701,20 @@ void UInventoryGridViewModel::HandleTaggedItemAdded_Implementation(const FGamepl
     UE_LOG(LogRISInventory, Log, TEXT("HandleTaggedItemAdded: Received unpredicted add for %s x%d to tag %s. Updating visuals."), *ItemData->ItemId.ToString(), Quantity, *SlotTag.ToString());
     if (ViewableTaggedSlots.Contains(SlotTag))
     {
-        FTaggedItemBundle& TargetSlot = ViewableTaggedSlots[SlotTag];
+        FItemBundle& TargetSlot = ViewableTaggedSlots[SlotTag];
         if (TargetSlot.IsValid() && TargetSlot.ItemId == ItemData->ItemId)
         {
             // Item matches, just add quantity (server state is truth)
             // Get actual current quantity from component to be safe
-             FTaggedItemBundle ActualItem = LinkedInventoryComponent->GetItemForTaggedSlot(SlotTag);
-             TargetSlot.Quantity = ActualItem.Quantity;
+            FTaggedItemBundle ActualItem = LinkedInventoryComponent->GetItemForTaggedSlot(SlotTag);
+            TargetSlot.Quantity = ActualItem.Quantity;
         }
         else
         {
             // Different item or empty, overwrite with server state
-             FTaggedItemBundle ActualItem = LinkedInventoryComponent->GetItemForTaggedSlot(SlotTag);
-             TargetSlot = ActualItem; // Assign directly
+            FTaggedItemBundle ActualItem = LinkedInventoryComponent->GetItemForTaggedSlot(SlotTag);
+            TargetSlot.ItemId = ActualItem.ItemId;
+            TargetSlot.Quantity = ActualItem.Quantity;
         }
         OnTaggedSlotUpdated.Broadcast(SlotTag);
     }
@@ -744,9 +744,9 @@ void UInventoryGridViewModel::HandleTaggedItemRemoved_Implementation(const FGame
              if (ViewableTaggedSlots.Contains(SlotTag)) {
                  FTaggedItemBundle ActualItem = LinkedInventoryComponent->GetItemForTaggedSlot(SlotTag);
                  if(!ActualItem.IsValid() && ViewableTaggedSlots[SlotTag].IsValid()) {
-                      // Server says empty, VM has item. Correct VM.
-                      ViewableTaggedSlots[SlotTag] = ActualItem; // Make VM empty
-                       // Broadcast handled by prediction? Re-broadcast if needed.
+                     // Server says empty, VM has item. Correct VM.
+                     ViewableTaggedSlots[SlotTag].ItemId = ActualItem.ItemId;
+                     ViewableTaggedSlots[SlotTag].Quantity = ActualItem.Quantity;
                  } else if (ActualItem.IsValid() && ViewableTaggedSlots[SlotTag].IsValid() && ActualItem.Quantity != ViewableTaggedSlots[SlotTag].Quantity) {
                       // Server has different quantity, correct VM.
                        ViewableTaggedSlots[SlotTag].Quantity = ActualItem.Quantity;
@@ -762,13 +762,18 @@ void UInventoryGridViewModel::HandleTaggedItemRemoved_Implementation(const FGame
      UE_LOG(LogRISInventory, Log, TEXT("HandleTaggedItemRemoved: Received unpredicted remove for %s x%d from tag %s. Updating visuals."), *ItemData->ItemId.ToString(), Quantity, *SlotTag.ToString());
     if (ViewableTaggedSlots.Contains(SlotTag))
     {
-        FTaggedItemBundle& TargetSlot = ViewableTaggedSlots[SlotTag];
+        FItemBundle& TargetSlot = ViewableTaggedSlots[SlotTag];
         if (TargetSlot.IsValid() && TargetSlot.ItemId == ItemData->ItemId)
         {
             // Get actual state from component
             FTaggedItemBundle ActualItem = LinkedInventoryComponent->GetItemForTaggedSlot(SlotTag);
-            TargetSlot.ItemId = ActualItem.ItemId; // Overwrite visual state with actual state
-            TargetSlot.Quantity = ActualItem.Quantity;
+            if (ActualItem.IsValid()) {
+                TargetSlot.ItemId = ActualItem.ItemId;
+                TargetSlot.Quantity = ActualItem.Quantity;
+            } else {
+                TargetSlot.ItemId = FGameplayTag();
+                TargetSlot.Quantity = 0;
+            }
 
             OnTaggedSlotUpdated.Broadcast(SlotTag);
         }
@@ -792,16 +797,16 @@ FGameplayTag UInventoryGridViewModel::FindTaggedSlotForItem(const FGameplayTag& 
 	if (!ItemId.IsValid() || !LinkedInventoryComponent) return FGameplayTag();
 
 	const UItemStaticData* ItemData = URISSubsystem::GetItemDataById(ItemId);
-	if (!ItemData) return FGameplayTag(); // Ensure the item data is valid
+	if (!ItemData) return FGameplayTag();
 
 	FGameplayTag FallbackSlot = FGameplayTag();
-	FGameplayTag FallbackFallbackSlot = FGameplayTag(); // For compatible but non-empty/non-ideal universal
+	FGameplayTag FallbackFallbackSlot = FGameplayTag();
     FGameplayTag BestPartialStackSlot = FGameplayTag();
 
 	// --- Pass 1: Check existing items for stacking ---
-    for (const auto& Pair : ViewableTaggedSlots) {
+    for (const auto& Pair : ViewableTaggedSlots) { // Pair is <FGameplayTag, FItemBundle>
          const FGameplayTag& SlotTag = Pair.Key;
-         const FTaggedItemBundle& ExistingItem = Pair.Value;
+         const FItemBundle& ExistingItem = Pair.Value; // FItemBundle
 
          if (ExistingItem.IsValid() && ExistingItem.ItemId == ItemId) {
               // Found same item. Check if stackable and has space.
@@ -819,9 +824,7 @@ FGameplayTag UInventoryGridViewModel::FindTaggedSlotForItem(const FGameplayTag& 
           return BestPartialStackSlot;
      }
 
-
 	// --- Pass 2: Find Empty & Compatible Slots ---
-	// First try specialized slots
 	for (const FGameplayTag& SlotTag : LinkedInventoryComponent->SpecializedTaggedSlots)
 	{
 		if (LinkedInventoryComponent->IsTaggedSlotCompatible(ItemId, SlotTag)) // Use component's check
@@ -903,7 +906,7 @@ void UInventoryGridViewModel::ForceFullInventoryUpdate_Implementation()
     {
         if (ViewableTaggedSlots.Contains(TaggedItem.Tag))
         {
-            ViewableTaggedSlots[TaggedItem.Tag] = TaggedItem; // Overwrite visual state
+            ViewableTaggedSlots[TaggedItem.Tag] = FItemBundle(TaggedItem.ItemId, TaggedItem.Quantity);
              OnTaggedSlotUpdated.Broadcast(TaggedItem.Tag); // Notify update
         }
         else
@@ -911,7 +914,7 @@ void UInventoryGridViewModel::ForceFullInventoryUpdate_Implementation()
             UE_LOG(LogRISInventory, Warning, TEXT("ForceFullInventoryUpdate: Tagged item %s found in component but tag %s is not registered visually."), *TaggedItem.ItemId.ToString(), *TaggedItem.Tag.ToString());
              // Optionally add the tag visually now if strictness allows
              // if(TaggedItem.Tag.IsValid()) {
-             //     ViewableTaggedSlots.Add(TaggedItem.Tag, TaggedItem);
+             //     ViewableTaggedSlots.Add(TaggedItem.Tag, FItemBundle(TaggedItem.ItemId, TaggedItem.Quantity));
              //     OnTaggedSlotUpdated.Broadcast(TaggedItem.Tag);
              // }
         }

@@ -299,7 +299,7 @@ protected:
 	virtual int32 AddItem_ServerImpl(TScriptInterface<IItemSource> ItemSource, const FGameplayTag& ItemId, int32 RequestedQuantity, bool AllowPartial,
 												 bool SuppressUpdate = false) override;
 	virtual int32 DropAllItems_ServerImpl() override;
-	virtual int32 DestroyItemImpl(const FGameplayTag& ItemId, int32 Quantity, EItemChangeReason Reason, bool AllowPartial = false, bool UpdateAfter = true, bool SendEventAfter = true) override;
+	virtual int32 DestroyItemImpl(const FGameplayTag& ItemId, int32 Quantity, EItemChangeReason Reason, bool AllowPartial = false, bool UpdateAfter = true, bool SendEventAfter = true, int32 ItemToDestroyUniqueId = -1) override;
 	virtual int32 GetContainerOnlyItemQuantityImpl(const FGameplayTag& ItemId) const override;
 	virtual bool ContainsImpl(const FGameplayTag& ItemId, int32 Quantity = 1) const override;
 	virtual void ClearImpl() override;
@@ -322,10 +322,6 @@ protected:
 	//// Client Prediction and Rollback ////
 	
 	TMap<FGameplayTag, FItemBundle> CachedTaggedSlotItems;
-
-	UPROPERTY(Replicated, BlueprintReadWrite, EditAnywhere)
-	UTestItemInstanceData* MyTestItemInstanceData;
-
 	
 private:
 	UPROPERTY()

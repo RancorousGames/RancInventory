@@ -293,7 +293,7 @@ public:
 		InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, LeftHandSlot, ThreeSticks);
 		ViewModel->MoveItem(NoTag, 0, LeftHandSlot, -1);
 		Res &= ViewModel->AssertViewModelSettled();
-		FTaggedItemBundle ItemInLeftHandAfterMove = ViewModel->GetItemForTaggedSlot(LeftHandSlot);
+		FItemBundle ItemInLeftHandAfterMove = ViewModel->GetItemForTaggedSlot(LeftHandSlot);
 		Res &= Test->TestTrue(TEXT("LeftHandSlot should contain 5 sticks after move"), ItemInLeftHandAfterMove.ItemId == ItemIdSticks && ItemInLeftHandAfterMove.Quantity == 5);
 		// generic slots should contain the remaining 1 sticks
 		Res &= Test->TestTrue(TEXT("Slot 0 should contain 1 stick after move"), ViewModel->GetGridItem(0).ItemId == ItemIdSticks && ViewModel->GetGridItem(0).Quantity == 1);
@@ -314,8 +314,8 @@ public:
 		// Test moving helmet to LeftHandSlot which would swap except Helmet slot can't hold the sticks in the hand so it should fail
 	    ViewModel->MoveItem(HelmetSlot, -1, LeftHandSlot, -1);
 		Res &= ViewModel->AssertViewModelSettled();
-		FTaggedItemBundle ItemInLeftHandAfterHelmetMove = ViewModel->GetItemForTaggedSlot(LeftHandSlot);
-	    FTaggedItemBundle HelmetInHelmetSlotAfterMove = ViewModel->GetItemForTaggedSlot(HelmetSlot);
+		FItemBundle ItemInLeftHandAfterHelmetMove = ViewModel->GetItemForTaggedSlot(LeftHandSlot);
+	    FItemBundle HelmetInHelmetSlotAfterMove = ViewModel->GetItemForTaggedSlot(HelmetSlot);
 		Res &= Test->TestTrue(TEXT("LeftHandSlot should still  contain sticks after failed move"), ItemInLeftHandAfterHelmetMove.ItemId == ItemIdSticks && ItemInLeftHandAfterHelmetMove.Quantity == 5);
 		Res &= Test->TestTrue(TEXT("HelmetSlot should still contain helmet after failed move"), HelmetInHelmetSlotAfterMove.ItemId == ItemIdHelmet && HelmetInHelmetSlotAfterMove.Quantity == 1);
 
@@ -331,7 +331,7 @@ public:
 	    // Attempt to move a non-helmet item from generic slot HelmetSlot, which should fail and no swap occurs
 	    ViewModel->MoveItem(NoTag, 2, HelmetSlot, -1); // Assuming rocks are at slot 2 now
 		Res &= ViewModel->AssertViewModelSettled();
-		FTaggedItemBundle ItemInHelmetSlotAfterInvalidMove = ViewModel->GetItemForTaggedSlot(HelmetSlot);
+		FItemBundle ItemInHelmetSlotAfterInvalidMove = ViewModel->GetItemForTaggedSlot(HelmetSlot);
 	    FItemBundle ItemInSlot2AfterInvalidMove = ViewModel->GetGridItem(2);
 	    Res &= Test->TestTrue(TEXT("HelmetSlot should not accept non-helmet item, should remain helmet"), ItemInHelmetSlotAfterInvalidMove.ItemId == ItemIdHelmet && ItemInHelmetSlotAfterInvalidMove.Quantity == 1);
 	    Res &= Test->TestTrue(TEXT("Slot 2 should remain unchanged after invalid move attempt"), ItemInSlot2AfterInvalidMove.ItemId == ItemIdRock && ItemInSlot2AfterInvalidMove.Quantity == 5);
@@ -341,8 +341,8 @@ public:
 	    InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, LeftHandSlot, OneSpecialHelmet); // Override spear with another helmet
 	    ViewModel->MoveItem(LeftHandSlot, -1, HelmetSlot, -1);
 		Res &= ViewModel->AssertViewModelSettled();
-		FTaggedItemBundle ItemInHelmetSlotAfterSwapBack = ViewModel->GetItemForTaggedSlot(HelmetSlot);
-	    FTaggedItemBundle ItemInLeftHandAfterSwapBack = ViewModel->GetItemForTaggedSlot(LeftHandSlot);
+		FItemBundle ItemInHelmetSlotAfterSwapBack = ViewModel->GetItemForTaggedSlot(HelmetSlot);
+	    FItemBundle ItemInLeftHandAfterSwapBack = ViewModel->GetItemForTaggedSlot(LeftHandSlot);
 		Res &= Test->TestTrue(TEXT("HelmetSlot should contain 1 special helmet"), ItemInHelmetSlotAfterSwapBack.ItemId == ItemIdSpecialHelmet && ItemInHelmetSlotAfterSwapBack.Quantity == 1);
 		Res &= Test->TestTrue(TEXT("LeftHandSlot should contain 1 helmet"), ItemInLeftHandAfterSwapBack.ItemId == ItemIdHelmet && ItemInLeftHandAfterSwapBack.Quantity == 1);
 		
@@ -442,7 +442,7 @@ public:
 	    // Split between a generic slot and a tagged slot
 	    ViewModel->SplitItem(NoTag, 1, RightHandSlot, -1, 1); // Splitting 1 rock to RightHandSlot
 	    Res &= Test->TestEqual(TEXT("After splitting, second slot should have 1 rock"), ViewModel->GetGridItem(1).Quantity, 1);
-	    FTaggedItemBundle RightHandItem = ViewModel->GetItemForTaggedSlot(RightHandSlot);
+	    FItemBundle RightHandItem = ViewModel->GetItemForTaggedSlot(RightHandSlot);
 	    Res &= Test->TestTrue(TEXT("RightHandSlot should now contain 1 rock"), RightHandItem.ItemId == ItemIdRock && RightHandItem.Quantity == 1);
 
 	    // Invalid split to a different item type slot
@@ -463,13 +463,13 @@ public:
 	    ViewModel->SplitItem(LeftHandSlot, -1, NoTag, 1, 1); // Splitting 1 rock to a new generic slot
 	    FItemBundle NewGenericSlotItem = ViewModel->GetGridItem(1);
 	    Res &= Test->TestEqual(TEXT("After splitting from tagged to generic, new slot should contain 4 rocks total"), NewGenericSlotItem.Quantity, 4);
-		FTaggedItemBundle LeftHandItem = ViewModel->GetItemForTaggedSlot(LeftHandSlot);
+		FItemBundle LeftHandItem = ViewModel->GetItemForTaggedSlot(LeftHandSlot);
 		Res &= Test->TestEqual(TEXT("LeftHandSlot should now contain 4 rocks"), LeftHandItem.Quantity, 4);
 		Res &= ViewModel->AssertViewModelSettled();
 		
 	    // split from generic to tagged slot
 	    ViewModel->SplitItem(NoTag, 1, LeftHandSlot, -1, 1); // Attempt to add another helmet to HelmetSlot
-	    FTaggedItemBundle ItemInLeftHandAfterSplit = ViewModel->GetItemForTaggedSlot(LeftHandSlot);
+	    FItemBundle ItemInLeftHandAfterSplit = ViewModel->GetItemForTaggedSlot(LeftHandSlot);
 		Res &= Test->TestEqual(TEXT("LeftHandSlot should now contain 5 rocks"), ItemInLeftHandAfterSplit.Quantity, 5);
 		Res &= Test->TestEqual(TEXT("Slot 1 should now contain 3 rocks"), ViewModel->GetGridItem(1).Quantity, 3);
 		
