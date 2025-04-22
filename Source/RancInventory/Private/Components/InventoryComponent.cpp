@@ -33,6 +33,10 @@ void UInventoryComponent::InitializeComponent()
 
 	Subsystem = URISSubsystem::Get(this);
 
+	// We sort to help with GetItemDistributionPlan calculations
+	// 1. If we have one item that fits in one of 2+ slots but one slot blocks another then we want to make sure we pick the blocking slot before the to-be-blocked slot
+	// 2. Sorting might have cycles if left hand can block right hand and right hand can block left hand making a perfect sorting impossible.
+	// This can create some slight undesired behavior if we have both 1 and 2.
 	SortUniversalTaggedSlots();
 
 	// Initialize available recipes based on initial inventory and recipes
@@ -110,7 +114,7 @@ int32 UInventoryComponent::ExtractItemFromTaggedSlot_IfServer(const FGameplayTag
 {
 	if (!ContainsImpl(ItemId, Quantity))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("Item not found in container"));
+		UE_LOG(LogRISInventory, Warning, TEXT("Item not found in container"));
 		return 0;
 	}
 
@@ -134,7 +138,7 @@ const FUniversalTaggedSlot* UInventoryComponent::WouldItemMoveIndirectlyViolateB
 		const FTaggedItemBundle& PotentiallyBlockedSlotItem = GetItemForTaggedSlot(
 			UniversalSlotDefinition->UniversalSlotToBlock);
 		if (PotentiallyBlockedSlotItem.IsValid() && ItemData->ItemCategories.HasTag(
-			UniversalSlotDefinition->RequiredItemCategoryToBlock))
+			UniversalSlotDefinition->RequiredItemCategoryToActivateBlocking))
 		{
 			// If the slot we should be blocking if equipped is blocked, we can't add to this slot
 			return UniversalSlotDefinition;
@@ -153,7 +157,7 @@ void UInventoryComponent::UpdateBlockingState(FGameplayTag SlotTag, const UItemS
 	{
 		bool ShouldBlock = false;
 		if (IsEquip && ItemData && ItemData->ItemCategories.
-		                                     HasTag(UniversalSlotDefinition->RequiredItemCategoryToBlock))
+		                                     HasTag(UniversalSlotDefinition->RequiredItemCategoryToActivateBlocking))
 		{
 			ShouldBlock = true;
 		}
@@ -171,7 +175,7 @@ int32 UInventoryComponent::AddItemToTaggedSlot_IfServer(TScriptInterface<IItemSo
 
 	if (GetOwnerRole() < ROLE_Authority && GetOwnerRole() != ROLE_None)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("AddItemsToTaggedSlot_IfServer called on non-authority!"));
+		UE_LOG(LogRISInventory, Warning, TEXT("AddItemsToTaggedSlot_IfServer called on non-authority!"));
 		return 0;
 	}
 
@@ -180,7 +184,8 @@ int32 UInventoryComponent::AddItemToTaggedSlot_IfServer(TScriptInterface<IItemSo
 	// New check for slot item compatibility and weight capacity
 	if (!IsTaggedSlotCompatible(ItemId, SlotTag))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("Item cannot be added to the tagged slot"));
+		UE_LOG(LogRISInventory, Warning, TEXT("Item %s cannot be added to the tagged slot %s"), *ItemId.ToString(),
+		       *SlotTag.ToString());
 		return 0;
 	}
 
@@ -268,7 +273,7 @@ int32 UInventoryComponent::AddItemToAnySlot(TScriptInterface<IItemSource> ItemSo
 	const auto* ItemData = URISSubsystem::GetItemDataById(ItemId);
 	if (!ItemData)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("Could not find item data for item: %s"), *ItemId.ToString());
+		UE_LOG(LogRISInventory, Warning, TEXT("Could not find item data for item: %s"), *ItemId.ToString());
 		return 0; // Item data not found
 	}
 
@@ -368,7 +373,7 @@ int32 UInventoryComponent::RemoveQuantityFromTaggedSlot_IfServer(FGameplayTag Sl
 
 	if (IndexToRemoveAt < 0)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("Tagged slot does not exist"));
+		UE_LOG(LogRISInventory, Warning, TEXT("Tagged slot does not exist"));
 		return 0;
 	}
 
@@ -376,7 +381,7 @@ int32 UInventoryComponent::RemoveQuantityFromTaggedSlot_IfServer(FGameplayTag Sl
 
 	if (!InstanceToRemoveFrom->IsValid())
 	{
-		UE_LOG(LogTemp, Warning, TEXT("Tagged slot is empty"));
+		UE_LOG(LogRISInventory, Warning, TEXT("Tagged slot is empty"));
 		return 0;
 	}
 
@@ -446,7 +451,7 @@ int32 UInventoryComponent::MoveItem_ServerImpl(const FGameplayTag& ItemId, int32
 {
 	if (GetOwnerRole() < ROLE_Authority && GetOwnerRole() != ROLE_None)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("MoveItemsToTaggedSlot_ServerImpl called on non-authority!"));
+		UE_LOG(LogRISInventory, Warning, TEXT("MoveItemsToTaggedSlot_ServerImpl called on non-authority!"));
 		return 0;
 	}
 
@@ -455,7 +460,7 @@ int32 UInventoryComponent::MoveItem_ServerImpl(const FGameplayTag& ItemId, int32
 
 	if (!SourceIsTaggedSlot && !TargetIsTaggedSlot)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("Moving to and from container is not meaningful"));
+		UE_LOG(LogRISInventory, Warning, TEXT("Moving to and from container is not meaningful"));
 		return 0;
 	}
 
@@ -467,7 +472,7 @@ int32 UInventoryComponent::MoveItem_ServerImpl(const FGameplayTag& ItemId, int32
 		SourceTaggedSlotIndex = GetIndexForTaggedSlot(SourceTaggedSlot);
 		if (!TaggedSlotItemInstances.IsValidIndex(SourceTaggedSlotIndex))
 		{
-			UE_LOG(LogTemp, Warning, TEXT("Source tagged slot does not exist"));
+			UE_LOG(LogRISInventory, Warning, TEXT("Source tagged slot does not exist"));
 			return 0;
 		}
 
@@ -487,7 +492,7 @@ int32 UInventoryComponent::MoveItem_ServerImpl(const FGameplayTag& ItemId, int32
 
 		if (!SourceItem.IsValid())
 		{
-			UE_LOG(LogTemp, Warning, TEXT("Source container item does not exist"));
+			UE_LOG(LogRISInventory, Warning, TEXT("Source container item does not exist"));
 			return 0;
 		}
 	}
@@ -500,7 +505,7 @@ int32 UInventoryComponent::MoveItem_ServerImpl(const FGameplayTag& ItemId, int32
 	{
 		if (!IsTaggedSlotCompatible(ItemId, TargetTaggedSlot))
 		{
-			UE_LOG(LogTemp, Warning, TEXT("Item is not compatible with the target slot"));
+			UE_LOG(LogRISInventory, Warning, TEXT("Item is not compatible with the target slot"));
 			return 0;
 		}
 
@@ -511,7 +516,7 @@ int32 UInventoryComponent::MoveItem_ServerImpl(const FGameplayTag& ItemId, int32
 			if (!SpecializedTaggedSlots.Contains(TargetTaggedSlot) &&
 				!ContainedInUniversalSlot(TargetTaggedSlot))
 			{
-				UE_LOG(LogTemp, Warning, TEXT("Target tagged slot does not exist"));
+				UE_LOG(LogRISInventory, Warning, TEXT("Target tagged slot does not exist"));
 				return 0;
 			}
 
@@ -565,7 +570,7 @@ int32 UInventoryComponent::MoveItem_ServerImpl(const FGameplayTag& ItemId, int32
 		(!IsTaggedSlotCompatible(TargetItem.GetItemId(), SourceTaggedSlot) ||
 			WouldItemMoveIndirectlyViolateBlocking(SourceTaggedSlot, TargetItemData)))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("Target Item is not compatible with the source slot"));
+		UE_LOG(LogRISInventory, Warning, TEXT("Target Item is not compatible with the source slot"));
 		return 0;
 	}
 
@@ -576,7 +581,7 @@ int32 UInventoryComponent::MoveItem_ServerImpl(const FGameplayTag& ItemId, int32
 	const auto SourceItemData = URISSubsystem::GetItemDataById(SourceItem.GetItemId());
 	if (!SourceItemData)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("Source item data not found"));
+		UE_LOG(LogRISInventory, Warning, TEXT("Source item data not found"));
 		return 0;
 	}
 
@@ -593,7 +598,7 @@ int32 UInventoryComponent::MoveItem_ServerImpl(const FGameplayTag& ItemId, int32
 		if (SwapBackRequested && ((TargetIsTaggedSlot && TargetItem.GetItemId() != SwapItemId) || TargetItem.
 			GetQuantity() < SwapQuantity))
 		{
-			UE_LOG(LogTemp, Warning, TEXT("Requested swap was invalid"));
+			UE_LOG(LogRISInventory, Warning, TEXT("Requested swap was invalid"));
 			return 0;
 		}
 	}
@@ -796,7 +801,7 @@ int32 UInventoryComponent::GetQuantityOfItemTaggedSlotCanReceive(const FGameplay
 	const UItemStaticData* ItemData = URISSubsystem::GetItemDataById(ItemId);
 	if (!ItemData)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("Could not find item data for item: %s"), *ItemId.ToString());
+		UE_LOG(LogRISInventory, Warning, TEXT("Could not find item data for item: %s"), *ItemId.ToString());
 		return 0; // Item data not found
 	}
 
@@ -853,7 +858,7 @@ void UInventoryComponent::DropFromTaggedSlot_Server_Implementation(const FGamepl
 	const FTaggedItemBundle& Item = TaggedSlotItemInstances[Index];
 	if (!Item.Tag.IsValid())
 	{
-		UE_LOG(LogTemp, Warning, TEXT("DropFromTaggedSlot called with invalid slot tag"));
+		UE_LOG(LogRISInventory, Warning, TEXT("DropFromTaggedSlot called with invalid slot tag"));
 		return;
 	}
 
@@ -937,7 +942,7 @@ int32 UInventoryComponent::UseItemFromTaggedSlot(const FGameplayTag& SlotTag)
 	const auto* ItemData = URISSubsystem::GetItemDataById(ItemId);
 	if (!ItemData)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("Could not find item data for item: %s"), *ItemId.ToString());
+		UE_LOG(LogRISInventory, Warning, TEXT("Could not find item data for item: %s"), *ItemId.ToString());
 		return 0;
 	}
 
@@ -945,7 +950,7 @@ int32 UInventoryComponent::UseItemFromTaggedSlot(const FGameplayTag& SlotTag)
 
 	if (!UsableItem)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("Item is not usable: %s"), *ItemId.ToString());
+		UE_LOG(LogRISInventory, Warning, TEXT("Item is not usable: %s"), *ItemId.ToString());
 		return 0;
 	}
 
@@ -969,7 +974,7 @@ void UInventoryComponent::UseItemFromTaggedSlot_Server_Implementation(const FGam
 		const UItemStaticData* ItemData = URISSubsystem::GetItemDataById(ItemId);
 		if (!ItemData)
 		{
-			UE_LOG(LogTemp, Warning, TEXT("Could not find item data for item: %s"), *ItemId.ToString());
+			UE_LOG(LogRISInventory, Warning, TEXT("Could not find item data for item: %s"), *ItemId.ToString());
 			return;
 		}
 
@@ -977,7 +982,7 @@ void UInventoryComponent::UseItemFromTaggedSlot_Server_Implementation(const FGam
 
 		if (!UsableItem)
 		{
-			UE_LOG(LogTemp, Warning, TEXT("Item is not usable: %s"), *ItemId.ToString());
+			UE_LOG(LogRISInventory, Warning, TEXT("Item is not usable: %s"), *ItemId.ToString());
 			return;
 		}
 
@@ -1128,22 +1133,6 @@ void UInventoryComponent::DetectAndPublishContainerChanges()
 	}*/
 }
 
-void UInventoryComponent::SetMyTestItemInstanceData_Server_Implementation(bool Clear)
-{
-	
-		if (!Clear)
-		{
-			// Spawn using RF_Public 
-			MyTestItemInstanceData = NewObject<UTestItemInstanceData>(this);/*, UTestItemInstanceData::StaticClass(),	NAME_None, RF_Public);*/
-			AddReplicatedSubObject(MyTestItemInstanceData);
-		}
-		else
-		{
-			MyTestItemInstanceData = nullptr;
-		}
-	
-}
-
 bool UInventoryComponent::IsTaggedSlotCompatible(const FGameplayTag& ItemId, const FGameplayTag& SlotTag) const
 {
 	const UItemStaticData* ItemData = URISSubsystem::GetItemDataById(ItemId);
@@ -1282,7 +1271,7 @@ TArray<std::tuple<FGameplayTag, int32>> UInventoryComponent::GetItemDistribution
 					TotalQuantityDistributed += AddedToTaggedSlot;
 					// Add any BlockedSlots
 					if (SlotTag.UniversalSlotToBlock.IsValid() && ItemData->ItemCategories.HasTag(
-						SlotTag.RequiredItemCategoryToBlock))
+						SlotTag.RequiredItemCategoryToActivateBlocking))
 					{
 						BlockedSlots.Add(SlotTag.UniversalSlotToBlock);
 					}
@@ -1313,7 +1302,7 @@ TArray<std::tuple<FGameplayTag, int32>> UInventoryComponent::GetItemDistribution
 				TotalQuantityDistributed += AddedToTaggedSlot;
 
 				if (SlotTag.UniversalSlotToBlock.IsValid() && ItemData->ItemCategories.HasTag(
-					SlotTag.RequiredItemCategoryToBlock))
+					SlotTag.RequiredItemCategoryToActivateBlocking))
 				{
 					BlockedSlots.Add(SlotTag.UniversalSlotToBlock);
 				}
@@ -1416,12 +1405,12 @@ void UInventoryComponent::SortUniversalTaggedSlots()
     // If cycles are detected, log a warning and partially sort
     if (!CyclicIndices.IsEmpty())
     {
-       UE_LOG(LogTemp, Warning, TEXT("Cycle detected in UniversalTaggedSlots dependency graph! %d slots have cyclic dependencies."), CyclicIndices.Num());
+       UE_LOG(LogRISInventory, Warning, TEXT("Cycle detected in UniversalTaggedSlots dependency graph! %d slots have cyclic dependencies."), CyclicIndices.Num());
        
        // Log the specific cyclic slots for debugging
        for (int32 CyclicIndex : CyclicIndices)
        {
-           UE_LOG(LogTemp, Warning, TEXT("Cyclic Slot Index: %d, Slot: %s"), 
+           UE_LOG(LogRISInventory, Warning, TEXT("Cyclic Slot Index: %d, Slot: %s"), 
                   CyclicIndex, 
                   *UniversalTaggedSlots[CyclicIndex].Slot.ToString());
        }
@@ -1508,7 +1497,7 @@ bool UInventoryComponent::CraftRecipe_IfServer(const UObjectRecipeData* Recipe)
 			                                           EItemChangeReason::Transformed);
 			if (Removed < Component.Quantity)
 			{
-				UE_LOG(LogTemp, Error, TEXT("Failed to remove all items for crafting even though they were confirmed"));
+				UE_LOG(LogRISInventory, Error, TEXT("Failed to remove all items for crafting even though they were confirmed"));
 				return false;
 			}
 		}
@@ -1521,11 +1510,11 @@ bool UInventoryComponent::CraftRecipe_IfServer(const UObjectRecipeData* Recipe)
 			                                                      false);
 			if (QuantityAdded < ItemRecipe->QuantityCreated)
 			{
-				UE_LOG(LogTemp, Display, TEXT("Failed to add crafted item to inventory, dropping item instead"));
+				UE_LOG(LogRISInventory, Display, TEXT("Failed to add crafted item to inventory, dropping item instead"));
 
 				if (!Subsystem)
 				{
-					UE_LOG(LogTemp, Error, TEXT("Subsystem is null, cannot drop item"));
+					UE_LOG(LogRISInventory, Error, TEXT("Subsystem is null, cannot drop item"));
 					return false;
 				}
 
@@ -1670,7 +1659,7 @@ void UInventoryComponent::ClearImpl()
 {
 	if (GetOwnerRole() < ROLE_Authority && GetOwnerRole() != ROLE_None)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("ClearInventory called on non-authority!"));
+		UE_LOG(LogRISInventory, Warning, TEXT("ClearInventory called on non-authority!"));
 		return;
 	}
 
@@ -1703,7 +1692,7 @@ int32 UInventoryComponent::GetReceivableQuantityImpl(const FGameplayTag& ItemId)
 	const UItemStaticData* ItemData = URISSubsystem::GetItemDataById(ItemId);
 	if (!ItemData)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("Could not find item data for item: %s"), *ItemId.ToString());
+		UE_LOG(LogRISInventory, Warning, TEXT("Could not find item data for item: %s"), *ItemId.ToString());
 		return 0; // Item data not found
 	}
 
@@ -1726,7 +1715,7 @@ int32 UInventoryComponent::GetReceivableQuantityImpl(const FGameplayTag& ItemId)
 		int32 QuantityThisSlotCanTake = GetQuantityOfItemTaggedSlotCanReceive(ItemId, UniversalSlot.Slot);
 		AcceptableQuantityBySlots += QuantityThisSlotCanTake;
 		if (QuantityThisSlotCanTake > 0 && UniversalSlot.UniversalSlotToBlock.IsValid() && ItemData->ItemCategories.
-			HasTag(UniversalSlot.RequiredItemCategoryToBlock))
+			HasTag(UniversalSlot.RequiredItemCategoryToActivateBlocking))
 		{
 			BlockedSlots.Add(UniversalSlot.UniversalSlotToBlock);
 		}

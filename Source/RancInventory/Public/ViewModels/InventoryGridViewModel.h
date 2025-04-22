@@ -1,57 +1,68 @@
 ﻿// Copyright Rancorous Games, 2024
-
 #pragma once
 
 #include "CoreMinimal.h"
-#include "UObject/Object.h"
-#include "RISNetworkingData.h"
+#include "ViewModels/ContainerGridViewModel.h" // Inherit from base
+#include "Data/ItemBundle.h"
+#include "GameplayTagContainer.h" // Needed for FGameplayTag
 #include "InventoryGridViewModel.generated.h"
 
-class UInventoryComponent;
-class RancInventoryComponent;
+// Forward Declarations
+class UInventoryComponent; // Use the specific Inventory Component type
+class AWorldItem;
+struct FTaggedItemBundle; // Include or forward declare as needed
 
-
+/**
+ * View Model for displaying and interacting with a full Inventory Component,
+ * including both the grid container slots and tagged equipment/hotbar slots.
+ */
 UCLASS(Blueprintable)
-class RANCINVENTORY_API UInventoryGridViewModel : public UObject
+class RANCINVENTORY_API UInventoryGridViewModel : public UContainerGridViewModel // Inherit
 {
     GENERATED_BODY()
 
 public:
-	
-    /* Initializes the slot mapper with a given inventory component, setting up initial mappings
-     * Parameters:
-     * InventoryComponent: The inventory component to be linked to the slot mapper
-     * NumSlots: The number of slots to be initialized
-     * bPreferEmptyUniversalSlots: Whether MoveItemToAnyTaggedSlot will prefer to use empty universal slots over occupied specialized slots
+    /**
+     * Initializes the view model with an Inventory component.
+     * @param InventoryComponent The inventory component to link.
+     * @param NumGridSlots The number of grid slots to display.
+     * @param PreferEmptyUniversalSlots If true, MoveItemToAnyTaggedSlot prefers empty universal over occupied specialized.
      */
-    UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category=RIS)
-    void Initialize(UInventoryComponent* InventoryComponent, int32 NumSlots = 9,  bool bPreferEmptyUniversalSlots = false);
+    UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category="InventoryViewModel")
+    void InitializeInventory(UInventoryComponent* InventoryComponent, int32 NumGridSlots = 9, bool PreferEmptyUniversalSlots = false);
 
-    // Checks if a given slot is empty
-    UFUNCTION(BlueprintCallable, BlueprintPure, Category=RIS)
-    bool IsSlotEmpty(int32 SlotIndex) const;
-    
-    UFUNCTION(BlueprintCallable, BlueprintPure, Category=RIS)
+    //~ Begin UContainerGridViewModel Overrides (or new functions)
+    // Note: We override Initialize from base, but give it a more specific name for clarity in BP
+    // If you need the base Initialize callable too, add `using Super::Initialize;` or call it explicitly.
+    virtual void Initialize_Implementation(UItemContainerComponent* ContainerComponent, int32 NumSlots = 9) override;
+    virtual int32 DropItemFromGrid(int32 SlotIndex, int32 Quantity) override;
+    virtual int32 UseItemFromGrid(int32 SlotIndex) override;
+    virtual void PickupItemToContainer(AWorldItem* WorldItem, bool DestroyAfterPickup) override; // Override to call Inventory's Pickup
+    virtual bool AssertViewModelSettled() const override;
+    //~ End UContainerGridViewModel Overrides
+
+    /** Checks if a given tagged slot is empty. */
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category="InventoryViewModel")
     bool IsTaggedSlotEmpty(const FGameplayTag& SlotTag) const;
 
-    // Retrieves the item informatio<n for a given slot index
-    UFUNCTION(BlueprintCallable, BlueprintPure, Category=RIS)
-    FItemBundle GetItem(int32 SlotIndex) const;
+    /** Retrieves the item bundle for a given tagged slot. Returns a reference for potential modification (use carefully). */
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category="InventoryViewModel")
+    const FTaggedItemBundle& GetItemForTaggedSlot(const FGameplayTag& SlotTag) const; // Keep const for getter
 
-	
-	UFUNCTION(BlueprintCallable, BlueprintCallable, Category=RIS)
-	void PickupItem(AWorldItem* WorldItem, EPreferredSlotPolicy PreferTaggedSlots, bool DestroyAfterPickup);
-	
-    UFUNCTION(BlueprintCallable, Category=RIS)
-    int32 DropItem(FGameplayTag TaggedSlot, int32 SlotIndex, int32 Quantity);
-	
-	UFUNCTION(BlueprintCallable, Category=RIS)
-	int32 UseItem(FGameplayTag TaggedSlot, int32 SlotIndex);
+    /** Retrieves a modifiable reference to the item bundle for a given tagged slot. Use with caution. */
+    UFUNCTION(BlueprintCallable, Category="InventoryViewModel")
+    FTaggedItemBundle& GetMutableItemForTaggedSlot(const FGameplayTag& SlotTag);
 
-    UFUNCTION(BlueprintCallable, Category=RIS)
-    FTaggedItemBundle& GetItemForTaggedSlot(const FGameplayTag& SlotTag) const;
-    
-    
+    /** Attempts to drop a quantity of an item from a tagged slot. */
+    UFUNCTION(BlueprintCallable, Category="InventoryViewModel")
+    int32 DropItemFromTaggedSlot(FGameplayTag TaggedSlot, int32 Quantity);
+
+    /** Attempts to use an item from a tagged slot. */
+    UFUNCTION(BlueprintCallable, Category="InventoryViewModel")
+    int32 UseItemFromTaggedSlot(FGameplayTag TaggedSlot);
+
+    /** Attempts to split items between grid/tagged slots. */
+    UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category="InventoryViewModel")
     /**
      * Attempts to split a specified quantity of an item from one slot to another.
      * If the source is a tagged slot, SourceTaggedSlot should be valid, and SourceSlotIndex is ignored.
@@ -70,78 +81,75 @@ public:
      * @param TargetTaggedSlot The gameplay tag of the target tagged slot, if applicable.
      * @param TargetSlotIndex The index of the target generic slot, if applicable.
      * @param Quantity The number of items to be split from the source slot to the target slot.
-     */
-    UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category=RIS)
-    bool SplitItem(FGameplayTag SourceTaggedSlot, int32 SourceSlotIndex, FGameplayTag TargetTaggedSlot, int32 TargetSlotIndex, int32 Quantity);
-    
-    UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category=RIS)
-    bool MoveItem(FGameplayTag SourceTaggedSlot, int32 SourceSlotIndex = -1,
-                  FGameplayTag TargetTaggedSlot = FGameplayTag(), int32 TargetSlotIndex = -1);
+     */    bool SplitItem(FGameplayTag SourceTaggedSlot, int32 SourceSlotIndex, FGameplayTag TargetTaggedSlot, int32 TargetSlotIndex, int32 Quantity);
 
-    UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category=RIS)
+    /** Attempts to move/swap items between grid/tagged slots. */
+    UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category="InventoryViewModel")
+    bool MoveItem(FGameplayTag SourceTaggedSlot, int32 SourceSlotIndex, FGameplayTag TargetTaggedSlot = FGameplayTag(), int32 TargetSlotIndex = -1);
+
+    /** Attempts to move an item from grid/tagged slot to the most appropriate available tagged slot. */
+    UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category="InventoryViewModel")
     bool MoveItemToAnyTaggedSlot(const FGameplayTag& SourceTaggedSlot, int32 SourceSlotIndex);
-	
-    UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category=RIS)
-    bool CanSlotReceiveItem(const FGameplayTag& ItemId, int32 Quantity, int32 SlotIndex) const;
-    
-    UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category=RIS)
+
+    /** Checks if a tagged slot can receive the item (checks compatibility and stacking). */
+    UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category="InventoryViewModel")
     bool CanTaggedSlotReceiveItem(const FGameplayTag& ItemId, int32 Quantity, const FGameplayTag& SlotTag, bool CheckContainerLimits = true) const;
 
-	// This function will validate that the viewmodel is settled and not expecting any more operations. Intended to be used for tests
-	bool AssertViewModelSettled() const;
-	
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category=RIS)
-    int32 NumberOfSlots;
-    
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category=RIS)
-    bool PreferEmptyUniversalSlots = true;
-    
-    // Linked inventory component for direct interaction
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category=RIS)
-    UInventoryComponent* LinkedInventoryComponent;
-    
-    DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnSlotUpdated, int32, SlotIndex);
-    UPROPERTY(BlueprintAssignable, Category=RIS)
-    FOnSlotUpdated OnSlotUpdated;
-    
+	/**
+     * Attempts to add an item from a WorldItem actor into the inventory, preferring tagged or grid slots based on policy.
+     * @param WorldItem The item actor to pick up.
+     * @param PreferTaggedSlots Policy for choosing the destination slot type.
+     * @param DestroyAfterPickup If true, destroys the WorldItem actor after successful pickup.
+     */
+	UFUNCTION(BlueprintCallable, Category="InventoryViewModel")
+	void PickupItem(AWorldItem* WorldItem, EPreferredSlotPolicy PreferTaggedSlots, bool DestroyAfterPickup);
+
+
+    /** If true, MoveItemToAnyTaggedSlot prefers empty universal slots over occupied specialized ones. */
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="InventoryViewModel")
+    bool bPreferEmptyUniversalSlots = true;
+
+    /** The linked inventory component (specific type). */
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="InventoryViewModel")
+    TObjectPtr<UInventoryComponent> LinkedInventoryComponent; // Specific type needed
+
+    /** Delegate broadcast when a tagged slot's visual representation is updated. */
     DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnTaggedSlotUpdated, const FGameplayTag&, SlotTag);
-    UPROPERTY(BlueprintAssignable, Category=RIS)
+    UPROPERTY(BlueprintAssignable, Category="InventoryViewModel")
     FOnTaggedSlotUpdated OnTaggedSlotUpdated;
-    
+
 protected:
-    FGameplayTag FindTaggedSlotForItem(const FGameplayTag& ItemId, int32 Quanitity) const;
+    /** Finds the best tagged slot for an item. */
+    FGameplayTag FindTaggedSlotForItem(const FGameplayTag& ItemId, int32 Quantity) const;
 
-	// Finds a slot that is appropriate for the given item and quantity
-    UFUNCTION(BlueprintNativeEvent , Category = RIS)
-    int32 FindSlotIndexForItem(const FGameplayTag& ItemId, int32 Quantity);
-    
-    UFUNCTION(BlueprintNativeEvent , Category = RIS)
-    void HandleItemAdded(const UItemStaticData* ItemData, int32 Quantity, EItemChangeReason Reason);
-    UFUNCTION(BlueprintNativeEvent , Category = RIS)
-    void HandleItemRemoved(const UItemStaticData* ItemData, int32 Quantity, EItemChangeReason Reason);
-    UFUNCTION(BlueprintNativeEvent , Category = RIS)
+    //~ Begin Event Handler Overrides/Implementations
+    // We might override base handlers if inventory logic changes how grid items are handled,
+    // but often we just need the new tagged handlers.
+    // virtual void HandleItemAdded_Implementation(const UItemStaticData* ItemData, int32 Quantity, EItemChangeReason Reason) override;
+    // virtual void HandleItemRemoved_Implementation(const UItemStaticData* ItemData, int32 Quantity, EItemChangeReason Reason) override;
+
+    /** Handles item additions to tagged slots notified by the linked inventory component. */
+    UFUNCTION(BlueprintNativeEvent, Category = "InventoryViewModel")
     void HandleTaggedItemAdded(const FGameplayTag& SlotTag, const UItemStaticData* ItemData, int32 Quantity, FTaggedItemBundle PreviousItem, EItemChangeReason Reason);
-    UFUNCTION(BlueprintNativeEvent , Category = RIS)
-    void HandleTaggedItemRemoved(const FGameplayTag& SlotTag, const UItemStaticData* ItemData, int32 Quantity, EItemChangeReason Reason);
-    
-    UFUNCTION(BlueprintNativeEvent , Category = RIS)
-    void ForceFullUpdate();
 
+    /** Handles item removals from tagged slots notified by the linked inventory component. */
+    UFUNCTION(BlueprintNativeEvent, Category = "InventoryViewModel")
+    void HandleTaggedItemRemoved(const FGameplayTag& SlotTag, const UItemStaticData* ItemData, int32 Quantity, EItemChangeReason Reason);
+
+    /** Attempts to resolve blocking issues before moving an item to a tagged slot. */
     bool TryUnblockingMove(FGameplayTag TargetTaggedSlot, FGameplayTag ItemId);
-	bool MoveItem_Impl(FGameplayTag SourceTaggedSlot, int32 SourceSlotIndex, FGameplayTag TargetTaggedSlot,
-                       int32 TargetSlotIndex, int32 InQuantity, bool IsSplit);
-	
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category=RIS)
-    TArray<FItemBundle> ViewableGridSlots;
-public:
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category=RIS)
+
+    /** Internal implementation handling all move/split combinations. */
+    virtual bool MoveItem_Internal(FGameplayTag SourceTaggedSlot, int32 SourceSlotIndex, FGameplayTag TargetTaggedSlot, int32 TargetSlotIndex, int32 InQuantity, bool IsSplit);
+
+     /** Fully refreshes both grid and tagged slots from the inventory component. */
+    UFUNCTION(BlueprintNativeEvent, Category = "InventoryViewModel")
+    void ForceFullInventoryUpdate();
+    //~ End Event Handler Overrides/Implementations
+
+    /** Map representing the visual state of the tagged slots. */
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="InventoryViewModel|Internal")
     TMap<FGameplayTag, FTaggedItemBundle> ViewableTaggedSlots;
 
-	// This is used to sync with inventory component, not to be confused with ItemContainer.RequestedOperationsToServer
-    UPROPERTY(VisibleAnywhere, Category=RIS)
-    TArray<FRISExpectedOperation> OperationsToConfirm;
-
-private:
-	bool IsInitialized = false;
+     virtual void BeginDestroy() override;
 };
-

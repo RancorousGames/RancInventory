@@ -5,6 +5,7 @@
 void UItemInstanceData::Initialize_Implementation(bool OwnedByComponent, AWorldItem* OwningWorldItem,
 	UItemContainerComponent* OwningContainer)
 {
+	UniqueId = GetUniqueID();
 }
 
 void UItemInstanceData::OnDestroy_Implementation()

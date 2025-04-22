@@ -24,7 +24,7 @@ struct FVersionedItemInstanceArray
 };
 
 UENUM()
-enum RISSlotOperation
+enum ERISSlotOperation
 {
 	Add,
 	AddTagged,
@@ -37,17 +37,17 @@ struct FRISExpectedOperation
 {
 	GENERATED_BODY()
 
-	RISSlotOperation Operation = RISSlotOperation::Add;
+	ERISSlotOperation Operation = ERISSlotOperation::Add;
 	FGameplayTag TaggedSlot = FGameplayTag();
 	FGameplayTag ItemId = FGameplayTag();
 	int32 Quantity = 0;
 
 	// Constructor for tagged operations
-	FRISExpectedOperation(RISSlotOperation InOperation, FGameplayTag InTaggedSlot, FGameplayTag InItemID, int32 InQuantity)
+	FRISExpectedOperation(ERISSlotOperation InOperation, FGameplayTag InTaggedSlot, FGameplayTag InItemID, int32 InQuantity)
 		: Operation(InOperation), TaggedSlot(InTaggedSlot), ItemId(InItemID), Quantity(InQuantity) { }
 
 	// Constructor for non-tagged operations
-	FRISExpectedOperation(RISSlotOperation InOperation, FGameplayTag InItemID, int32 InQuantity)
+	FRISExpectedOperation(ERISSlotOperation InOperation, FGameplayTag InItemID, int32 InQuantity)
 		: Operation(InOperation), ItemId(InItemID), Quantity(InQuantity) { }
 
 	// Default constructor

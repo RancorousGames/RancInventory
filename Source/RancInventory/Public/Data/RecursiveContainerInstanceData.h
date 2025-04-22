@@ -16,7 +16,7 @@ class RANCINVENTORY_API URecursiveContainerInstanceData : public UItemInstanceDa
 
 public:
 	// Constructor
-	URecursiveContainerInstanceData(){}
+	URecursiveContainerInstanceData();
 	virtual ~URecursiveContainerInstanceData() override;
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;

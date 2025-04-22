@@ -8,6 +8,7 @@
 #include "WeaponActor.h"
 #include "Framework/DebugTestResult.h"
 #include "GameFramework/Character.h"
+#include "MockClasses/ItemHoldingCharacter.h"
 
 #define TestName "GameTests.RIS.GearManager"
 
@@ -43,7 +44,7 @@ public:
 		URISSubsystem* Subsystem = TestFixture.GetSubsystem();
 		World = TestFixture.GetWorld();
 		TimerManager = &World->GetTimerManager();
-		TempActor = World->SpawnActor<ACharacter>();
+		TempActor = World->SpawnActor<AItemHoldingCharacter>();
 		InventoryComponent = NewObject<UInventoryComponent>(TempActor);
 		TempActor->AddInstanceComponent(InventoryComponent);
 		InventoryComponent->UniversalTaggedSlots.Add(FUniversalTaggedSlot(LeftHandSlot));
@@ -72,12 +73,13 @@ public:
 
 		GearManager->EquipDelay = 1.0f;
 		GearManager->UnequipDelay = 1.0f;
+		
+		TestFixture.InitializeTestItems(); // Initialize test items
 		GearManager->DefaultUnarmedWeaponData = Subsystem->GetItemDataById(ItemIdUnarmed);
 		
 		TempActor->AddInstanceComponent(GearManager);
 		GearManager->RegisterComponent();
 		GearManager->Initialize();
-		TestFixture.InitializeTestItems(); // Initialize test items
 	}
 
 	~GearManagerComponentTestContext()
@@ -139,7 +141,7 @@ public:
 			TEXT("MainhandSlotWeapon should be valid after equipping the spear"),GearManager->MainhandSlotWeapon != nullptr);
 		Res &= Test->TestTrue(
 			TEXT("OffhandSlotWeapon should still be null after equipping the spear"), GearManager->OffhandSlotWeapon == nullptr);
-
+	
 		// Remove spear and add two daggers
 		Inventory->RemoveQuantityFromTaggedSlot_IfServer(RightHandSlot, 999, EItemChangeReason::Moved, true);
 		Inventory->AddItemToTaggedSlot_IfServer(Subsystem, RightHandSlot, ItemIdBrittleCopperKnife, 1, false);
@@ -149,7 +151,7 @@ public:
 		
 		Res &= Test->TestTrue(
 			TEXT("MainhandSlotWeapon should still be spear"),GearManager->MainhandSlotWeapon != nullptr && GearManager->MainhandSlotWeapon->ItemData->ItemId == ItemIdSpear);
-
+	
 		Context.TickTime(GearManager->UnequipDelay);
 		Res &= Test->TestTrue(
 			TEXT("MainhandSlotWeapon should be null after removing the spear"), CheckMainHandWeaponIsEmptyOrUnarmed(GearManager));

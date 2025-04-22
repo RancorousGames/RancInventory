@@ -722,9 +722,6 @@ public:
         auto* Subsystem = ContextA.TestFixture.GetSubsystem();
         FDebugTestResult Res = true;
 
-        const int32 BackpackDefaultSlots = 5;
-        const float BackpackDefaultWeight = 10.0f;
-        const int32 PurseDefaultSlots = 2;
         const float PurseDefaultWeight = 1.0f;
         const float KnifeDurability = 88.f;
 
@@ -740,10 +737,7 @@ public:
         URecursiveContainerInstanceData* BackpackInstanceA = GetRecursiveInstanceData(BackpackBundleA);
         Res &= Test->TestNotNull(TEXT("[Recursive] 2. Verify Creation (A): Instance Data Exists"), BackpackInstanceA);
         if (!BackpackInstanceA) return false; // Stop test if instance data failed
-
-        // Manually set capacity (since Initialize doesn't read static data yet)
-        BackpackInstanceA->MaxSlotCount = BackpackDefaultSlots;
-        BackpackInstanceA->MaxWeight = BackpackDefaultWeight;
+		
         // Call initialize manually - This should ideally happen automatically when the instance is created/added
         // For now, we simulate it post-addition. You might need to adjust UItemContainerComponent::AddItem_ServerImpl
         // or the FItemBundleWithInstanceData constructor to call Initialize if appropriate.
@@ -756,8 +750,8 @@ public:
         Res &= Test->TestEqual(TEXT("[Recursive] 2. Verify Creation (A): Sub-Component Owner"), SubContainerA->GetOwner(), ContextA.TempActor);
         Res &= Test->TestTrue(TEXT("[Recursive] 2. Verify Creation (A): Sub-Component Registered"), SubContainerA->IsRegistered());
         // Initial capacity might not be set by Initialize yet, check based on manual set above
-        Res &= Test->TestEqual(TEXT("[Recursive] 2. Verify Creation (A): Sub-Component Max Slots"), SubContainerA->MaxSlotCount, BackpackDefaultSlots);
-        Res &= Test->TestEqual(TEXT("[Recursive] 2. Verify Creation (A): Sub-Component Max Weight"), SubContainerA->MaxWeight, BackpackDefaultWeight);
+        Res &= Test->TestEqual(TEXT("[Recursive] 2. Verify Creation (A): Sub-Component Max Slots"), SubContainerA->MaxSlotCount, BackpackInstanceA->MaxSlotCount);
+        Res &= Test->TestEqual(TEXT("[Recursive] 2. Verify Creation (A): Sub-Component Max Weight"), SubContainerA->MaxWeight, BackpackInstanceA->MaxWeight);
         Res &= Test->TestTrue(TEXT("[Recursive] 2. Verify Creation (A): Instance points to Sub-Component"), BackpackInstanceA->RepresentedContainer == SubContainerA);
         Res &= Test->TestTrue(TEXT("[Recursive] 2. Verify Creation (A): Backpack Instance Registered"), ContextA.TempActor->IsReplicatedSubObjectRegistered(BackpackInstanceA));
 
@@ -822,8 +816,8 @@ public:
 
         Res &= Test->TestEqual(TEXT("[Recursive] 6. Verify Post-Transfer (B): New Sub-Component Owner"), SubContainerB->GetOwner(), ContextB.TempActor);
         Res &= Test->TestTrue(TEXT("[Recursive] 6. Verify Post-Transfer (B): New Sub-Component Registered"), SubContainerB->IsRegistered());
-        Res &= Test->TestEqual(TEXT("[Recursive] 6. Verify Post-Transfer (B): New Sub-Component Max Slots"), SubContainerB->MaxSlotCount, BackpackDefaultSlots);
-        Res &= Test->TestEqual(TEXT("[Recursive] 6. Verify Post-Transfer (B): New Sub-Component Max Weight"), SubContainerB->MaxWeight, BackpackDefaultWeight);
+        Res &= Test->TestEqual(TEXT("[Recursive] 6. Verify Post-Transfer (B): New Sub-Component Max Slots"), SubContainerB->MaxSlotCount, BackpackInstanceB->MaxSlotCount);
+        Res &= Test->TestEqual(TEXT("[Recursive] 6. Verify Post-Transfer (B): New Sub-Component Max Weight"), SubContainerB->MaxWeight, BackpackInstanceB->MaxWeight);
         Res &= Test->TestTrue(TEXT("[Recursive] 6. Verify Post-Transfer (B): Instance points to New Sub-Component"), BackpackInstanceB->RepresentedContainer == SubContainerB);
 
         // Verify Contents Transferred to SubContainerB
@@ -890,8 +884,8 @@ public:
 
         Res &= Test->TestTrue(TEXT("[Recursive] 8. Verify Post-Drop (World): Sub-Component Owner is WorldItem"), SubContainerWorld->GetOwner() == DroppedWorldItem);
         Res &= Test->TestTrue(TEXT("[Recursive] 8. Verify Post-Drop (World): Sub-Component Registered"), SubContainerWorld->IsRegistered());
-        Res &= Test->TestEqual(TEXT("[Recursive] 8. Verify Post-Drop (World): Sub-Component Max Slots"), SubContainerWorld->MaxSlotCount, BackpackDefaultSlots);
-        Res &= Test->TestEqual(TEXT("[Recursive] 8. Verify Post-Drop (World): Sub-Component Max Weight"), SubContainerWorld->MaxWeight, BackpackDefaultWeight);
+        Res &= Test->TestEqual(TEXT("[Recursive] 8. Verify Post-Drop (World): Sub-Component Max Slots"), SubContainerWorld->MaxSlotCount, BackpackInstanceWorld->MaxSlotCount);
+        Res &= Test->TestEqual(TEXT("[Recursive] 8. Verify Post-Drop (World): Sub-Component Max Weight"), SubContainerWorld->MaxWeight, BackpackInstanceWorld->MaxWeight);
         Res &= Test->TestTrue(TEXT("[Recursive] 8. Verify Post-Drop (World): Instance points to Sub-Component"), BackpackInstanceWorld->RepresentedContainer == SubContainerWorld);
 
         // Verify Contents in WorldItem's SubContainer
@@ -966,11 +960,9 @@ public:
         ContextA.ItemContainerComponent->AddItem_IfServer(Subsystem, ItemIdBackpack, 1, false);
         BackpackBundleA = ContextA.ItemContainerComponent->FindItemById(ItemIdBackpack);
         BackpackInstanceA = GetRecursiveInstanceData(BackpackBundleA);
-        BackpackInstanceA->MaxSlotCount = BackpackDefaultSlots; BackpackInstanceA->MaxWeight = BackpackDefaultWeight;
         BackpackInstanceA->Initialize(true, nullptr, ContextA.ItemContainerComponent);
         SubContainerA = BackpackInstanceA->RepresentedContainer;
         Res &= Test->TestNotNull(TEXT("[Nested] 11. Setup: SubContainerA valid"), SubContainerA);
-        if (!SubContainerA) return false;
 
         // Add Coin Purse INSIDE Backpack A
         Added = SubContainerA->AddItem_IfServer(Subsystem, ItemIdCoinPurse, 1, false);
@@ -980,9 +972,8 @@ public:
         URecursiveContainerInstanceData* PurseInstanceA = GetRecursiveInstanceData(PurseBundleA);
         Res &= Test->TestNotNull(TEXT("[Nested] 11. Setup: Purse Instance valid"), PurseInstanceA);
         if (!PurseInstanceA) return false;
+		Res &= Test->TestEqual(TEXT("[Nested] 11. Setup: Purse Instance Slot Count"), PurseInstanceA->MaxSlotCount, 4);
 
-        // Initialize Purse Instance Data
-        PurseInstanceA->MaxSlotCount = PurseDefaultSlots; PurseInstanceA->MaxWeight = PurseDefaultWeight;
         // Initialize needs owner info. The 'OwningContainer' for the purse instance is SubContainerA
         PurseInstanceA->Initialize(true, nullptr, SubContainerA);
         UItemContainerComponent* SubContainerPurseA = PurseInstanceA->RepresentedContainer;
@@ -1003,8 +994,9 @@ public:
         // Verify Nested Structure on B
         BackpackBundleB = ContextB.ItemContainerComponent->FindItemById(ItemIdBackpack);
         BackpackInstanceB = GetRecursiveInstanceData(BackpackBundleB);
-         if (!BackpackInstanceB) return false;
+		Res &= Test->TestNotNull(TEXT("[Nested] 11. Verify Transfer: Backpack Instance valid"), BackpackInstanceB);
         BackpackInstanceB->Initialize(true, nullptr, ContextB.ItemContainerComponent); // Manually initialize
+		Res &= Test->TestEqual(TEXT("[Nested] 11. Verify: Backpack Slot Count"), BackpackInstanceB->MaxSlotCount, 8);
         SubContainerB = BackpackInstanceB->RepresentedContainer;
         Res &= Test->TestNotNull(TEXT("[Nested] 11. Verify Transfer: SubContainerB valid"), SubContainerB);
         Res &= Test->TestEqual(TEXT("[Nested] 11. Verify Transfer: SubContainerB owner"), SubContainerB->GetOwner(), ContextB.TempActor);
@@ -1035,7 +1027,6 @@ public:
         ContextA.ItemContainerComponent->AddItem_IfServer(Subsystem, ItemIdBackpack, 1, false);
         BackpackBundleA = ContextA.ItemContainerComponent->FindItemById(ItemIdBackpack);
         BackpackInstanceA = GetRecursiveInstanceData(BackpackBundleA);
-        BackpackInstanceA->MaxSlotCount = BackpackDefaultSlots; BackpackInstanceA->MaxWeight = BackpackDefaultWeight;
         BackpackInstanceA->Initialize(true, nullptr, ContextA.ItemContainerComponent);
         SubContainerA = BackpackInstanceA->RepresentedContainer;
         Res &= Test->TestNotNull(TEXT("[Destroy] 12. Setup: SubContainerA valid"), SubContainerA);

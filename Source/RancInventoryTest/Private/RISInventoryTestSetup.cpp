@@ -230,7 +230,7 @@ public:
 		BrittleCopperKnife->ItemDefinitions.Add(MakeshiftWeaponDefinition);
 		BrittleCopperKnife->ItemCategories.AddTag(LeftHandSlot);
 		BrittleCopperKnife->ItemCategories.AddTag(RightHandSlot);
-		BrittleCopperKnife->ItemInstanceDataClass = UItemDurabilityTestInstanceData::StaticClass();		
+		BrittleCopperKnife->DefaultInstanceDataTemplate = NewObject<UItemDurabilityTestInstanceData>(BrittleCopperKnife);	
 
 		UItemStaticData* ShortbowData = NewObject<UItemStaticData>();
 		ShortbowData->ItemId = ItemIdShortbow;
@@ -285,7 +285,9 @@ public:
 		BackpackData->MaxStackSize = 1; 
 		BackpackData->ItemWeight = 1.5f;
 		BackpackData->ItemCategories.AddTag(ItemTypeContainer);
-		BackpackData->ItemInstanceDataClass = URecursiveContainerInstanceData::StaticClass();
+		auto BackpackInstanceDataTemplate = NewObject<URecursiveContainerInstanceData>(BackpackData);
+		BackpackInstanceDataTemplate->MaxSlotCount = 8;
+		BackpackData->DefaultInstanceDataTemplate = BackpackInstanceDataTemplate;
 		Subsystem->HardcodeItem(ItemIdBackpack, BackpackData);
 		
 		UItemStaticData* CoinPurseData = NewObject<UItemStaticData>();
@@ -296,8 +298,10 @@ public:
 		CoinPurseData->MaxStackSize = 1;
 		CoinPurseData->ItemWeight = 0.2f;
 		CoinPurseData->ItemCategories.AddTag(ItemTypeContainer);
-		CoinPurseData->ItemInstanceDataClass = URecursiveContainerInstanceData::StaticClass(); 
-
+		auto PurseInstanceDataTemplate = NewObject<URecursiveContainerInstanceData>(CoinPurseData);
+		PurseInstanceDataTemplate->MaxSlotCount = 4;
+		CoinPurseData->DefaultInstanceDataTemplate = PurseInstanceDataTemplate;
+		
 		Subsystem->HardcodeItem(ItemIdCoinPurse, CoinPurseData);
 	}
 

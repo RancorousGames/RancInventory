@@ -13,12 +13,12 @@ struct FUniversalTaggedSlot
 {
 	GENERATED_BODY()
 
-	FUniversalTaggedSlot() : Slot(FGameplayTag::EmptyTag), UniversalSlotToBlock(FGameplayTag::EmptyTag), RequiredItemCategoryToBlock(FGameplayTag::EmptyTag) {}
-	FUniversalTaggedSlot(FGameplayTag InSlot) : Slot(InSlot), UniversalSlotToBlock(FGameplayTag::EmptyTag), RequiredItemCategoryToBlock(FGameplayTag::EmptyTag) {}
+	FUniversalTaggedSlot() : Slot(FGameplayTag::EmptyTag), UniversalSlotToBlock(FGameplayTag::EmptyTag), RequiredItemCategoryToActivateBlocking(FGameplayTag::EmptyTag) {}
+	FUniversalTaggedSlot(FGameplayTag InSlot) : Slot(InSlot), UniversalSlotToBlock(FGameplayTag::EmptyTag), RequiredItemCategoryToActivateBlocking(FGameplayTag::EmptyTag) {}
 	FUniversalTaggedSlot(FGameplayTag InSlot, FGameplayTag InSlotToBlock, FGameplayTag InRequiredItemCategoryToBlock)
-		: Slot(InSlot), UniversalSlotToBlock(InSlotToBlock), RequiredItemCategoryToBlock(InRequiredItemCategoryToBlock) {}
+		: Slot(InSlot), UniversalSlotToBlock(InSlotToBlock), RequiredItemCategoryToActivateBlocking(InRequiredItemCategoryToBlock) {}
 	FUniversalTaggedSlot(FGameplayTag InSlot, FGameplayTag InSlotToBlock, FGameplayTag InRequiredItemCategoryToBlock, FGameplayTag InExclusiveToSlotCategory)
-		: Slot(InSlot), UniversalSlotToBlock(InSlotToBlock), RequiredItemCategoryToBlock(InRequiredItemCategoryToBlock), ExclusiveToSlotCategory(InExclusiveToSlotCategory) {}
+		: Slot(InSlot), UniversalSlotToBlock(InSlotToBlock), RequiredItemCategoryToActivateBlocking(InRequiredItemCategoryToBlock), ExclusiveToSlotCategory(InExclusiveToSlotCategory) {}
 	
 	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "RIS | Equipment")
@@ -31,7 +31,7 @@ struct FUniversalTaggedSlot
 	// This is a conditional item category to look for in THIS slots item to determine whether we should block SlotToBlock
 	// If it is not set and SlotToBlock is, then we will block SlotToBlock always
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ranc Inventory")
-	FGameplayTag RequiredItemCategoryToBlock;
+	FGameplayTag RequiredItemCategoryToActivateBlocking;
 
 	
 	// If an item has this category then it can only enter this specific universal slot and not any other universal slots
@@ -323,10 +323,6 @@ protected:
 	
 	TMap<FGameplayTag, FItemBundle> CachedTaggedSlotItems;
 
-
-	UFUNCTION(BlueprintCallable, Server, Reliable, Category = "RIS | Equipment")
-	void SetMyTestItemInstanceData_Server(bool Clear);
-	
 	UPROPERTY(Replicated, BlueprintReadWrite, EditAnywhere)
 	UTestItemInstanceData* MyTestItemInstanceData;
 

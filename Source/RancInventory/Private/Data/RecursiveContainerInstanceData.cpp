@@ -4,6 +4,12 @@
 #include "Components/ItemContainerComponent.h"
 #include "Net/UnrealNetwork.h"
 
+URecursiveContainerInstanceData::URecursiveContainerInstanceData()
+	: ContainerClassToSpawn(UItemContainerComponent::StaticClass())
+{
+	
+}
+
 URecursiveContainerInstanceData::~URecursiveContainerInstanceData()
 {
 	OnDestroy();

@@ -85,11 +85,11 @@ public:
 	UPROPERTY(EditDefaultsOnly, Category = "RIS", meta = (AssetBundles = "Data"))
 	TSubclassOf<AWorldItem> WorldItemClassOverride;
 
-	/* If this is set to a class, then dynamicitem instances will be created with this class as the instance data class
-	 * E.g. to track dynamic durability or randomized stats per item instance
-	 */
-	UPROPERTY(EditDefaultsOnly, Category = "RIS", meta = (AssetBundles = "Data"))
-	TSubclassOf<UItemInstanceData> ItemInstanceDataClass;	
+	/**
+	 * Optional Template object for item instance data. If set, copies will be created for each instance of this item
+	 * E.g. to track durability over time or randomized stats per item instance*/
+	UPROPERTY(EditDefaultsOnly, Instanced, Category = "RIS|Instance Data", meta = (DisplayName = "Instance Data Template"))
+	TObjectPtr<UItemInstanceData> DefaultInstanceDataTemplate;
 	
 	/* Allows to implement custom properties in this item data */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RIS",

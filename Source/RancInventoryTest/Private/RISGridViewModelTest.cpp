@@ -9,6 +9,7 @@
 #include "RISInventoryTestSetup.cpp"
 #include "Core/RISSubsystem.h"
 #include "Framework/DebugTestResult.h"
+#include "MockClasses/ItemHoldingCharacter.h"
 
 #define TestNameGVM "GameTests.RIS.GridViewModel"
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRISGridViewModelTest, TestNameGVM, EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -21,7 +22,7 @@ public:
 	{
 		URISSubsystem* Subsystem = TestFixture.GetSubsystem();
 		World = TestFixture.GetWorld();
-		TempActor = World->SpawnActor<AActor>();
+		TempActor = World->SpawnActor<AItemHoldingCharacter>();
 		InventoryComponent = NewObject<UInventoryComponent>(TempActor);
 		TempActor->AddInstanceComponent(InventoryComponent);
 		InventoryComponent->UniversalTaggedSlots.Add(FUniversalTaggedSlot(RightHandSlot, LeftHandSlot, ItemTypeTwoHanded, ItemTypeTwoHanded));
@@ -33,7 +34,7 @@ public:
 		InventoryComponent->RegisterComponent();
 
 		ViewModel = NewObject<UInventoryGridViewModel>();
-		ViewModel->Initialize(InventoryComponent, NumSlots, PreferUniversalSlots);
+		ViewModel->InitializeInventory(InventoryComponent, NumSlots, PreferUniversalSlots);
 		TestFixture.InitializeTestItems();
 	}
 
@@ -71,16 +72,16 @@ public:
 		FDebugTestResult Res = true;
 	    
 		// Test if the linked inventory component is correctly set
-		Res &= Test->TestNotNull(TEXT("InventoryComponent should not be null after initialization"), ViewModel->LinkedInventoryComponent);
+		Res &= Test->TestNotNull(TEXT("InventoryComponent should not be null after initialization"), ViewModel->LinkedInventoryComponent.Get());
 	    
 		// Test if the number of slots is correctly set
-		Res &= Test->TestEqual(TEXT("ViewModel should have the correct number of slots"), ViewModel->NumberOfSlots, 9);
+		Res &= Test->TestEqual(TEXT("ViewModel should have the correct number of slots"), ViewModel->NumberOfGridSlots, 9);
 
 		// Verify that the slot mapper has correctly initialized empty slots
-		for (int32 Index = 0; Index < ViewModel->NumberOfSlots; ++Index)
+		for (int32 Index = 0; Index < ViewModel->NumberOfGridSlots; ++Index)
 		{
-			bool IsSlotEmpty = ViewModel->IsSlotEmpty(Index);
-			Res &= Test->TestTrue(FString::Printf(TEXT("Slot %d should be initialized as empty"), Index), IsSlotEmpty);
+			bool IsGridSlotEmpty = ViewModel->IsGridSlotEmpty(Index);
+			Res &= Test->TestTrue(FString::Printf(TEXT("Slot %d should be initialized as empty"), Index), IsGridSlotEmpty);
 		}
 
 		// Verify tagged slots are initialized and empty
@@ -103,7 +104,7 @@ public:
 	    // Test adding items
 	    InventoryComponent->AddItem_IfServer(Subsystem, FiveRocks);
 		Res &= ViewModel->AssertViewModelSettled();
-	    Res &= Test->TestEqual(TEXT("ViewModel should reflect 5 rocks added to the first slot"), ViewModel->GetItem(0).Quantity, 5);
+	    Res &= Test->TestEqual(TEXT("ViewModel should reflect 5 rocks added to the first slot"), ViewModel->GetGridItem(0).Quantity, 5);
 		Res &= Test->TestEqual(TEXT("Inventory component should match ViewModel"), InventoryComponent->GetContainerOnlyItemQuantity(ItemIdRock), 5);
 		
 	    // Test adding items to a tagged slot
@@ -114,7 +115,7 @@ public:
 	    // Test removing items from a generic slot
 	    InventoryComponent->DestroyItem_IfServer(FiveRocks, EItemChangeReason::Removed);
 		Res &= ViewModel->AssertViewModelSettled();
-		Res &= Test->TestTrue(TEXT("First slot should be empty after removing rocks"), ViewModel->IsSlotEmpty(0));
+		Res &= Test->TestTrue(TEXT("First slot should be empty after removing rocks"), ViewModel->IsGridSlotEmpty(0));
 	    
 	    // Test removing items from a tagged slot
 	    InventoryComponent->RemoveQuantityFromTaggedSlot_IfServer(HelmetSlot, 1, EItemChangeReason::Removed);
@@ -125,17 +126,17 @@ public:
 	    InventoryComponent->AddItem_IfServer(Subsystem, ThreeRocks);
 	    InventoryComponent->AddItem_IfServer(Subsystem, TwoRocks);
 		Res &= ViewModel->AssertViewModelSettled();
-	    Res &= Test->TestEqual(TEXT("ViewModel should reflect 5 rocks added to the first slot again"), ViewModel->GetItem(0).Quantity, 5);
+	    Res &= Test->TestEqual(TEXT("ViewModel should reflect 5 rocks added to the first slot again"), ViewModel->GetGridItem(0).Quantity, 5);
 	    
 	    // Test exceeding max stack
 	    InventoryComponent->AddItem_IfServer(Subsystem, ItemIdRock, 10);
 		Res &= ViewModel->AssertViewModelSettled();
-	    Res &= Test->TestTrue(TEXT("ViewModel should handle exceeding max stack correctly"), ViewModel->GetItem(0).Quantity == 5 && ViewModel->GetItem(1).Quantity == 5 && ViewModel->GetItem(2).Quantity == 5);
+	    Res &= Test->TestTrue(TEXT("ViewModel should handle exceeding max stack correctly"), ViewModel->GetGridItem(0).Quantity == 5 && ViewModel->GetGridItem(1).Quantity == 5 && ViewModel->GetGridItem(2).Quantity == 5);
 	    
 	    // Test partial removal of items
 	    InventoryComponent->DestroyItem_IfServer(ThreeRocks, EItemChangeReason::Removed);
 		Res &= ViewModel->AssertViewModelSettled();
-		Res &= Test->TestEqual(TEXT("ViewModel should reflect 2 rocks remaining in first slot after partial removal"), ViewModel->GetItem(0).Quantity, 2);
+		Res &= Test->TestEqual(TEXT("ViewModel should reflect 2 rocks remaining in first slot after partial removal"), ViewModel->GetGridItem(0).Quantity, 2);
 
 		// The next 3 test blocks use ViewModel->MoveItems where i meant to use InventoryComponent->MoveItems_IfServer
 		// but it ended up catching some bugs so i'll leave them here
@@ -144,12 +145,12 @@ public:
 	    InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, LeftHandSlot, ThreeRocks);
 	    ViewModel->MoveItem(NoTag, 0, LeftHandSlot, -1);
 		Res &= ViewModel->AssertViewModelSettled();
-		Res &= Test->TestTrue(TEXT("ViewModel should reflect 5 rocks in LeftHandSlot and empty slot 0"), ViewModel->GetItemForTaggedSlot(LeftHandSlot).Quantity == 5 && ViewModel->IsSlotEmpty(0));
+		Res &= Test->TestTrue(TEXT("ViewModel should reflect 5 rocks in LeftHandSlot and empty slot 0"), ViewModel->GetItemForTaggedSlot(LeftHandSlot).Quantity == 5 && ViewModel->IsGridSlotEmpty(0));
 
 		// Test moving item from a tagged slot to an empty generic slot
 		ViewModel->MoveItem(LeftHandSlot, -1, NoTag, 0);
 		Res &= ViewModel->AssertViewModelSettled();
-		Res &= Test->TestTrue(TEXT("After moving rocks from LeftHandSlot to slot 0, slot 0 should have 2 rocks"), ViewModel->GetItem(0).Quantity == 5 && ViewModel->IsTaggedSlotEmpty(LeftHandSlot));
+		Res &= Test->TestTrue(TEXT("After moving rocks from LeftHandSlot to slot 0, slot 0 should have 2 rocks"), ViewModel->GetGridItem(0).Quantity == 5 && ViewModel->IsTaggedSlotEmpty(LeftHandSlot));
 		Res &= Test->TestFalse(TEXT("Inventory component should match ViewModel"), InventoryComponent->GetItemForTaggedSlot(LeftHandSlot).IsValid());
 		
 		// Test splitting stack from tagged slot to empty generic slot
@@ -159,7 +160,7 @@ public:
 		Res &= ViewModel->AssertViewModelSettled();
 		Res &= Test->TestEqual(TEXT("Inventory component should match ViewModel"), InventoryComponent->GetItemForTaggedSlot(LeftHandSlot).Quantity, 1);
 		Res &= Test->TestEqual(TEXT("After splitting, LeftHandSlot should have 1 rock"), ViewModel->GetItemForTaggedSlot(LeftHandSlot).Quantity, 1);
-		Res &= Test->TestEqual(TEXT("After splitting, slot 3 should have 1 rock"), ViewModel->GetItem(3).Quantity, 1);
+		Res &= Test->TestEqual(TEXT("After splitting, slot 3 should have 1 rock"), ViewModel->GetGridItem(3).Quantity, 1);
 
 		// Now lets actually use InventoryComponent->MoveItems_IfServer
 		// We have 1 rock in LeftHandSlot, 1 rock in slot 3, 2 rocks in slot 0, 5 rocks in slot 1 and 2
@@ -170,13 +171,13 @@ public:
 	    InventoryComponent->MoveItem(FiveRocks, NoTag, LeftHandSlot); // Move 4/5 rocks from container to LeftHandSlot
 		// slot 0 should now have no rocks, slot 1 should have 2 rocks, LeftHandSlot should have 5 rocks
 		Res &= Test->TestEqual(TEXT("ViewModel should reflect 5 rocks in LeftHandSlot"), ViewModel->GetItemForTaggedSlot(LeftHandSlot).Quantity, 5);
-		Res &= Test->TestEqual(TEXT("Slot 0 should have 1 rock left after moving 4 rocks to LeftHandSlot"), ViewModel->GetItem(0).Quantity, 1);
+		Res &= Test->TestEqual(TEXT("Slot 0 should have 1 rock left after moving 4 rocks to LeftHandSlot"), ViewModel->GetGridItem(0).Quantity, 1);
 
 	    // Test moving items from a tagged slot to a generic slot when both have items
 	    InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, RightHandSlot, FiveRocks); // Ensure RightHandSlot has items for moving
 	    InventoryComponent->MoveItem(FiveRocks, RightHandSlot, NoTag); // Move items from RightHandSlot to container
-	    Res &= Test->TestEqual(TEXT("ViewModel should reflect moved items from RightHandSlot to slot 0"), ViewModel->GetItem(0).Quantity, 5);
-	    Res &= Test->TestEqual(TEXT("ViewModel should reflect moved items from RightHandSlot to slot 3"), ViewModel->GetItem(3).Quantity, 2);
+	    Res &= Test->TestEqual(TEXT("ViewModel should reflect moved items from RightHandSlot to slot 0"), ViewModel->GetGridItem(0).Quantity, 5);
+	    Res &= Test->TestEqual(TEXT("ViewModel should reflect moved items from RightHandSlot to slot 3"), ViewModel->GetGridItem(3).Quantity, 2);
 	    Res &= Test->TestTrue(TEXT("RightHandSlot should be empty after moving items to slot 0"), ViewModel->IsTaggedSlotEmpty(RightHandSlot));
 		Res &= ViewModel->AssertViewModelSettled();
 		
@@ -195,13 +196,13 @@ public:
 		// Simulate adding a rock to the inventory
 		InventoryComponent->AddItem_IfServer(Subsystem, ThreeRocks);
 		
-		FItemBundle Item = ViewModel->GetItem(0);
+		FItemBundle Item = ViewModel->GetGridItem(0);
 		Res &= Test->TestTrue(TEXT("ViewModel should reflect 3 rocks added to the first slot"), Item.ItemId == ItemIdRock && Item.Quantity == 3);
 
 		InventoryComponent->AddItem_IfServer(Subsystem, ThreeRocks);
-		Item = ViewModel->GetItem(0);
+		Item = ViewModel->GetGridItem(0);
 		Res &= Test->TestTrue(TEXT("ViewModel should reflect 5 rocks added the first"), Item.ItemId == ItemIdRock && Item.Quantity == 5);
-		Item = ViewModel->GetItem(1);
+		Item = ViewModel->GetGridItem(1);
 		Res &= Test->TestTrue(TEXT("ViewModel should reflect 1 rock added to the second slot"), Item.ItemId == ItemIdRock && Item.Quantity == 1);
 
 		Res &= Test->TestTrue(TEXT("HelmetSlot should be empty"), ViewModel->IsTaggedSlotEmpty(HelmetSlot));
@@ -213,7 +214,7 @@ public:
 
 		// Add another helmet, which should go to generic slots
 		InventoryComponent->AddItemToAnySlot(Subsystem, OneHelmet, EPreferredSlotPolicy::PreferSpecializedTaggedSlot);
-		Item = ViewModel->GetItem(2);
+		Item = ViewModel->GetGridItem(2);
 		Res &= Test->TestTrue(TEXT("ViewModel should reflect the helmet added to the third slot"), Item.ItemId == ItemIdHelmet && Item.Quantity == 1);
 
 		// Add another helmet to hand slot
@@ -241,18 +242,18 @@ public:
 		ViewModel->SplitItem(NoTag, 5, NoTag, 8, 2);
 		// Now add sticks one at a time and ensure that they fill up in the order slot: 5, 8, 1
 		InventoryComponent->AddItem_IfServer(Subsystem, OneStick);
-		Res &= Test->TestTrue(TEXT("Slot 5 should have 4 sticks after adding 1 stick"), ViewModel->GetItem(5).Quantity == 4);
+		Res &= Test->TestTrue(TEXT("Slot 5 should have 4 sticks after adding 1 stick"), ViewModel->GetGridItem(5).Quantity == 4);
 		InventoryComponent->AddItem_IfServer(Subsystem, OneStick);
-		Res &= Test->TestTrue(TEXT("Slot 5 should have 5 sticks after adding 1 stick"), ViewModel->GetItem(5).Quantity == 5);
-		Res &= Test->TestTrue(TEXT("Slot 0 should have 5 sticks unchanged"), ViewModel->GetItem(0).Quantity == 5);
-		Res &= Test->TestTrue(TEXT("Slot 1 should have 0 unchanged"), ViewModel->GetItem(1).Quantity == 0);
+		Res &= Test->TestTrue(TEXT("Slot 5 should have 5 sticks after adding 1 stick"), ViewModel->GetGridItem(5).Quantity == 5);
+		Res &= Test->TestTrue(TEXT("Slot 0 should have 5 sticks unchanged"), ViewModel->GetGridItem(0).Quantity == 5);
+		Res &= Test->TestTrue(TEXT("Slot 1 should have 0 unchanged"), ViewModel->GetGridItem(1).Quantity == 0);
 		InventoryComponent->AddItem_IfServer(Subsystem, OneStick);
-		Res &= Test->TestTrue(TEXT("Slot 8 should have 5 sticks after adding 1 stick"), ViewModel->GetItem(8).Quantity == 5);
-		Res &= Test->TestTrue(TEXT("Slot 1 should have 0 unchanged"), ViewModel->GetItem(1).Quantity == 0);
+		Res &= Test->TestTrue(TEXT("Slot 8 should have 5 sticks after adding 1 stick"), ViewModel->GetGridItem(8).Quantity == 5);
+		Res &= Test->TestTrue(TEXT("Slot 1 should have 0 unchanged"), ViewModel->GetGridItem(1).Quantity == 0);
 		for (int i = 0; i < 5; i++)
 		{
 			InventoryComponent->AddItem_IfServer(Subsystem, OneStick);
-			Res &= Test->TestTrue(TEXT("Slot 1 should have") + FString::FromInt(i + 1) + TEXT("sticks after adding 1 stick"), ViewModel->GetItem(1).Quantity == i + 1);
+			Res &= Test->TestTrue(TEXT("Slot 1 should have") + FString::FromInt(i + 1) + TEXT("sticks after adding 1 stick"), ViewModel->GetGridItem(1).Quantity == i + 1);
 		}
 		
 		return Res;
@@ -274,8 +275,8 @@ public:
 		// Move rock from slot 0 to slot 1, where sticks are, and expect them to swap
 		ViewModel->MoveItem(NoTag, 0, NoTag, 1);
 		Res &= ViewModel->AssertViewModelSettled();
-		FItemBundle ItemInSlot0AfterMove = ViewModel->GetItem(0);
-		FItemBundle ItemInSlot1AfterMove = ViewModel->GetItem(1);
+		FItemBundle ItemInSlot0AfterMove = ViewModel->GetGridItem(0);
+		FItemBundle ItemInSlot1AfterMove = ViewModel->GetGridItem(1);
 		Res &= Test->TestTrue(TEXT("Slot 0 should now contain sticks after swap"), ItemInSlot0AfterMove.ItemId == ItemIdSticks && ItemInSlot0AfterMove.Quantity == 3);
 		Res &= Test->TestTrue(TEXT("Slot 1 should now contain rocks after swap"), ItemInSlot1AfterMove.ItemId == ItemIdRock && ItemInSlot1AfterMove.Quantity == 5);
 
@@ -283,8 +284,8 @@ public:
 		InventoryComponent->AddItemToAnySlot(Subsystem, OneHelmet, EPreferredSlotPolicy::PreferGenericInventory);
 		ViewModel->MoveItem(NoTag, 2, NoTag, 1);
 		Res &= ViewModel->AssertViewModelSettled();
-		FItemBundle ItemInSlot1AfterHelmetSwap = ViewModel->GetItem(1);
-		FItemBundle ItemInSlot2AfterHelmetSwap = ViewModel->GetItem(2);
+		FItemBundle ItemInSlot1AfterHelmetSwap = ViewModel->GetGridItem(1);
+		FItemBundle ItemInSlot2AfterHelmetSwap = ViewModel->GetGridItem(2);
 		Res &= Test->TestTrue(TEXT("Slot 1 should now contain a helmet after swap"), ItemInSlot1AfterHelmetSwap.ItemId == ItemIdHelmet && ItemInSlot1AfterHelmetSwap.Quantity == 1);
 		Res &= Test->TestTrue(TEXT("Slot 2 should now contain rocks after swap"), ItemInSlot2AfterHelmetSwap.ItemId == ItemIdRock && ItemInSlot2AfterHelmetSwap.Quantity == 5);
 
@@ -295,7 +296,7 @@ public:
 		FTaggedItemBundle ItemInLeftHandAfterMove = ViewModel->GetItemForTaggedSlot(LeftHandSlot);
 		Res &= Test->TestTrue(TEXT("LeftHandSlot should contain 5 sticks after move"), ItemInLeftHandAfterMove.ItemId == ItemIdSticks && ItemInLeftHandAfterMove.Quantity == 5);
 		// generic slots should contain the remaining 1 sticks
-		Res &= Test->TestTrue(TEXT("Slot 0 should contain 1 stick after move"), ViewModel->GetItem(0).ItemId == ItemIdSticks && ViewModel->GetItem(0).Quantity == 1);
+		Res &= Test->TestTrue(TEXT("Slot 0 should contain 1 stick after move"), ViewModel->GetGridItem(0).ItemId == ItemIdSticks && ViewModel->GetGridItem(0).Quantity == 1);
 
 		if (Context.TestFixture.AreGameplayTagsCorrupt())
 		{
@@ -307,7 +308,7 @@ public:
 		ViewModel->MoveItemToAnyTaggedSlot(NoTag, 1);
 		Res &= ViewModel->AssertViewModelSettled();
 		// slot 1 should now be empty and helmet slot should have helmet
-		Res &= Test->TestTrue(TEXT("Slot 1 should be empty after moving helmet to HelmetSlot"), ViewModel->IsSlotEmpty(1));
+		Res &= Test->TestTrue(TEXT("Slot 1 should be empty after moving helmet to HelmetSlot"), ViewModel->IsGridSlotEmpty(1));
 		Res &= Test->TestTrue(TEXT("HelmetSlot should contain 1 helmet after move"), ViewModel->GetItemForTaggedSlot(HelmetSlot).ItemId == ItemIdHelmet && ViewModel->GetItemForTaggedSlot(HelmetSlot).Quantity == 1);
 		
 		// Test moving helmet to LeftHandSlot which would swap except Helmet slot can't hold the sticks in the hand so it should fail
@@ -331,7 +332,7 @@ public:
 	    ViewModel->MoveItem(NoTag, 2, HelmetSlot, -1); // Assuming rocks are at slot 2 now
 		Res &= ViewModel->AssertViewModelSettled();
 		FTaggedItemBundle ItemInHelmetSlotAfterInvalidMove = ViewModel->GetItemForTaggedSlot(HelmetSlot);
-	    FItemBundle ItemInSlot2AfterInvalidMove = ViewModel->GetItem(2);
+	    FItemBundle ItemInSlot2AfterInvalidMove = ViewModel->GetGridItem(2);
 	    Res &= Test->TestTrue(TEXT("HelmetSlot should not accept non-helmet item, should remain helmet"), ItemInHelmetSlotAfterInvalidMove.ItemId == ItemIdHelmet && ItemInHelmetSlotAfterInvalidMove.Quantity == 1);
 	    Res &= Test->TestTrue(TEXT("Slot 2 should remain unchanged after invalid move attempt"), ItemInSlot2AfterInvalidMove.ItemId == ItemIdRock && ItemInSlot2AfterInvalidMove.Quantity == 5);
 
@@ -349,8 +350,8 @@ public:
 	    InventoryComponent->AddItem_IfServer(Subsystem, OneSpear); // Add spear to inventory
 	    ViewModel->MoveItem(NoTag, 1, NoTag, 2); // Assuming spear is at slot 1 now, and rocks at slot 2
 		Res &= ViewModel->AssertViewModelSettled();
-		FItemBundle ItemInSlot1AfterSwap = ViewModel->GetItem(1);
-	    FItemBundle ItemInSlot2AfterSwap = ViewModel->GetItem(2);
+		FItemBundle ItemInSlot1AfterSwap = ViewModel->GetGridItem(1);
+	    FItemBundle ItemInSlot2AfterSwap = ViewModel->GetGridItem(2);
 	    Res &= Test->TestTrue(TEXT("Slot 1 should now contain rocks after swap with spear"), ItemInSlot1AfterSwap.ItemId == ItemIdRock && ItemInSlot1AfterSwap.Quantity == 5);
 	    Res &= Test->TestTrue(TEXT("Slot 2 should now contain the spear after swap"), ItemInSlot2AfterSwap.ItemId == ItemIdSpear && ItemInSlot2AfterSwap.Quantity == 1);
 
@@ -431,16 +432,16 @@ public:
 	    // Valid split in generic slots
 	    ViewModel->SplitItem(NoTag, 0, NoTag, 1, 2);
 		Res &= ViewModel->AssertViewModelSettled();
-		Res &= Test->TestEqual(TEXT("After splitting, first slot should have 3 rocks"), ViewModel->GetItem(0).Quantity, 3);
-	    Res &= Test->TestEqual(TEXT("After splitting, second slot should have 2 rocks"), ViewModel->GetItem(1).Quantity, 2);
+		Res &= Test->TestEqual(TEXT("After splitting, first slot should have 3 rocks"), ViewModel->GetGridItem(0).Quantity, 3);
+	    Res &= Test->TestEqual(TEXT("After splitting, second slot should have 2 rocks"), ViewModel->GetGridItem(1).Quantity, 2);
 
 	    // Invalid split due to insufficient quantity in source slot
 	    ViewModel->SplitItem(NoTag, 0, NoTag, 1, 4); // Trying to split more than available
-	    Res &= Test->TestEqual(TEXT("Attempt to split more rocks than available should fail"), ViewModel->GetItem(0).Quantity, 3);
+	    Res &= Test->TestEqual(TEXT("Attempt to split more rocks than available should fail"), ViewModel->GetGridItem(0).Quantity, 3);
 
 	    // Split between a generic slot and a tagged slot
 	    ViewModel->SplitItem(NoTag, 1, RightHandSlot, -1, 1); // Splitting 1 rock to RightHandSlot
-	    Res &= Test->TestEqual(TEXT("After splitting, second slot should have 1 rock"), ViewModel->GetItem(1).Quantity, 1);
+	    Res &= Test->TestEqual(TEXT("After splitting, second slot should have 1 rock"), ViewModel->GetGridItem(1).Quantity, 1);
 	    FTaggedItemBundle RightHandItem = ViewModel->GetItemForTaggedSlot(RightHandSlot);
 	    Res &= Test->TestTrue(TEXT("RightHandSlot should now contain 1 rock"), RightHandItem.ItemId == ItemIdRock && RightHandItem.Quantity == 1);
 
@@ -455,12 +456,12 @@ public:
 		Res &= !ViewModel->SplitItem(NoTag, 2, NoTag, 1, 2); // Attempt to overflow slot 1 with rocks
 	    // Now try to split from a slot with items but would overflow
 		ViewModel->SplitItem(NoTag, 1, NoTag, 0, 2); // Attempt to overflow slot 1 with rocks
-	    Res &= Test->TestEqual(TEXT("Splitting that exceeds max stack size should fail"), ViewModel->GetItem(0).Quantity, 5); 
-	    Res &= Test->TestEqual(TEXT("Splitting that exceeds max stack size should fail"), ViewModel->GetItem(1).Quantity, 3); 
+	    Res &= Test->TestEqual(TEXT("Splitting that exceeds max stack size should fail"), ViewModel->GetGridItem(0).Quantity, 5); 
+	    Res &= Test->TestEqual(TEXT("Splitting that exceeds max stack size should fail"), ViewModel->GetGridItem(1).Quantity, 3); 
 	    // Attempt split from tagged to generic slot with valid quantities
 		InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, LeftHandSlot, FiveRocks);
 	    ViewModel->SplitItem(LeftHandSlot, -1, NoTag, 1, 1); // Splitting 1 rock to a new generic slot
-	    FItemBundle NewGenericSlotItem = ViewModel->GetItem(1);
+	    FItemBundle NewGenericSlotItem = ViewModel->GetGridItem(1);
 	    Res &= Test->TestEqual(TEXT("After splitting from tagged to generic, new slot should contain 4 rocks total"), NewGenericSlotItem.Quantity, 4);
 		FTaggedItemBundle LeftHandItem = ViewModel->GetItemForTaggedSlot(LeftHandSlot);
 		Res &= Test->TestEqual(TEXT("LeftHandSlot should now contain 4 rocks"), LeftHandItem.Quantity, 4);
@@ -470,15 +471,15 @@ public:
 	    ViewModel->SplitItem(NoTag, 1, LeftHandSlot, -1, 1); // Attempt to add another helmet to HelmetSlot
 	    FTaggedItemBundle ItemInLeftHandAfterSplit = ViewModel->GetItemForTaggedSlot(LeftHandSlot);
 		Res &= Test->TestEqual(TEXT("LeftHandSlot should now contain 5 rocks"), ItemInLeftHandAfterSplit.Quantity, 5);
-		Res &= Test->TestEqual(TEXT("Slot 1 should now contain 3 rocks"), ViewModel->GetItem(1).Quantity, 3);
+		Res &= Test->TestEqual(TEXT("Slot 1 should now contain 3 rocks"), ViewModel->GetGridItem(1).Quantity, 3);
 		
 		// Status: lefthand 5 rocks, right hand 1 rock, slots 0, 5 rocks, slot 1 3 rocks, helmetSlot 1 helmet
 		
 	    // Split with empty/invalid indices and tags
 		ViewModel->SplitItem(NoTag, 5, NoTag, 6, 1); // Invalid indices
-		Res &= Test->TestTrue(TEXT("Invalid split indices should result in no changes"), ViewModel->IsSlotEmpty(5) && ViewModel->IsSlotEmpty(6));
+		Res &= Test->TestTrue(TEXT("Invalid split indices should result in no changes"), ViewModel->IsGridSlotEmpty(5) && ViewModel->IsGridSlotEmpty(6));
 	    ViewModel->SplitItem(NoTag, 10, NoTag, 11, 1); // Invalid indices
-	    Res &= Test->TestTrue(TEXT("Invalid split indices should result in no changes"), ViewModel->IsSlotEmpty(10) && ViewModel->IsSlotEmpty(11));
+	    Res &= Test->TestTrue(TEXT("Invalid split indices should result in no changes"), ViewModel->IsGridSlotEmpty(10) && ViewModel->IsGridSlotEmpty(11));
 
 	    ViewModel->SplitItem(NoTag, -1, ChestSlot, -1, 1); // Invalid source tag
 	    Res &= Test->TestTrue(TEXT("Invalid source tag should result in no changes"), ViewModel->IsTaggedSlotEmpty(ChestSlot));
@@ -489,7 +490,7 @@ public:
 	    ViewModel->SplitItem(NoTag, 0, RightHandSlot, -1, 1); // Attempt to split rock into RightHandSlot containing a stick
 	    RightHandItem = ViewModel->GetItemForTaggedSlot(RightHandSlot);
 	    Res &= Test->TestTrue(TEXT("Attempting to split into a slot with a different item type should fail"), RightHandItem.ItemId == ItemIdSticks && RightHandItem.Quantity == 1);
-		Res &= Test->TestTrue(TEXT("Source slot should remain unchanged after failed split"), ViewModel->GetItem(0).Quantity == 5);
+		Res &= Test->TestTrue(TEXT("Source slot should remain unchanged after failed split"), ViewModel->GetGridItem(0).Quantity == 5);
 		
 	    return Res;
 	}
@@ -530,8 +531,8 @@ public:
 	    Res &= Test->TestTrue(TEXT("Move spear to any tagged slot"), ViewModel->MoveItemToAnyTaggedSlot(NoTag, 2));
 		Res &= ViewModel->AssertViewModelSettled();
 		Res &= Test->TestTrue(TEXT("Spear should be in right hand tagged slot"), ViewModel->GetItemForTaggedSlot(RightHandSlot).ItemId == ItemIdSpear);
-		int32 SlotWithRock = ViewModel->GetItem(0).ItemId == ItemIdRock ? 0 : 2; // Rock should have been either swapped or moved to 0
-		Res &= Test->TestTrue(TEXT("Rock should be in generic slot 0"), ViewModel->GetItem(SlotWithRock).ItemId == ItemIdRock);
+		int32 SlotWithRock = ViewModel->GetGridItem(0).ItemId == ItemIdRock ? 0 : 2; // Rock should have been either swapped or moved to 0
+		Res &= Test->TestTrue(TEXT("Rock should be in generic slot 0"), ViewModel->GetGridItem(SlotWithRock).ItemId == ItemIdRock);
 		Res &= ViewModel->AssertViewModelSettled();
 		
 	    // Attempt to move item that is already in its correct tagged slot (helmet), should result in no action
@@ -552,10 +553,10 @@ public:
 	    Res &= Test->TestFalse(TEXT("Attempt to move extra rock to tagged should fail as no slots are available"), ViewModel->MoveItemToAnyTaggedSlot(NoTag, SlotWithRock));
 		
 	    InventoryComponent->AddItem_IfServer(Subsystem, OneSpecialHelmet); // goes to slot 0 or 1
-		int32 SlotWithSpecialHelmet = ViewModel->GetItem(0).ItemId == ItemIdSpecialHelmet ? 0 : 1;
+		int32 SlotWithSpecialHelmet = ViewModel->GetGridItem(0).ItemId == ItemIdSpecialHelmet ? 0 : 1;
 		Res &= Test->TestTrue(TEXT("A different helmet should swap into the helmet slot"), ViewModel->MoveItemToAnyTaggedSlot(NoTag, SlotWithSpecialHelmet));
 		Res &= Test->TestTrue(TEXT("Special helmet should be in HelmetSlot"), ViewModel->GetItemForTaggedSlot(HelmetSlot).ItemId == ItemIdSpecialHelmet);
-		Res &= Test->TestTrue(TEXT("Helmet should be in generic slot 0"), ViewModel->GetItem(SlotWithSpecialHelmet).ItemId == ItemIdHelmet);
+		Res &= Test->TestTrue(TEXT("Helmet should be in generic slot 0"), ViewModel->GetGridItem(SlotWithSpecialHelmet).ItemId == ItemIdHelmet);
 
 	    // Attempt to move an item to a tagged slot when the source index is invalid
 	    Res &= Test->TestFalse(TEXT("Attempting to move item from invalid source index should fail"), ViewModel->MoveItemToAnyTaggedSlot(NoTag, 100));
@@ -568,7 +569,7 @@ public:
 		InventoryComponent->Clear_IfServer();
 		for (int i = 0; i < 9; i++)
 		{
-			Res &= Test->TestTrue(FString::Printf(TEXT("Slot %d should be empty"), i), ViewModel->IsSlotEmpty(i));
+			Res &= Test->TestTrue(FString::Printf(TEXT("Slot %d should be empty"), i), ViewModel->IsGridSlotEmpty(i));
 		}
 		Res &= Test->TestTrue(TEXT("Left hand should be empty"), ViewModel->IsTaggedSlotEmpty(LeftHandSlot));
 		Res &= Test->TestTrue(TEXT("Right hand should be empty"), ViewModel->IsTaggedSlotEmpty(RightHandSlot));
@@ -577,7 +578,7 @@ public:
 		InventoryComponent->AddItemToAnySlot(Subsystem, OneSpear, EPreferredSlotPolicy::PreferGenericInventory);
 		Res &= ViewModel->MoveItemToAnyTaggedSlot(NoTag, 0);
 		// verify spear in left hand, nothing in right hand and rock in generic slot
-		Res &= Test->TestTrue(TEXT("Rock should be in generic slot 0"), ViewModel->GetItem(0).ItemId == ItemIdRock);
+		Res &= Test->TestTrue(TEXT("Rock should be in generic slot 0"), ViewModel->GetGridItem(0).ItemId == ItemIdRock);
 		Res &= Test->TestTrue(TEXT("Spear should be in right hand"), ViewModel->GetItemForTaggedSlot(RightHandSlot).ItemId == ItemIdSpear);
 		Res &= Test->TestTrue(TEXT("Left hand should be empty"), ViewModel->IsTaggedSlotEmpty(LeftHandSlot));
 		
@@ -586,7 +587,7 @@ public:
 		// Check that all generic and tagged slots are empty
 		for (int i = 0; i < 9; i++)
 		{
-			Res &= Test->TestTrue(FString::Printf(TEXT("Slot %d should be empty"), i), ViewModel->IsSlotEmpty(i));
+			Res &= Test->TestTrue(FString::Printf(TEXT("Slot %d should be empty"), i), ViewModel->IsGridSlotEmpty(i));
 		}
 		Res &= Test->TestTrue(TEXT("Left hand should be empty"), ViewModel->IsTaggedSlotEmpty(LeftHandSlot));
 		Res &= Test->TestTrue(TEXT("Right hand should be empty"), ViewModel->IsTaggedSlotEmpty(RightHandSlot));
@@ -595,7 +596,7 @@ public:
 		InventoryComponent->AddItemToAnySlot(Subsystem, OneSpear, EPreferredSlotPolicy::PreferGenericInventory);
 		Res &= ViewModel->MoveItemToAnyTaggedSlot(NoTag, 0);
 		// verify spear in right hand, nothing in left hand and rock in generic slot
-		Res &= Test->TestTrue(TEXT("Rock should be in generic slot 0 or 1"), ViewModel->GetItem(0).ItemId == ItemIdRock || ViewModel->GetItem(1).ItemId == ItemIdRock);
+		Res &= Test->TestTrue(TEXT("Rock should be in generic slot 0 or 1"), ViewModel->GetGridItem(0).ItemId == ItemIdRock || ViewModel->GetGridItem(1).ItemId == ItemIdRock);
 		Res &= Test->TestTrue(TEXT("Spear should be in right hand"), ViewModel->GetItemForTaggedSlot(RightHandSlot).ItemId == ItemIdSpear);
 		Res &= Test->TestTrue(TEXT("Left hand should be empty"), ViewModel->IsTaggedSlotEmpty(LeftHandSlot));
 
@@ -608,9 +609,9 @@ public:
 		ViewModel->PickupItem(WorldItem, EPreferredSlotPolicy::PreferSpecializedTaggedSlot, false);
 
 		Res &= Test->TestTrue(TEXT("Rock should still be in left hand"), ViewModel->GetItemForTaggedSlot(LeftHandSlot).ItemId == ItemIdRock);
-		Res &= Test->TestTrue(TEXT("Spear should be generic slot 0 or 1"), ViewModel->GetItem(0).ItemId == ItemIdSpear || ViewModel->GetItem(1).ItemId == ItemIdSpear);
+		Res &= Test->TestTrue(TEXT("Spear should be generic slot 0 or 1"), ViewModel->GetGridItem(0).ItemId == ItemIdSpear || ViewModel->GetGridItem(1).ItemId == ItemIdSpear);
 		// Logic was changed so we dont want a pickup to move items out
-		//Res &= Test->TestTrue(TEXT("Rock should be in generic slot 0 or 1"), ViewModel->GetItem(0).ItemId == ItemIdRock);
+		//Res &= Test->TestTrue(TEXT("Rock should be in generic slot 0 or 1"), ViewModel->GetGridItem(0).ItemId == ItemIdRock);
 		//Res &= Test->TestTrue(TEXT("Spear should be in right hand"), ViewModel->GetItemForTaggedSlot(RightHandSlot).ItemId == ItemIdSpear);
 		//Res &= Test->TestTrue(TEXT("Left hand should be empty"), ViewModel->IsTaggedSlotEmpty(LeftHandSlot));
 
@@ -620,10 +621,10 @@ public:
 		InventoryComponent->AddItem_IfServer(Subsystem, ItemIdSticks, 2);
 		Res &= ViewModel->MoveItem(NoTag, 0, RightHandSlot, -1);
 		Res &= Test->TestTrue(TEXT("Sticks should be in right hand"), ViewModel->GetItemForTaggedSlot(RightHandSlot).ItemId == ItemIdSticks && ViewModel->GetItemForTaggedSlot(RightHandSlot).Quantity == 2);
-		Res &= Test->TestTrue(TEXT("Spear should be in slot 0"), ViewModel->GetItem(0).ItemId == ItemIdSpear);
+		Res &= Test->TestTrue(TEXT("Spear should be in slot 0"), ViewModel->GetGridItem(0).ItemId == ItemIdSpear);
 		Res &= ViewModel->MoveItem(RightHandSlot, -1, LeftHandSlot, -1);
 		Res &= Test->TestTrue(TEXT("Sticks should be in left hand"), ViewModel->GetItemForTaggedSlot(LeftHandSlot).ItemId == ItemIdSticks && ViewModel->GetItemForTaggedSlot(LeftHandSlot).Quantity == 2);
-		Res &= Test->TestTrue(TEXT("Spear should be in slot 0"), ViewModel->GetItem(0).ItemId == ItemIdSpear);
+		Res &= Test->TestTrue(TEXT("Spear should be in slot 0"), ViewModel->GetGridItem(0).ItemId == ItemIdSpear);
 		Res &= Test->TestTrue(TEXT("Right hand should be empty"), ViewModel->IsTaggedSlotEmpty(RightHandSlot));
 		
 	    return Res;
@@ -692,7 +693,7 @@ public:
 
 		// Move it to generic and then move it to anytaggedslot and verify it moves to left hand
 		Res &= Test->TestTrue(TEXT("Move shortbow to generic slot"), ViewModel->MoveItem(LeftHandSlot, -1, NoTag, 0));
-		Res &= Test->TestTrue(TEXT("Shortbow should be in generic slot 0"), ViewModel->GetItem(0).ItemId == ItemIdShortbow);
+		Res &= Test->TestTrue(TEXT("Shortbow should be in generic slot 0"), ViewModel->GetGridItem(0).ItemId == ItemIdShortbow);
 		Res &= Test->TestTrue(TEXT("Left hand should be empty"), ViewModel->IsTaggedSlotEmpty(LeftHandSlot));
 
 		Res &= Test->TestTrue(TEXT("Move shortbow to left hand"), ViewModel->MoveItemToAnyTaggedSlot(NoTag, 0));
@@ -700,8 +701,10 @@ public:
 
 		// Now remove the shortbow and add the longbow
 		InventoryComponent->RemoveQuantityFromTaggedSlot_IfServer(LeftHandSlot, 1, EItemChangeReason::Removed, true);
+		Res &= ViewModel->AssertViewModelSettled();
 		WorldItem = Subsystem->SpawnWorldItem(InventoryComponent, FItemBundleWithInstanceData(ItemIdLongbow, 1), FVector::Zero(), AWorldItem::StaticClass());
 		ViewModel->PickupItem(WorldItem, EPreferredSlotPolicy::PreferSpecializedTaggedSlot, false);
+		Res &= ViewModel->AssertViewModelSettled();
 
 		Res &= Test->TestTrue(TEXT("Longbow should be in left hand"), ViewModel->GetItemForTaggedSlot(LeftHandSlot).ItemId == ItemIdLongbow);
 		Res &= Test->TestTrue(TEXT("Right hand should be empty"), ViewModel->IsTaggedSlotEmpty(RightHandSlot));
@@ -713,8 +716,9 @@ public:
 
 		// Now move the longbow to generic and then move it to anytaggedslot and verify it moves to left hand and unblocking as needed
 		InventoryComponent->MoveItem(ItemIdLongbow, 1, LeftHandSlot, NoTag);
+		Res &= ViewModel->AssertViewModelSettled();
 		InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, RightHandSlot, OneRock); // indirectly blocking two-handed items
-		Res &= Test->TestTrue(TEXT("Move longbow to generic slot"), ViewModel->MoveItemToAnyTaggedSlot(NoTag, 0));
+		Res &= Test->TestTrue(TEXT("Move longbow to any slot, which should be left. It should move blocking rock."), ViewModel->MoveItemToAnyTaggedSlot(NoTag, 0));
 
 		Res &= Test->TestTrue(TEXT("Longbow should be in left hand"), ViewModel->GetItemForTaggedSlot(LeftHandSlot).ItemId == ItemIdLongbow);
 		Res &= Test->TestTrue(TEXT("Right hand should be empty"), ViewModel->IsTaggedSlotEmpty(RightHandSlot));
@@ -734,26 +738,26 @@ public:
 	    FDebugTestResult Res = true;
 	    
 	    // Adding item to an empty slot
-	    Res &= Test->TestTrue(TEXT("Can add rocks to empty slot"), ViewModel->CanSlotReceiveItem(ThreeRocks, 0));
+	    Res &= Test->TestTrue(TEXT("Can add rocks to empty slot"), ViewModel->CanGridSlotReceiveItem(ThreeRocks, 0));
 
 		// Adding more of that item up to maxstack for the same slot
-		Res &= Test->TestTrue(TEXT("Can add more rocks to slot with same item type"), ViewModel->CanSlotReceiveItem(TwoRocks, 0));
+		Res &= Test->TestTrue(TEXT("Can add more rocks to slot with same item type"), ViewModel->CanGridSlotReceiveItem(TwoRocks, 0));
 		InventoryComponent->AddItem_IfServer(Subsystem, TwoRocks); 
 		
 	    // Trying to add item to a slot with a different item type
-	    Res &= Test->TestFalse(TEXT("Cannot add a helmet to a slot with rocks"), ViewModel->CanSlotReceiveItem(OneHelmet, 0));
+	    Res &= Test->TestFalse(TEXT("Cannot add a helmet to a slot with rocks"), ViewModel->CanGridSlotReceiveItem(OneHelmet, 0));
 
 		// Add helmet to a different slot
-		Res &= Test->TestTrue(TEXT("Can add helmet to a different slot"), ViewModel->CanSlotReceiveItem(OneHelmet, 1));
+		Res &= Test->TestTrue(TEXT("Can add helmet to a different slot"), ViewModel->CanGridSlotReceiveItem(OneHelmet, 1));
 		
 	    // SAdding item exceeding max stack size
-	    Res &= Test->TestFalse(TEXT("Cannot add rocks exceeding max stack size"), ViewModel->CanSlotReceiveItem(FiveRocks, 0));
+	    Res &= Test->TestFalse(TEXT("Cannot add rocks exceeding max stack size"), ViewModel->CanGridSlotReceiveItem(FiveRocks, 0));
 
 	    // Adding item to an out-of-bounds slot
-	    Res &= Test->TestFalse(TEXT("Cannot add item to an out-of-bounds slot"), ViewModel->CanSlotReceiveItem(ThreeRocks, 10));
+	    Res &= Test->TestFalse(TEXT("Cannot add item to an out-of-bounds slot"), ViewModel->CanGridSlotReceiveItem(ThreeRocks, 10));
 
 	    // Weight based test, add a giant boulder with weight 10
-	    Res &= Test->TestFalse(TEXT("Cannot add Giant Boulder due to weight restrictions"), ViewModel->CanSlotReceiveItem(GiantBoulder, 1));
+	    Res &= Test->TestFalse(TEXT("Cannot add Giant Boulder due to weight restrictions"), ViewModel->CanGridSlotReceiveItem(GiantBoulder, 1));
 
 		// Testing CanTaggedSlotReceiveItem
 		Res &= Test->TestTrue(TEXT("Can add rocks to empty slot"), ViewModel->CanTaggedSlotReceiveItem(ThreeRocks, LeftHandSlot));
@@ -778,13 +782,13 @@ public:
 		// Add 9 spears to generic inventory
 		InventoryComponent->AddItemToAnySlot(Subsystem, ItemIdSpear, 9, EPreferredSlotPolicy::PreferGenericInventory);
 		// Now drop slot index 8 and verify only 8 is removed
-		ViewModel->DropItem(FGameplayTag(), 8, 1);
+		ViewModel->DropItemFromGrid(8, 1);
 		Res &= ViewModel->AssertViewModelSettled();
 		Res &= Test->TestEqual(TEXT("After dropping 1 spear, there should be 8 spears left"), InventoryComponent->GetContainerOnlyItemQuantity(ItemIdSpear), 8);
-		Res &= Test->TestTrue(TEXT("Slot 8 should be empty after dropping 1 spear"), ViewModel->IsSlotEmpty(8));
+		Res &= Test->TestTrue(TEXT("Slot 8 should be empty after dropping 1 spear"), ViewModel->IsGridSlotEmpty(8));
 		for (int32 Index = 0; Index < 8; ++Index)
 		{
-			Res &= Test->TestFalse(FString::Printf(TEXT("Slot %d should not be empty"), Index), ViewModel->IsSlotEmpty(Index));
+			Res &= Test->TestFalse(FString::Printf(TEXT("Slot %d should not be empty"), Index), ViewModel->IsGridSlotEmpty(Index));
 		}
 
 		return Res;

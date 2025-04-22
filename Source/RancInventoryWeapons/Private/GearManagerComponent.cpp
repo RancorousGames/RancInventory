@@ -99,12 +99,15 @@ void UGearManagerComponent::Initialize()
 		
 		if (UStaticMeshComponent* NewMeshComponent = NewObject<UStaticMeshComponent>(Owner, UStaticMeshComponent::StaticClass()))
 		{
-			NewMeshComponent->AttachToComponent(Owner->GetMesh(), FAttachmentTransformRules::SnapToTargetIncludingScale, GearSlot.AttachSocketName);
-			NewMeshComponent->RegisterComponent();
+			if (IsValid(Owner->GetMesh()) && Owner->GetMesh()->GetSkinnedAsset() != nullptr)
+			{
+				NewMeshComponent->AttachToComponent(Owner->GetMesh(), FAttachmentTransformRules::SnapToTargetIncludingScale, GearSlot.AttachSocketName);
+				NewMeshComponent->RegisterComponent();
 			
-			// Save the mesh component
-			GearSlot.MeshComponent = NewMeshComponent;
-			GearSlot.MeshComponent->SetVisibility(GearSlot.bVisibleOnCharacter);
+				// Save the mesh component
+				GearSlot.MeshComponent = NewMeshComponent;
+				GearSlot.MeshComponent->SetVisibility(GearSlot.bVisibleOnCharacter);
+			}
 		}
 	}
 
@@ -249,7 +252,7 @@ void UGearManagerComponent::RegisterSpawnedWeapon(AWeaponActor* WeaponActor)
 	{
 		if (SelectableWeaponsData.Num() == MaxSelectableWeaponCount)
 		{
-			UE_LOG(LogRISInventory, Display, TEXT("NumberOfWeaponsAcquired >= WeaponSlots, replaced earliest weapon"))
+			UE_LOG(LogRISInventory, Verbose, TEXT("NumberOfWeaponsAcquired >= WeaponSlots, replaced earliest weapon"))
 
 			SelectableWeaponsData.RemoveAt(0);
 		}
@@ -270,6 +273,8 @@ void UGearManagerComponent::RegisterSpawnedWeapon(AWeaponActor* WeaponActor)
 			PathsToLoad.Add(MontageData.RecordedTraceSequence.ToSoftObjectPath());
 		}
 	}
+
+	if (PathsToLoad.Num() == 0)	return;
 	
 	// Get the Streamable Manager from the Asset Manager
 	FStreamableManager& Streamable = UAssetManager::GetStreamableManager();
@@ -348,9 +353,9 @@ void UGearManagerComponent::AttachWeaponToOwner(AWeaponActor* InputWeaponActor, 
 
 	FVector WeaponWorldScale = InputWeaponActor->GetActorScale3D(); //WorldSpace scale
 
-	InputWeaponActor->AttachToComponent(CharMesh, AttachRules, SocketName);
-	// print SocketName
-	UE_LOG(LogRISInventory, Warning, TEXT("SocketName: %s"), *SocketName.ToString());
+	if (CharMesh->GetSkinnedAsset() != nullptr)
+		InputWeaponActor->AttachToComponent(CharMesh, AttachRules, SocketName);
+	
 	FTransform WeaponAttachOffset = InputWeaponActor->GetAttachTransform(SocketName);
 	InputWeaponActor->SetMobility(EComponentMobility::Movable);
 	InputWeaponActor->SetActorRelativeTransform(WeaponAttachOffset);
@@ -664,7 +669,7 @@ void UGearManagerComponent::EquipGear(FGameplayTag Slot, const UItemStaticData* 
         case EGearChangeStep::Apply:
         {
         	// If the active weapon is unarmed then unequip it
-        	if (GetActiveWeapon() == UnarmedWeaponActor)
+        	if (UnarmedWeaponActor && GetActiveWeapon() == UnarmedWeaponActor)
 			{
 				UnequipGear(GearSlots[MainHandSlotIndex].SlotTag, DefaultUnarmedWeaponData, EGearChangeStep::Apply, true);
 			}

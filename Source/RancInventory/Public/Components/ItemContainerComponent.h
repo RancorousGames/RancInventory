@@ -39,7 +39,7 @@ public:
      * Instead have the client send an input like UseItem or DropItem
      * Returns the amount removed, if AllowPartial is false and there is insufficient quantity then removes 0*/
     UFUNCTION(BlueprintCallable, Category=RIS)
-    int32 DestroyItem_IfServer(const FGameplayTag& ItemId, int32 Quantity, EItemChangeReason Reason, bool AllowPartial = false);
+    int32 DestroyItem_IfServer(const FGameplayTag& ItemId, int32 Quantity, EItemChangeReason Reason, bool AllowPartial = false, int32 ItemToDestroyUniqueId = -1);
 
     /* Attempts to drop the item from the inventory, attempting to spawn an Item object in the world
      * Specify DropItemClass and DropDistance properties to customize the drop
@@ -52,7 +52,7 @@ public:
 
 	// Attempt to activate the item, e.g. use a potion, activate a magic item, etc.
 	UFUNCTION(BlueprintCallable, Category=RIS)
-    int32 UseItem(const FGameplayTag& ItemId);
+    int32 UseItem(const FGameplayTag& ItemId, int32 ItemToUseUniqueId = -1);
 
     /* Useful for e.g. Death, drops items evenly spaced in a circle with radius DropDistance */
     UFUNCTION(BlueprintCallable, Category=RIS)
@@ -176,7 +176,7 @@ protected:
 	void SpawnItemIntoWorldFromContainer_ServerImpl(const FGameplayTag& ItemId, int32 Quantity, FVector RelativeDropLocation, TArray<UItemInstanceData*> ItemInstanceData);
 	
 	UFUNCTION(Server, Reliable)
-	void UseItem_Server(const FGameplayTag& ItemId);
+	void UseItem_Server(const FGameplayTag& ItemId, int32 ItemToUseUniqueId = -1);
     
     // virtual implementations for override in subclasses
 	virtual int32 AddItem_ServerImpl(TScriptInterface<IItemSource> ItemSource, const FGameplayTag& ItemId, int32 RequestedQuantity, bool AllowPartial,
@@ -185,7 +185,7 @@ protected:
 	virtual int32 GetContainerOnlyItemQuantityImpl(const FGameplayTag& ItemId) const;
 	virtual bool ContainsImpl(const FGameplayTag& ItemId, int32 Quantity = 1) const;
 	virtual void ClearImpl();
-	virtual int32 DestroyItemImpl(const FGameplayTag& ItemId, int32 Quantity, EItemChangeReason Reason, bool AllowPartial = false, bool UpdateAfter = true, bool SendEventAfter = true);
+	virtual int32 DestroyItemImpl(const FGameplayTag& ItemId, int32 Quantity, EItemChangeReason Reason, bool AllowPartial = false, bool UpdateAfter = true, bool SendEventAfter = true, int32 ItemToDestroyUniqueId = -1);
 	virtual int32 GetReceivableQuantityImpl(const FGameplayTag& ItemId) const;
     virtual int32 GetQuantityContainerCanReceiveByWeight(const UItemStaticData* ItemData) const;
 	virtual int32 ExtractItemImpl_IfServer(const FGameplayTag& ItemId, int32 Quantity, EItemChangeReason Reason, TArray<UItemInstanceData*>& StateArrayToAppendTo, bool SuppressUpdate = false);
@@ -194,7 +194,7 @@ protected:
 
 	// Helper functions
 	int32 GetQuantityContainerCanReceiveBySlots(const UItemStaticData* ItemData) const;
-    FItemBundleWithInstanceData* FindItemInstance(const FGameplayTag& ItemId);
+    FItemBundleWithInstanceData* FindItemInstance(const FGameplayTag& ItemId, int32 ItemToFindUniqueId = -1);
     
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	

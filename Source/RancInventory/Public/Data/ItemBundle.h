@@ -111,6 +111,67 @@ struct RANCINVENTORY_API FTaggedItemBundle
     }
 };
 
+
+// TODO: Figure out if we want to keep this or replace it with instance data
+USTRUCT(BlueprintType, Category = "RIS | Structs")
+struct RANCINVENTORY_API FItemBundleWithInstanceId
+{
+	GENERATED_BODY()
+
+	static const FTaggedItemBundle EmptyItemInstance;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "RIS")
+	FGameplayTag ItemId;
+    
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "RIS")
+	int32 Quantity = 0;
+	
+	// Optionally defined unique ID for items that has instance data
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "RIS")
+	int32 InstanceId = -1;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "RIS")
+	bool IsBlocked = false;
+	
+	bool IsValid() const
+	{
+		return Tag.IsValid() && ItemId.IsValid() && Quantity > 0;
+	}
+    
+	FTaggedItemBundle(){}
+	FTaggedItemBundle(FGameplayTag InTag, FItemBundle InItemInfo)
+	{
+		ItemId = InItemInfo.ItemId;
+		Quantity = InItemInfo.Quantity;
+		Tag = InTag;
+	}
+
+	FTaggedItemBundle(FGameplayTag InTag, FGameplayTag InItemId, int32 InQuantity)
+	{
+		FItemBundle bundle = FItemBundle(InItemId, InQuantity);
+		ItemId = bundle.ItemId;
+		Quantity = bundle.Quantity;
+		Tag = InTag;
+	}
+
+    
+	bool operator==(const FTaggedItemBundle& Other) const
+	{
+		return Tag == Other.Tag && ItemId == Other.ItemId && Quantity == Other.Quantity;
+	}
+
+	bool operator!=(const FTaggedItemBundle& Other) const
+	{
+		return !(*this == Other);
+	}
+
+	bool operator<(const FTaggedItemBundle& Other) const
+	{
+		return Tag.ToString() < Other.Tag.ToString();
+	}
+};
+
+
 USTRUCT(BlueprintType, Category = "RIS | Structs")
 struct RANCINVENTORY_API FItemBundleWithInstanceData
 {

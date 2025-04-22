@@ -30,7 +30,7 @@ struct FRecordingSession
     FTransform PivotOffsetTransform;
     int32 CurrentIndex;
     UPROPERTY()
-    UWeaponAttackData* AttackData;
+    TObjectPtr<UWeaponAttackData> AttackData;
     UPROPERTY()
     FTimerHandle RecordingTimerHandle;
 };
