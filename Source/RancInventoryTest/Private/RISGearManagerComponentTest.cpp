@@ -143,7 +143,7 @@ public:
 			TEXT("OffhandSlotWeapon should still be null after equipping the spear"), GearManager->OffhandSlotWeapon == nullptr);
 	
 		// Remove spear and add two daggers
-		Inventory->RemoveQuantityFromTaggedSlot_IfServer(RightHandSlot, 999, EItemChangeReason::Moved, true);
+		Inventory->RemoveQuantityFromTaggedSlot_IfServer(RightHandSlot, 999, FItemBundle::NoInstances, EItemChangeReason::Moved, true);
 		Inventory->AddItemToTaggedSlot_IfServer(Subsystem, RightHandSlot, ItemIdBrittleCopperKnife, 1, false);
 		Inventory->AddItemToTaggedSlot_IfServer(Subsystem, LeftHandSlot, ItemIdBrittleCopperKnife, 1, false);
 
@@ -189,7 +189,7 @@ public:
 		int32 AmountAdded = InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, LeftHandSlot, OneHelmet, false);
 		Res &= Test->TestEqual(TEXT("Adding an item to a blocked slot should add 0 items"), AmountAdded, 0);
 
-		InventoryComponent->RemoveQuantityFromTaggedSlot_IfServer(RightHandSlot, 999, EItemChangeReason::Moved, true);
+		InventoryComponent->RemoveQuantityFromTaggedSlot_IfServer(RightHandSlot, 999, FItemBundle::NoInstances, EItemChangeReason::Moved, true);
 
 		AmountAdded = InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, LeftHandSlot, OneHelmet, false);
 		Res &= Test->TestNotEqual(
@@ -217,7 +217,7 @@ public:
 		Res &= Test->TestTrue(
 			TEXT("Weapon should be equipped before unequipping"), GearManager->MainhandSlotWeapon != nullptr);
 
-		InventoryComponent->RemoveQuantityFromTaggedSlot_IfServer(RightHandSlot, 999, EItemChangeReason::Moved, true);
+		InventoryComponent->RemoveQuantityFromTaggedSlot_IfServer(RightHandSlot, 999, FItemBundle::NoInstances, EItemChangeReason::Moved, true);
 
 		Context.TickTime(GearManager->UnequipDelay);
 		
@@ -299,7 +299,7 @@ public:
 		// ***********************************************
 		// Step 4: Remove the Spear from mainhand.
 		// ***********************************************
-		AmountAdded = InventoryComponent->RemoveQuantityFromTaggedSlot_IfServer(RightHandSlot, 999, EItemChangeReason::Moved, true, true);
+		AmountAdded = InventoryComponent->RemoveQuantityFromTaggedSlot_IfServer(RightHandSlot, 999, FItemBundle::NoInstances, EItemChangeReason::Moved, true, true);
 		Context.TickTime(GearManager->UnequipDelay);
 		Res &= Test->TestTrue(TEXT("Step 4: After removal, MainhandSlotWeapon should be null"), CheckMainHandWeaponIsEmptyOrUnarmed(GearManager));
 
@@ -335,7 +335,7 @@ public:
 		// ***********************************************
 		// Step 10: Remove Spear from mainhand.
 		// ***********************************************
-		AmountAdded = InventoryComponent->RemoveQuantityFromTaggedSlot_IfServer(RightHandSlot, 999, EItemChangeReason::Moved, true, true);
+		AmountAdded = InventoryComponent->RemoveQuantityFromTaggedSlot_IfServer(RightHandSlot, 999, FItemBundle::NoInstances, EItemChangeReason::Moved, true, true);
 		Context.TickTime(GearManager->UnequipDelay);
 		Res &= Test->TestTrue(TEXT("Step 10: After removal, MainhandSlotWeapon should be null"), CheckMainHandWeaponIsEmptyOrUnarmed(GearManager));
 
@@ -365,9 +365,9 @@ public:
 		// ***********************************************
 		// Step 13: clear offhand, then MOVE Spear into mainhand;
 		// ***********************************************
-		InventoryComponent->RemoveQuantityFromTaggedSlot_IfServer(LeftHandSlot, 999, EItemChangeReason::Moved, true, true);
+		InventoryComponent->RemoveQuantityFromTaggedSlot_IfServer(LeftHandSlot, 999, FItemBundle::NoInstances, EItemChangeReason::Moved, true, true);
 		AmountAdded = InventoryComponent->AddItemToAnySlot(Subsystem, ItemIdSpear, 1, EPreferredSlotPolicy::PreferGenericInventory);
-		int32 MoveResult = InventoryComponent->MoveItem(SpearData->ItemId, 1, FGameplayTag::EmptyTag, RightHandSlot, FGameplayTag::EmptyTag, 1);
+		int32 MoveResult = InventoryComponent->MoveItem(SpearData->ItemId, 1, FItemBundle::NoInstances, FGameplayTag::EmptyTag, RightHandSlot, FGameplayTag::EmptyTag, 1);
 		Context.TickTime(GearManager->UnequipDelay);
 		Context.TickTime(GearManager->EquipDelay);
 		Res &= Test->TestTrue(TEXT("Step 13: Adding Spear to RightHandSlot should succeed"), AmountAdded > 0);
@@ -389,7 +389,7 @@ public:
 		// ***********************************************
 		// Step 15: Remove Spear from mainhand.
 		// ***********************************************
-		AmountAdded = InventoryComponent->RemoveQuantityFromTaggedSlot_IfServer(RightHandSlot, 999, EItemChangeReason::Moved, true, true);
+		AmountAdded = InventoryComponent->RemoveQuantityFromTaggedSlot_IfServer(RightHandSlot, 999, FItemBundle::NoInstances, EItemChangeReason::Moved, true, true);
 		Context.TickTime(GearManager->UnequipDelay);
 		Res &= Test->TestTrue(TEXT("Step 15: After removal, MainhandSlotWeapon should be null"), CheckMainHandWeaponIsEmptyOrUnarmed(GearManager));
 
@@ -408,7 +408,7 @@ public:
 		// Step 17: Lock the LeftHandSlot explicitly.
 		// Simulate a locked slot.
 		// ***********************************************
-		InventoryComponent->RemoveQuantityFromTaggedSlot_IfServer(LeftHandSlot, 999, EItemChangeReason::Moved, true, true);
+		InventoryComponent->RemoveQuantityFromTaggedSlot_IfServer(LeftHandSlot, 999, FItemBundle::NoInstances, EItemChangeReason::Moved, true, true);
 		InventoryComponent->SetTaggedSlotBlocked(LeftHandSlot, true);
 		// Attempt to equip Rock again into the locked slot should fail.
 		AmountAdded = InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, LeftHandSlot, RockData->ItemId, 1, false);
@@ -432,7 +432,7 @@ public:
 		// Step 19: Attempt an invalid swap using MoveItem with an empty source tag.
 		// Expect failure.
 		// ***********************************************
-		MoveResult = InventoryComponent->MoveItem(SpearData->ItemId, 1, FGameplayTag::EmptyTag, LeftHandSlot, RockData->ItemId, 1);
+		MoveResult = InventoryComponent->MoveItem(SpearData->ItemId, 1, FItemBundle::NoInstances, FGameplayTag::EmptyTag, LeftHandSlot, RockData->ItemId, 1);
 		Context.TickTime(GearManager->UnequipDelay);
 		Context.TickTime(GearManager->EquipDelay);
 		Res &= Test->TestTrue(TEXT("Step 19: Invalid swap should fail (result 0)"), MoveResult == 0);
@@ -478,13 +478,13 @@ public:
 
 		for (int i = 0; i < 2; i++)
 		{
-			InventoryComponent->RemoveQuantityFromTaggedSlot_IfServer(RightHandSlot, 1, EItemChangeReason::Moved, true);
+			InventoryComponent->RemoveQuantityFromTaggedSlot_IfServer(RightHandSlot, 1, FItemBundle::NoInstances, EItemChangeReason::Moved, true);
 			Context.TickTime(GearManager->UnequipDelay);
 			ActiveWeapon = GearManager->GetActiveWeapon();
 			Res &= Test->TestTrue(TEXT("Active weapon should still be valid after removing 1 rock"), !CheckMainHandWeaponIsEmptyOrUnarmed(GearManager));
 		}
 
-		InventoryComponent->RemoveQuantityFromTaggedSlot_IfServer(RightHandSlot, 1, EItemChangeReason::Moved, true);
+		InventoryComponent->RemoveQuantityFromTaggedSlot_IfServer(RightHandSlot, 1, FItemBundle::NoInstances, EItemChangeReason::Moved, true);
 		Context.TickTime(GearManager->UnequipDelay);
 		ActiveWeapon = GearManager->GetActiveWeapon();
 		Res &= Test->TestTrue(TEXT("Active weapon should be null after removing all rocks"), CheckMainHandWeaponIsEmptyOrUnarmed(GearManager));	
@@ -551,7 +551,7 @@ public:
 
 
 		// Re-Equip Spear (Should not duplicate, count remains 3)
-		Inventory->RemoveQuantityFromTaggedSlot_IfServer(RightHandSlot, 1, EItemChangeReason::Moved);
+		Inventory->RemoveQuantityFromTaggedSlot_IfServer(RightHandSlot, 1, FItemBundle::NoInstances, EItemChangeReason::Moved);
 		Context.TickTime(0); Context.TickTime(GearManager->UnequipDelay);
 		Inventory->AddItemToTaggedSlot_IfServer(Subsystem, RightHandSlot, ItemIdSpear, 1, false); // Re-add it
 		Context.TickTime(0); Context.TickTime(GearManager->EquipDelay);
@@ -567,7 +567,7 @@ public:
 
 		// Add Rock (Weapon 4 overall) - Exceeds limit (3), should remove oldest (Unarmed)
 		Inventory->AddItemToAnySlot(Subsystem, ItemIdRock, 1);
-        Inventory->MoveItem(ItemIdRock, 1, FGameplayTag::EmptyTag, RightHandSlot); // Replaces Spear equip
+        Inventory->MoveItem(ItemIdRock, 1, FItemBundle::NoInstances, FGameplayTag::EmptyTag, RightHandSlot); // Replaces Spear equip
         Context.TickTime(0); Context.TickTime(GearManager->UnequipDelay); Context.TickTime(GearManager->EquipDelay);
 		Res &= Test->TestEqual(TEXT("1w. Add Rock (Limit): Count still 3"), GetSelectableWeapons(GearManager).Num(), 3);
 		Res &= Test->TestFalse(TEXT("1x. Add Rock (Limit): Unarmed (oldest) removed"), ContainsSelectableWeapon(GearManager, ItemIdUnarmed));
@@ -582,7 +582,7 @@ public:
 
         // Add Shortbow (Weapon 5 overall) - Exceeds limit (3), should remove oldest (Spear)
         Inventory->AddItemToAnySlot(Subsystem, ItemIdShortbow, 1);
-        Inventory->MoveItem(ItemIdShortbow, 1, FGameplayTag::EmptyTag, LeftHandSlot); // Replaces Knife equip
+        Inventory->MoveItem(ItemIdShortbow, 1, FItemBundle::NoInstances, FGameplayTag::EmptyTag, LeftHandSlot); // Replaces Knife equip
         Context.TickTime(0); Context.TickTime(GearManager->UnequipDelay); Context.TickTime(GearManager->EquipDelay);
         Res &= Test->TestEqual(TEXT("1ae. Add Bow (Limit): Count still 3"), GetSelectableWeapons(GearManager).Num(), 3);
         Res &= Test->TestFalse(TEXT("1af. Add Bow (Limit): Spear (oldest) removed"), ContainsSelectableWeapon(GearManager, ItemIdSpear));
@@ -640,11 +640,11 @@ public:
         Res &= Test->TestTrue(TEXT("3b. Setup Check: Selectable has Knife"), ContainsSelectableWeapon(GearManager, ItemIdBrittleCopperKnife));
 
         // Remove the generic Knife - it's the last one. Should trigger removal from selectable.
-        Inventory->DestroyItem_IfServer(ItemIdBrittleCopperKnife, 1, EItemChangeReason::Moved);
+        Inventory->DestroyItem_IfServer(ItemIdBrittleCopperKnife, 1, FItemBundle::NoInstances, EItemChangeReason::Moved);
         Context.TickTime(0); // Allow inventory update
         // Simulate the handler call (Inventory component should do this)
         Res &= Test->TestFalse(TEXT("3c. Inventory check after removal"), Inventory->Contains(ItemIdBrittleCopperKnife, 1));
-        GearManager->HandleItemRemovedFromGenericSlot(KnifeData, 1, EItemChangeReason::Moved);
+        GearManager->HandleItemRemovedFromGenericSlot(KnifeData, 1, FItemBundle::NoInstances, EItemChangeReason::Moved);
 
         Res &= Test->TestFalse(TEXT("3d. Remove Last Knife: Selectable no longer contains Knife"), ContainsSelectableWeapon(GearManager, ItemIdBrittleCopperKnife));
         Res &= Test->TestEqual(TEXT("3e. Remove Last Knife: Count = 2"), GetSelectableWeapons(GearManager).Num(), 2);
@@ -655,15 +655,15 @@ public:
         // Add another Rock to generic inventory. Now we have equipped Rock + generic Rock.
         // Current state: Selectable=[Rock, Bow]. Inventory has Rock (MH), Bow (OH).
         Inventory->AddItemToAnySlot(Subsystem, ItemIdRock, 1); // Add generic Rock
-        Res &= Test->TestEqual(TEXT("3h. Inventory has 2 Rocks"), Inventory->GetItemQuantityTotal(ItemIdRock), 2);
+        Res &= Test->TestEqual(TEXT("3h. Inventory has 2 Rocks"), Inventory->GetQuantityTotal(ItemIdRock), 2);
         Res &= Test->TestTrue(TEXT("3i. Selectable still contains Rock"), ContainsSelectableWeapon(GearManager, ItemIdRock));
 
         // Remove the *equipped* Rock (MH). Another Rock remains in inventory. Selectable should NOT change.
-        Inventory->RemoveQuantityFromTaggedSlot_IfServer(RightHandSlot, 1, EItemChangeReason::Moved); // Use Moved/Removed
+        Inventory->RemoveQuantityFromTaggedSlot_IfServer(RightHandSlot, 1, FItemBundle::NoInstances, EItemChangeReason::Moved); // Use Moved/Removed
         Context.TickTime(0); Context.TickTime(GearManager->UnequipDelay);
         // Simulate handler call (even though inventory still Contains > 0)
         Res &= Test->TestTrue(TEXT("3j. Inventory still has 1 Rock (Generic)"), Inventory->Contains(ItemIdRock, 1));
-        GearManager->HandleItemRemovedFromGenericSlot(RockData, 1, EItemChangeReason::Moved);
+        GearManager->HandleItemRemovedFromGenericSlot(RockData, 1, FItemBundle::NoInstances, EItemChangeReason::Moved);
 
         Res &= Test->TestTrue(TEXT("3k. Remove Equipped Rock (Not Last): Selectable still contains Rock"), ContainsSelectableWeapon(GearManager, ItemIdRock));
         Res &= Test->TestEqual(TEXT("3l. Remove Equipped Rock (Not Last): Count still 2"), GetSelectableWeapons(GearManager).Num(), 2);
@@ -682,7 +682,7 @@ public:
 
 
 		return Res;
-	}
+	} 
 };
 
 bool FRancGearManagerComponentTest::RunTest(const FString& Parameters)

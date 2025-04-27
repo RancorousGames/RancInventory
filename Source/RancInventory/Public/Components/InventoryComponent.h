@@ -85,15 +85,17 @@ public:
 	 * If PreferTaggedSlots is true, an item with category e.g. HelmetSlot will go into HelmetSlot first
 	 * Returns amount added, and always allows partial adding */
 	UFUNCTION(BlueprintCallable, Category = "RIS | Equipment")
-	int32 AddItemToAnySlot(TScriptInterface<IItemSource> ItemSource, const FGameplayTag& ItemId, int32 RequestedQuantity, EPreferredSlotPolicy PreferTaggedSlots = EPreferredSlotPolicy::PreferGenericInventory, bool AllowPartial = false);
+	int32 AddItemToAnySlot(TScriptInterface<IItemSource> ItemSource, const FGameplayTag& ItemId, int32 RequestedQuantity, EPreferredSlotPolicy PreferTaggedSlots = EPreferredSlotPolicy::PreferGenericInventory, bool AllowPartial = false, bool SuppressEvents = false, bool SuppressUpdate = false);
 	
 	// Remove up to Quantity item from a tagged slot, will return the count that was removed
-	UFUNCTION(BlueprintCallable, Category = "RIS | Equipment")
-	int32 RemoveQuantityFromTaggedSlot_IfServer(FGameplayTag SlotTag, int32 QuantityToRemove, EItemChangeReason Reason, bool AllowPartial = true, bool DestroyFromContainer = true, bool SkipWeightUpdate = false);
+	// If InstancesToRemove is not empty then QuantityToRemove is ignored
+	UFUNCTION(BlueprintCallable, Category = "RIS | Equipment", meta = (AutoCreateRefTerm = "MyOptionalParam"))
+	int32 RemoveQuantityFromTaggedSlot_IfServer(FGameplayTag SlotTag, int32 QuantityToRemove, const TArray<UItemInstanceData*>& InstancesToRemove, EItemChangeReason Reason, bool AllowPartial = true, bool DestroyFromContainer = true, bool SuppressEvents = false, bool SuppressUpdate = false);
 
 	// Remove up to Quantity item from any tagged slot, will return the count that was removed, always allows partial removal
+	// If InstancesToRemove is not empty then QuantityToRemove is used as a maximum amount to remove
 	UFUNCTION(BlueprintCallable, Category = "RIS | Equipment")
-	int32 RemoveItemFromAnyTaggedSlots_IfServer(FGameplayTag ItemId, int32 QuantityToRemove, EItemChangeReason Reason, bool DestroyFromContainer = true);
+	int32 RemoveItemFromAnyTaggedSlots_IfServer(FGameplayTag ItemId, int32 QuantityToRemove, TArray<UItemInstanceData*> InstancesToRemove, EItemChangeReason Reason, bool DestroyFromContainer = true, bool SuppressEvents = false, bool SuppressUpdate = false);
 
 	/**
 	 * Attempts to clear a specific tagged slot by moving its contents to the generic inventory container.
@@ -105,9 +107,11 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "RIS | Equipment")
 	int32 RemoveAnyItemFromTaggedSlot_IfServer(FGameplayTag SlotTag);
 	
-	/* Attempts to activate the item from the inventory, e.g. use a potion or active a magical item	 */
+	/* Attempt to activate the item, e.g. use a potion, activate a magic item, etc.
+	 * Note we do not specify a quantity or array of instance data here
+	 * As a consequence, usable items must either not be instanced OR have QuantityPerUse <= 1 */
 	UFUNCTION(BlueprintCallable, Category = "RIS | Equipment")
-	int32 UseItemFromTaggedSlot(const FGameplayTag& SlotTag);
+	int32 UseItemFromTaggedSlot(const FGameplayTag& SlotTag, int32 ItemToUseInstanceId = -1);
 
 	// Checks weight and count limits and compatability
 	UFUNCTION(BlueprintCallable, Category="Inventory Mapping")
@@ -116,9 +120,10 @@ public:
 	UFUNCTION(BlueprintPure, Category="Inventory Mapping")
 	int32 GetQuantityOfItemTaggedSlotCanReceive(const FGameplayTag& ItemId, const FGameplayTag& SlotTag) const;
 
-	UFUNCTION(BlueprintPure, Category = "RIS")
-	int32 GetItemQuantityTotal(const FGameplayTag& ItemId) const;
-
+	/* Returns an item id and quantity exists among the items in the containers generic slots but not tagged slots */
+	UFUNCTION(BlueprintPure, Category=RIS)
+	int32 GetContainerOnlyItemQuantity(const FGameplayTag& ItemId) const;
+	
 	//  Returns if the item can be added to teh slot, does NOT check if the slot is occupied
 	UFUNCTION(BlueprintPure, Category = "RIS | Equipment")
 	bool IsTaggedSlotCompatible(const FGameplayTag& ItemId, const FGameplayTag& SlotTag) const;
@@ -141,11 +146,11 @@ public:
 	bool IsTaggedSlotBlocked(const FGameplayTag& Slot) const;
 
 	// New events for slot equipment changes, this also gets called if an already held stackable item has its stack quantity increased
-	DECLARE_DYNAMIC_MULTICAST_DELEGATE_FiveParams(FOnItemAddedToTaggedSlot, const FGameplayTag&, SlotTag, const UItemStaticData*, ItemData, int32, Quantity, FTaggedItemBundle, PreviousItem, EItemChangeReason, Reason);
+	DECLARE_DYNAMIC_MULTICAST_DELEGATE_SixParams(FOnItemAddedToTaggedSlot, const FGameplayTag&, SlotTag, const UItemStaticData*, ItemData, int32, Quantity, const TArray<UItemInstanceData*>&, InstancesAdded, FTaggedItemBundle, PreviousItem, EItemChangeReason, Reason);
 	UPROPERTY(BlueprintAssignable, Category = "RIS | Equipment")
 	FOnItemAddedToTaggedSlot OnItemAddedToTaggedSlot;
 
-	DECLARE_DYNAMIC_MULTICAST_DELEGATE_FourParams(FOnItemRemovedFromTaggedSlot, const FGameplayTag&, SlotTag, const UItemStaticData*, ItemData, int32, Quantity, EItemChangeReason, Reason);
+	DECLARE_DYNAMIC_MULTICAST_DELEGATE_FiveParams(FOnItemRemovedFromTaggedSlot, const FGameplayTag&, SlotTag, const UItemStaticData*, ItemData, int32, Quantity, const TArray<UItemInstanceData*>&, InstancesRemoved, EItemChangeReason, Reason);
 	// Note: This also gets called for partial removing, e.g. moving 1 apple in a stack of 5
 	UPROPERTY(BlueprintAssignable, Category = "RIS | Equipment")
 	FOnItemRemovedFromTaggedSlot OnItemRemovedFromTaggedSlot;
@@ -162,9 +167,9 @@ public:
 	TArray<FGameplayTag> SpecializedTaggedSlots; // E.g., head, feet
 
 	UFUNCTION()
-	void OnInventoryItemAddedHandler(const UItemStaticData* ItemData, int32 Quantity, EItemChangeReason Reason);
+	void OnInventoryItemAddedHandler(const UItemStaticData* ItemData, int32 Quantity, const TArray<UItemInstanceData*>& InstancesAdded, EItemChangeReason Reason);
 	UFUNCTION()
-	void OnInventoryItemRemovedHandler(const UItemStaticData* ItemData, int32 Quantity, EItemChangeReason Reason);
+	void OnInventoryItemRemovedHandler(const UItemStaticData* ItemData, int32 Quantity, const TArray<UItemInstanceData*>& InstancesRemoved, EItemChangeReason Reason);
 
 	////////////////// CRAFTING ///////////////////
 
@@ -182,8 +187,7 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "RIS | Crafting")
 	bool CraftRecipe_IfServer(const UObjectRecipeData* Recipe);
-
-
+	
 	UFUNCTION(BlueprintPure, Category = "RIS")
 	TArray<FTaggedItemBundle> GetAllTaggedItems() const;
 
@@ -222,14 +226,14 @@ public:
 	void PickupItem(AWorldItem* WorldItem, EPreferredSlotPolicy PreferTaggedSlots = EPreferredSlotPolicy::PreferGenericInventory, bool DestroyAfterPickup = true);
 	
 	UFUNCTION(BlueprintCallable, Category = "RIS")
-	int32 MoveItem(const FGameplayTag& ItemId, int32 Quantity,
+	int32 MoveItem(const FGameplayTag& ItemId, int32 Quantity, TArray<UItemInstanceData*> InstancesToMove, 
 					const FGameplayTag& SourceTaggedSlot = FGameplayTag(),
 					const FGameplayTag& TargetTaggedSlot = FGameplayTag(),
 					const FGameplayTag& SwapItemId = FGameplayTag(), int32 SwapQuantity = 0);
 
 
 	// Runs the code of MoveItem but does not actually move the item, useful for validations pre-move
-	int32 ValidateMoveItem(const FGameplayTag& ItemId, int32 Quantity,
+	int32 ValidateMoveItem(const FGameplayTag& ItemId, int32 Quantity, const TArray<UItemInstanceData*>& InstancesToMove,
 					const FGameplayTag& SourceTaggedSlot = FGameplayTag(),
 					const FGameplayTag& TargetTaggedSlot = FGameplayTag(),
 					const FGameplayTag& SwapItemId = FGameplayTag(), int32 SwapQuantity = 0);
@@ -239,7 +243,7 @@ public:
 	 * Called on client it will request the drop on the server
 	 * Returns the quantity actually dropped, on client this is only a "guess" */
 	UFUNCTION(BlueprintCallable, Category = "RIS | Equipment")
-	int32 DropFromTaggedSlot(const FGameplayTag& SlotTag, int32 Quantity, FVector RelativeDropLocation = FVector(1e+300, 0,0));
+	int32 DropFromTaggedSlot(const FGameplayTag& SlotTag, int32 Quantity, const TArray<UItemInstanceData*>& InstancesToDrop, FVector RelativeDropLocation = FVector(1e+300, 0,0));
 
 	bool ContainedInUniversalSlot(const FGameplayTag& TagToFind) const;
 
@@ -253,17 +257,16 @@ protected:
 	 * If AllowPartial is true, will only pick up as much as possible. */
 	UFUNCTION(Server, Reliable, Category = "RIS | Equipment")
 	void PickupItem_Server(AWorldItem* WorldItem, EPreferredSlotPolicy PreferTaggedSlots = EPreferredSlotPolicy::PreferGenericInventory, bool DestroyAfterPickup = true);
-
-	
 	
 	/* Do NOT call this directly
 	 * Moves items from one tagged slot to another, always allows partial moves but source must contain right amount
 	 * Leave SourceTaggedSlot as empty tag to move from container or leave TargetTaggedSlot empty to move to container */
 	UFUNCTION(Server, Reliable, Category = "RIS")
 	void MoveItem_Server(const FGameplayTag& ItemId, int32 Quantity,
-						  const FGameplayTag& SourceTaggedSlot = FGameplayTag(),
-						  const FGameplayTag& TargetTaggedSlot = FGameplayTag(),
-						  const FGameplayTag& SwapItemId = FGameplayTag(), int32 SwapQuantity = 0);
+	                     const TArray<int32>& InstanceIdsToMove,
+						 const FGameplayTag& SourceTaggedSlot = FGameplayTag(),
+						 const FGameplayTag& TargetTaggedSlot = FGameplayTag(),
+						 const FGameplayTag& SwapItemId = FGameplayTag(), int32 SwapQuantity = 0);
 	
 
 
@@ -279,40 +282,43 @@ protected:
 	 * @return The quantity actually moved
 	 */
 	int32 MoveItem_ServerImpl(const FGameplayTag& ItemId, int32 RequestedQuantity,
-							   const FGameplayTag& SourceTaggedSlot = FGameplayTag(),
-							   const FGameplayTag& TargetTaggedSlot = FGameplayTag(),
-							   bool AllowAutomaticSwapping = true,
-							   const FGameplayTag& SwapItemId = FGameplayTag(), int32 SwapQuantity = 0,
-							   bool SuppressUpdate = false, bool SimulateMoveOnly = false);
+	                          TArray<UItemInstanceData*> InstancesToMove,
+							  const FGameplayTag& SourceTaggedSlot = FGameplayTag(),
+							  const FGameplayTag& TargetTaggedSlot = FGameplayTag(),
+							  bool AllowAutomaticSwapping = true,
+							  const FGameplayTag& SwapItemId = FGameplayTag(), int32 SwapQuantity = 0,
+							  bool SuppressEvents = false, bool SuppressUpdate = false, bool SimulateMoveOnly = false);
+
 	
 	UFUNCTION(Server, Reliable)
-	void DropFromTaggedSlot_Server(const FGameplayTag& SlotTag, int32 Quantity, FVector RelativeDropLocation = FVector(1e+300, 0,0));
-
+	void DropFromTaggedSlot_Server(const FGameplayTag& SlotTag, int32 Quantity, const TArray<int32>& InstanceIdsToDrop, FVector RelativeDropLocation = FVector(1e+300, 0,0));
+	void DropFromTaggedSlot_ServerImpl(const FGameplayTag& SlotTag, int32 Quantity, const TArray<UItemInstanceData*>& InstancesToDrop, FVector RelativeDropLocation = FVector(1e+300, 0,0));
+	
 	UFUNCTION(Server, Reliable)
-	void UseItemFromTaggedSlot_Server(const FGameplayTag& SlotTag);
-
+	void UseItemFromTaggedSlot_Server(const FGameplayTag& SlotTag, int32 ItemToUseInstanceId = -1);
+	
 	virtual void UpdateWeightAndSlots() override;
 
 	int32 GetIndexForTaggedSlot(const FGameplayTag& SlotTag) const;
 
 	// Container overrides
-	virtual int32 AddItem_ServerImpl(TScriptInterface<IItemSource> ItemSource, const FGameplayTag& ItemId, int32 RequestedQuantity, bool AllowPartial,
-												 bool SuppressUpdate = false) override;
+	virtual int32 AddItem_ServerImpl(TScriptInterface<IItemSource> ItemSource, const FGameplayTag& ItemId, int32 RequestedQuantity,
+		bool AllowPartial, bool SuppressEvents = false, bool SuppressUpdate = false) override;
 	virtual int32 DropAllItems_ServerImpl() override;
-	virtual int32 DestroyItemImpl(const FGameplayTag& ItemId, int32 Quantity, EItemChangeReason Reason, bool AllowPartial = false, bool UpdateAfter = true, bool SendEventAfter = true, int32 ItemToDestroyUniqueId = -1) override;
-	virtual int32 GetContainerOnlyItemQuantityImpl(const FGameplayTag& ItemId) const override;
-	virtual bool ContainsImpl(const FGameplayTag& ItemId, int32 Quantity = 1) const override;
-	virtual void ClearImpl() override;
+	virtual int32 DestroyItemImpl(const FGameplayTag& ItemId, int32 Quantity, TArray<UItemInstanceData*> InstancesToDestroy, EItemChangeReason Reason, bool AllowPartial = false, bool SuppressEvents = false, bool SuppressUpdate = false) override;
+	virtual void ClearServerImpl() override;
 	virtual int32 GetReceivableQuantityImpl(const FGameplayTag& ItemId) const;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
-	virtual int32 ExtractItemImpl_IfServer(const FGameplayTag& ItemId, int32 Quantity, EItemChangeReason Reason, TArray<UItemInstanceData*>& StateArrayToAppendTo, bool SuppressUpdate) override;
-	int32 ExtractItemFromTaggedSlot_IfServer(const FGameplayTag& TaggedSlot, const FGameplayTag& ItemId, int32 Quantity, EItemChangeReason Reason, TArray<UItemInstanceData*>& StateArrayToAppendTo);
+	virtual int32 ExtractItemImpl_IfServer(const FGameplayTag& ItemId, int32 Quantity, const TArray<UItemInstanceData*>& InstancesToExtract, EItemChangeReason Reason, TArray<UItemInstanceData*>& InstanceArrayToAppendTo, bool SuppressEvents, bool SuppressUpdate) override;
+
+	// Unlike other extract methods, this Does NOT allow partial extraction, will return 0
+	int32 ExtractItemFromTaggedSlot_IfServer(const FGameplayTag& TaggedSlot, const FGameplayTag& ItemId, int32 Quantity, const TArray<UItemInstanceData*>& InstancesToExtract, EItemChangeReason Reason, TArray<UItemInstanceData*>& InstanceArrayToAppendTo);
 
 	void UpdateBlockingState(FGameplayTag SlotTag, const UItemStaticData* ItemData, bool IsEquip);
 
 
 	UPROPERTY(ReplicatedUsing=OnRep_Slots, BlueprintReadOnly, Category = "RIS")
-	TArray<FTaggedItemBundle> TaggedSlotItemInstances;
+	TArray<FTaggedItemBundle> TaggedSlotItems;
 	
 	TMap<FGameplayTag, TArray<UObjectRecipeData*>> CurrentAvailableRecipes;
 

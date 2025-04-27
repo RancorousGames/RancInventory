@@ -75,19 +75,21 @@ public:
     void HardcodeRecipe(FGameplayTag RecipeId, UObjectRecipeData* RecipeData);
 
 
-    UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Ranc Inventory") // ReSharper disable once CppHidingFunction
-    int32 ExtractItem_IfServer(const FGameplayTag& ItemId, int32 Quantity, EItemChangeReason Reason, TArray<UItemInstanceData*>& StateArrayToAppendTo);
+    UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Ranc Inventory", meta= (HidePin = "_"))
+    int32 ExtractItem_IfServer(const FGameplayTag& ItemId, int32 Quantity, const TArray<UItemInstanceData*>& _, EItemChangeReason Reason, TArray<UItemInstanceData*>& StateArrayToAppendTo);
 
-    virtual int32 ExtractItem_IfServer_Implementation(const FGameplayTag& ItemId, int32 Quantity, EItemChangeReason Reason, TArray<UItemInstanceData*>& StateArrayToAppendTo) override;
-	
     UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Ranc Inventory") // ReSharper disable once CppHidingFunction
     int32 GetContainedQuantity(const FGameplayTag& ItemId);
     
     UFUNCTION(BlueprintCallable, Category = "RIS", meta = (WorldContext = "WorldContextObject", HidePin = "WorldContextObject"))
     AWorldItem* SpawnWorldItem(UObject* WorldContextObject,
-                                FItemBundleWithInstanceData Item,
+                                FItemBundle Item,
                                 const FVector& Location,
                                 TSubclassOf<AWorldItem> WorldItemClass = nullptr);
+
+    
+    UFUNCTION(BlueprintPure, BlueprintCallable, Category = "RIS")
+    TArray<UItemInstanceData*> GenerateInstanceData(const FGameplayTag& ItemId, int32 Quantity);
     
     // Helper function to get the appropriate world item class
     TSubclassOf<AWorldItem> GetWorldItemClass(const FGameplayTag& ItemId, 

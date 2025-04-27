@@ -14,13 +14,13 @@ class RANCINVENTORY_API AWorldItem : public AStaticMeshActor, public IItemSource
 	GENERATED_BODY()
 public:
 	UPROPERTY(Replicated, BlueprintReadWrite, Meta = (DisplayName = "ItemInstance", ExposeOnSpawn = true), Category = "Item")
-	FItemBundleWithInstanceData RepresentedItem;
+	FItemBundle RepresentedItem;
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Meta = (DisplayName = "ItemData"), Category = "Item")
 	UItemStaticData* ItemData = nullptr;
 
 	UFUNCTION(BlueprintCallable, Category = "Item")
-	void SetItem(const FItemBundleWithInstanceData& NewItem);
+	void SetItem(const FItemBundle& NewItem);
 
 	virtual void OnConstruction(const FTransform& Transform) override;
 	
@@ -32,11 +32,10 @@ public:
 	UFUNCTION(BlueprintImplementableEvent, meta=(DisplayName = "Initialize"))
 	void ReceiveInitialize();
 
-	
-	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Ranc Inventory") // ReSharper disable once CppHidingFunction
-	int32 ExtractItem_IfServer(const FGameplayTag& ItemId, int32 Quantity, EItemChangeReason Reason, TArray<UItemInstanceData*>& StateArrayToAppendTo);
-	
-	virtual int32 ExtractItem_IfServer_Implementation(const FGameplayTag& ItemId, int32 Quantity, EItemChangeReason Reason, TArray<UItemInstanceData*>& StateArrayToAppendTo) override;
+
+	//TODO: TEST IF THIS WORKS FROM BP, this is how chatgpt says to do it, then look for all // ReSharper disable once CppHidingFunction
+	//UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Ranc Inventory")
+	virtual int32 ExtractItem_IfServer_Implementation(const FGameplayTag& ItemId, int32 Quantity, const TArray<UItemInstanceData*>& InstancesToExtract, EItemChangeReason Reason, TArray<UItemInstanceData*>& StateArrayToAppendTo) override;
 	
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Ranc Inventory") // ReSharper disable once CppHidingFunction
 	int32 GetContainedQuantity(const FGameplayTag& ItemId);

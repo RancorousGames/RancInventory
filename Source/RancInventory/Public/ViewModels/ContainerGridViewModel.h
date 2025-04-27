@@ -25,7 +25,7 @@ class RANCINVENTORY_API UContainerGridViewModel : public UObject
 
 public:
     /**
-     * Initializes the view model with a container component.
+     * Initializes the view model with a container component. Do not call for InventoryComponents, instead call InitializeInventory()
      * @param ContainerComponent The container component to link.
      * @param NumSlots The number of grid slots to display.
      */
@@ -87,19 +87,10 @@ public:
      */
     UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category="ContainerViewModel")
     bool CanGridSlotReceiveItem(const FGameplayTag& ItemId, int32 Quantity, int32 SlotIndex) const;
-
-	/**
-     * Attempts to add an item from a WorldItem actor into the container's grid slots.
-     * This is a simplified version for base containers.
-     * @param WorldItem The item actor to pick up.
-     * @param DestroyAfterPickup If true, destroys the WorldItem actor after successful pickup.
-     */
-	UFUNCTION(BlueprintCallable, Category="ContainerViewModel")
-	virtual void PickupItemToContainer(AWorldItem* WorldItem, bool DestroyAfterPickup);
-
+ 
     /** Checks if the view model has reconciled all expected operations from the linked container. */
     UFUNCTION(BlueprintCallable, Category="ContainerViewModel")
-	virtual bool AssertViewModelSettled() const;
+	   virtual bool AssertViewModelSettled() const;
 
     /** The number of grid slots managed by this view model. */
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="ContainerViewModel")
@@ -121,18 +112,18 @@ protected:
 
     /** Handles item additions notified by the linked container component. */
     UFUNCTION(BlueprintNativeEvent, Category = "ContainerViewModel")
-    void HandleItemAdded(const UItemStaticData* ItemData, int32 Quantity, EItemChangeReason Reason);
+    void HandleItemAdded(const UItemStaticData* ItemData, int32 Quantity, const TArray<UItemInstanceData*>& InstancesAdded, EItemChangeReason Reason);
 
     /** Handles item removals notified by the linked container component. */
     UFUNCTION(BlueprintNativeEvent, Category = "ContainerViewModel")
-    void HandleItemRemoved(const UItemStaticData* ItemData, int32 Quantity, EItemChangeReason Reason);
+    void HandleItemRemoved(const UItemStaticData* ItemData, int32 Quantity, const TArray<UItemInstanceData*>& InstancesRemoved, EItemChangeReason Reason);
 
     /** Attempts to visually move/split items between two grid slots. */
     virtual bool MoveItemInGrid_Internal(int32 SourceSlotIndex, int32 TargetSlotIndex, int32 InQuantity, bool IsSplit);
 
     /** Tries to fully refresh the view model state from the linked container. */
     UFUNCTION(BlueprintNativeEvent, Category = "ContainerViewModel")
-    void ForceFullGridUpdate();
+    void ForceFullUpdate();
 
     /** Array representing the visual state of the grid slots. */
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="ContainerViewModel")

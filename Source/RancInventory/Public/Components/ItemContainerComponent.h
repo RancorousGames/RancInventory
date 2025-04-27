@@ -14,6 +14,8 @@ class RANCINVENTORY_API UItemContainerComponent : public UActorComponent, public
 {
     GENERATED_BODY()
 public:
+
+	static const TArray<UItemInstanceData*> NoInstances;
     
     explicit UItemContainerComponent(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
 
@@ -26,20 +28,20 @@ public:
     float GetMaxWeight() const;
 
     UFUNCTION(BlueprintPure, Category=RIS)
-    const FItemBundleWithInstanceData& FindItemById(const FGameplayTag& ItemId) const;
+    const FItemBundle& FindItemById(const FGameplayTag& ItemId) const;
 
     /* Add items to the inventory
      * Typically only called on server but if called on client it can be used as a form of client prediction
      * This will extract the item count from the source, if you don't want to take the items from anywhere specific, use the GetInfiniteItemSource
      * Returns the amount added */
 	UFUNCTION(BlueprintCallable, Category=RIS)
-	int32 AddItem_IfServer(TScriptInterface<IItemSource> ItemSource,  const FGameplayTag& ItemId, int32 RequestedQuantity, bool AllowPartial = false, bool SuppressUpdate = false);
+	int32 AddItem_IfServer(TScriptInterface<IItemSource> ItemSource,  const FGameplayTag& ItemId, int32 RequestedQuantity, bool AllowPartial = false, bool SuppressEvents = false, bool SuppressUpdate = false);
 
     /* For most games we could probably trust the client to specify ItemInstance but for e.g. a hot potato we can't
      * Instead have the client send an input like UseItem or DropItem
      * Returns the amount removed, if AllowPartial is false and there is insufficient quantity then removes 0*/
     UFUNCTION(BlueprintCallable, Category=RIS)
-    int32 DestroyItem_IfServer(const FGameplayTag& ItemId, int32 Quantity, EItemChangeReason Reason, bool AllowPartial = false, int32 ItemToDestroyUniqueId = -1);
+    int32 DestroyItem_IfServer(const FGameplayTag& ItemId, int32 Quantity, TArray<UItemInstanceData*> InstancesToDestroy, EItemChangeReason Reason, bool AllowPartial = false);
 
     /* Attempts to drop the item from the inventory, attempting to spawn an Item object in the world
      * Specify DropItemClass and DropDistance properties to customize the drop
@@ -47,12 +49,14 @@ public:
      * Returns the quantity dropped, on client this is only a "guess"
      * Does not partial, will not do a drop if not enough quantity is available
      */
-    UFUNCTION(BlueprintCallable, Category=RIS)
-    int32 DropItems(const FGameplayTag& ItemId, int32 Quantity,  FVector RelativeDropLocation = FVector(1e+300, 0,0));
+    UFUNCTION(BlueprintCallable, Category=RIS, meta = (AutoCreateRefTerm = "InstancesToDrop"))
+    int32 DropItems(const FGameplayTag& ItemId, int32 Quantity, TArray<UItemInstanceData*> InstancesToDrop, FVector RelativeDropLocation = FVector(1e+300, 0,0));
 
-	// Attempt to activate the item, e.g. use a potion, activate a magic item, etc.
+	/* Attempt to activate the item, e.g. use a potion, activate a magic item, etc.
+	 * Note we do not specify a quantity or array of instance data here
+     * As a consequence, usable items must either not be instanced OR have QuantityPerUse <= 1 */
 	UFUNCTION(BlueprintCallable, Category=RIS)
-    int32 UseItem(const FGameplayTag& ItemId, int32 ItemToUseUniqueId = -1);
+    int32 UseItem(const FGameplayTag& ItemId, int32 ItemToUseInstanceId = -1);
 
     /* Useful for e.g. Death, drops items evenly spaced in a circle with radius DropDistance */
     UFUNCTION(BlueprintCallable, Category=RIS)
@@ -67,25 +71,44 @@ public:
     int32 GetReceivableQuantity(const FGameplayTag& ItemId) const;
 	
 	UFUNCTION(BlueprintPure, Category=RIS)
-    bool HasWeightCapacityForItems(const FGameplayTag& ItemId, int32 Quantity) const;
+    bool HasWeightCapacityForItems(const FGameplayTag& ItemId,  int32 Quantity) const;
 
-	/* Returns an item id and at least a quantity exists among ALL items in the container */
+	
     UFUNCTION(BlueprintPure, Category=RIS)
     bool Contains(const FGameplayTag& ItemId, int32 Quantity = 1) const;
-
-	/* Returns an item id and quantity exists among the items in the containers generic slots
-	 * This is equivalent to GetContainedQuantity if this is an Itemcontainer but NOT an InventoryComponent */
-    UFUNCTION(BlueprintPure, Category=RIS)
-    int32 GetContainerOnlyItemQuantity(const FGameplayTag& ItemId) const;
+	
+	/* Returns an item id and at least a quantity exists among ALL items in the container.
+	 * @param ItemId The ID of the item to search for.
+	 * @param Quantity The minimum number of items required.
+	 * @param InstancesToLookFor Optional array of item instances to check against. If empty then just quantity is compared
+	 * @return True if the condition is met, false otherwise.
+	 */
+	UFUNCTION(BlueprintPure, Category=RIS)
+	bool ContainsInstances(const FGameplayTag& ItemId, int32 Quantity, const TArray<UItemInstanceData*>& InstancesToLookFor) const;
+	
+	/**
+	 * Checks if the container holds at least 'Quantity' items of 'ItemId' where
+	 * each counted item's instance data satisfies the provided Blueprint Predicate.
+	 * If the item type does not use instance data, this behaves like the regular Contains check.
+	 * If the Predicate is unbound, it's considered satisfied by any instance data.
+	 *
+	 * @param ItemId The ID of the item to search for.
+	 * @param Predicate A Blueprint delegate (const UItemInstanceData*) -> bool. Must return true for an item instance to be counted.
+	 * @param Quantity The minimum number of item instances satisfying the predicate required.
+	 * @return True if the condition is met, false otherwise.
+	 */
+	DECLARE_DYNAMIC_DELEGATE_RetVal_OneParam(bool, FBPItemInstancePredicate, const UItemInstanceData*, InstanceData);
+	UFUNCTION(BlueprintPure, Category="RIS", meta = (DisplayName = "Contains By Predicate (Blueprint)"))
+	bool ContainsByPredicate(const FGameplayTag& ItemId, const FBPItemInstancePredicate& Predicate, int32 Quantity = 1) const;
 	
 	UFUNCTION(BlueprintPure, Category=RIS)
-	TArray<UItemInstanceData*> GetItemState(const FGameplayTag& ItemId);
+	TArray<UItemInstanceData*> GetItemInstanceData(const FGameplayTag& ItemId);
 	
 	UFUNCTION(BlueprintPure, Category=RIS)
-	UItemInstanceData* GetSingleItemState(const FGameplayTag& ItemId);
+	UItemInstanceData* GetSingleItemInstanceData(const FGameplayTag& ItemId);
 
     UFUNCTION(BlueprintPure, Category=RIS)
-    TArray<FItemBundleWithInstanceData> GetAllContainerItems() const;
+    TArray<FItemBundle> GetAllItems() const;
     
     UFUNCTION(BlueprintPure, Category=RIS)
     bool IsEmpty() const;
@@ -101,11 +124,11 @@ public:
 	UFUNCTION(BlueprintCallable, Category=RIS)
 	void SetAddItemValidationCallback_IfServer(const FAddItemValidationDelegate& ValidationDelegate);
 	
-    DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnInventoryItemAdded, const UItemStaticData*, ItemData, int32, Quantity, EItemChangeReason, Reason);
+    DECLARE_DYNAMIC_MULTICAST_DELEGATE_FourParams(FOnInventoryItemAdded, const UItemStaticData*, ItemData, int32, Quantity, const TArray<UItemInstanceData*>&, InstancesAdded, EItemChangeReason, Reason);
     UPROPERTY(BlueprintAssignable, Category=RIS)
     FOnInventoryItemAdded OnItemAddedToContainer;
 
-    DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnInventoryItemRemoved,  const UItemStaticData*, ItemData, int32, Quantity, EItemChangeReason, Reason);
+    DECLARE_DYNAMIC_MULTICAST_DELEGATE_FourParams(FOnInventoryItemRemoved,  const UItemStaticData*, ItemData, int32, Quantity, const TArray<UItemInstanceData*>&, InstancesRemoved, EItemChangeReason, Reason);
     UPROPERTY(BlueprintAssignable, Category=RIS)
     FOnInventoryItemRemoved OnItemRemovedFromContainer;
     
@@ -144,17 +167,17 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "RIS|Debug")
 	bool DebugLoggingEnabled = false;
 
+	// Does not allow partial extraction
 	UFUNCTION(BlueprintCallable, Category=RIS)
-	int32 ExtractItemFromContainer_IfServer(const FGameplayTag& ItemId, int32 Quantity, UItemContainerComponent* ContainerToExtractFrom, bool AllowPartial = false);
+	int32 ExtractItemFromOtherContainer_IfServer(UItemContainerComponent* ContainerToExtractFrom, const FGameplayTag& ItemId, int32 Quantity,  TArray<UItemInstanceData*> InstancesToExtract, bool AllowPartial = false);
 
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Ranc Inventory") // ReSharper disable once CppHidingFunction
-	int32 ExtractItem_IfServer(const FGameplayTag& ItemId, int32 Quantity, EItemChangeReason Reason, TArray<UItemInstanceData*>& StateArrayToAppendTo);
+	int32 ExtractItem_IfServer(const FGameplayTag& ItemId, int32 Quantity, const TArray<UItemInstanceData*>& InstancesToExtract, EItemChangeReason Reason, TArray<UItemInstanceData*>& StateArrayToAppendTo);
 	
-	virtual int32 ExtractItem_IfServer_Implementation(const FGameplayTag& ItemId, int32 Quantity, EItemChangeReason Reason, TArray<UItemInstanceData*>& StateArrayToAppendTo) override;
+	UFUNCTION(BlueprintPure, BlueprintCallable, Category = "Ranc Inventory") // ReSharper disable once CppHidingFunction
+    int32 GetQuantityTotal(const FGameplayTag& ItemId) const;
 	
-	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Ranc Inventory") // ReSharper disable once CppHidingFunction
-    int32 GetContainedQuantity(const FGameplayTag& ItemId);
-	
+	const FItemBundle* FindItemInstance(const FGameplayTag& ItemId) const;
 	
 protected:
 
@@ -172,7 +195,12 @@ protected:
 	FAddItemValidationDelegate OnValidateAddItemToContainer;
 
     UFUNCTION(Server, Reliable)
-    void DropItemFromContainer_Server(const FGameplayTag& ItemId, int32 Quantity, FVector RelativeDropLocation = FVector(1e+300, 0,0));
+    void DropItemFromContainer_Server(const FGameplayTag& ItemId, int32 Quantity, const TArray<int32>& InstanceIdsToDrop, FVector RelativeDropLocation = FVector(1e+300, 0,0));
+	void DropItemFromContainer_ServerImpl(FItemBundle* Item, int32 Quantity, const TArray<UItemInstanceData*>& InstancesToDrop, FVector RelativeDropLocation = FVector(1e+300, 0,0));
+
+	// Drops all items, respecting stack sizes. Returns number of worlditems created			
+	virtual int32 DropAllItems_ServerImpl();
+	
 	void SpawnItemIntoWorldFromContainer_ServerImpl(const FGameplayTag& ItemId, int32 Quantity, FVector RelativeDropLocation, TArray<UItemInstanceData*> ItemInstanceData);
 	
 	UFUNCTION(Server, Reliable)
@@ -180,21 +208,22 @@ protected:
     
     // virtual implementations for override in subclasses
 	virtual int32 AddItem_ServerImpl(TScriptInterface<IItemSource> ItemSource, const FGameplayTag& ItemId, int32 RequestedQuantity, bool AllowPartial,
-												 bool SuppressUpdate = false);
-    virtual int32 DropAllItems_ServerImpl();
-	virtual int32 GetContainerOnlyItemQuantityImpl(const FGameplayTag& ItemId) const;
-	virtual bool ContainsImpl(const FGameplayTag& ItemId, int32 Quantity = 1) const;
-	virtual void ClearImpl();
-	virtual int32 DestroyItemImpl(const FGameplayTag& ItemId, int32 Quantity, EItemChangeReason Reason, bool AllowPartial = false, bool UpdateAfter = true, bool SendEventAfter = true, int32 ItemToDestroyUniqueId = -1);
+												 bool SuppressEvents = false, bool SuppressUpdate = false);
+	
+
+	virtual bool ContainsImpl(const FGameplayTag& ItemId, int32 Quantity, TArray<UItemInstanceData*> InstancesToLookFor) const;
+	virtual void ClearServerImpl();
+	virtual int32 DestroyItemImpl(const FGameplayTag& ItemId, int32 Quantity, TArray<UItemInstanceData*> InstancesToDestroy, EItemChangeReason Reason, bool AllowPartial = false, bool SuppressEvents = false, bool SuppressUpdate = false);
 	virtual int32 GetReceivableQuantityImpl(const FGameplayTag& ItemId) const;
     virtual int32 GetQuantityContainerCanReceiveByWeight(const UItemStaticData* ItemData) const;
-	virtual int32 ExtractItemImpl_IfServer(const FGameplayTag& ItemId, int32 Quantity, EItemChangeReason Reason, TArray<UItemInstanceData*>& StateArrayToAppendTo, bool SuppressUpdate = false);
-	
-    virtual int32 GetContainedQuantity_Implementation(const FGameplayTag& ItemId) override;
 
+	// Always allows partial. 
+	// Ignores quantity if InstancesToExtract is not empty
+	virtual int32 ExtractItemImpl_IfServer(const FGameplayTag& ItemId, int32 Quantity, const TArray<UItemInstanceData*>& InstancesToExtract, EItemChangeReason Reason, TArray<UItemInstanceData*>& StateArrayToAppendTo, bool SuppressEvents = false, bool SuppressUpdate = false);
+	
 	// Helper functions
 	int32 GetQuantityContainerCanReceiveBySlots(const UItemStaticData* ItemData) const;
-    FItemBundleWithInstanceData* FindItemInstance(const FGameplayTag& ItemId, int32 ItemToFindUniqueId = -1);
+    FItemBundle* FindItemInstanceMutable(const FGameplayTag& ItemId);
     
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	
@@ -221,22 +250,22 @@ private:
     void OnRep_Items();
 
 public:
-	FORCEINLINE TArray<FItemBundleWithInstanceData>::RangedForIteratorType begin()
+	FORCEINLINE TArray<FItemBundle>::RangedForIteratorType begin()
 	{
 		return ItemsVer.Items.begin();
 	}
 
-	FORCEINLINE TArray<FItemBundleWithInstanceData>::RangedForConstIteratorType begin() const
+	FORCEINLINE TArray<FItemBundle>::RangedForConstIteratorType begin() const
 	{
 		return ItemsVer.Items.begin();
 	}
 
-	FORCEINLINE TArray<FItemBundleWithInstanceData>::RangedForIteratorType end()
+	FORCEINLINE TArray<FItemBundle>::RangedForIteratorType end()
 	{
 		return ItemsVer.Items.end();
 	}
 
-	FORCEINLINE TArray<FItemBundleWithInstanceData>::RangedForConstIteratorType end() const
+	FORCEINLINE TArray<FItemBundle>::RangedForConstIteratorType end() const
 	{
 		return ItemsVer.Items.end();
 	}

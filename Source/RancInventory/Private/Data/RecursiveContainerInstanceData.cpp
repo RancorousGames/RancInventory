@@ -45,19 +45,23 @@ void URecursiveContainerInstanceData::Initialize_Implementation(bool OwnedByCont
 		if (UItemContainerComponent* SubContainer = NewObject<UItemContainerComponent>(
 			OwningActor, ContainerClassToSpawn))
 		{
+			SubContainer->MaxSlotCount = MaxSlotCount;
+			SubContainer->MaxWeight = MaxWeight;
+
+			UItemContainerComponent* TemplateContainer = OwningContainer ? OwningContainer : OldContainer.Get();
+			if (IsValid(TemplateContainer))
+			{
+				SubContainer->JigsawMode = TemplateContainer->JigsawMode;
+				SubContainer->DefaultDropDistance = TemplateContainer->DefaultDropDistance;
+				SubContainer->DropItemClass = TemplateContainer->DropItemClass;
+			}
+			
 			if (IsValid(OldContainer) && OwningActor->HasAuthority())
 			{
-				SubContainer->JigsawMode = OldContainer->JigsawMode;
-				SubContainer->DefaultDropDistance = OldContainer->DefaultDropDistance;
-				SubContainer->DropItemClass = OldContainer->DropItemClass;
-				
-				SubContainer->MaxSlotCount = MaxSlotCount;
-				SubContainer->MaxWeight = MaxWeight;
-
-				auto OldContainerItems = OldContainer->GetAllContainerItems();
+				auto OldContainerItems = OldContainer->GetAllItems();
 				for (int32 Index = OldContainerItems.Num() - 1; Index >= 0; --Index)
 				{
-					const FItemBundleWithInstanceData& Item = OldContainerItems[Index];
+					const FItemBundle& Item = OldContainerItems[Index];
 					SubContainer->AddItem_IfServer(OldContainer, Item.ItemId, Item.Quantity, false);
 					for (UItemInstanceData* InstanceData : Item.InstanceData)
 					{
@@ -73,12 +77,12 @@ void URecursiveContainerInstanceData::Initialize_Implementation(bool OwnedByCont
 				}
 
 				// Grab reference to the raw array you want to iterate
-				TArray<FItemBundleWithInstanceData> Bundles = OldContainer->GetAllContainerItems();
+				TArray<FItemBundle> Bundles = OldContainer->GetAllItems();
 
 				// Iterate backwards by index
 				for (int32 Index = Bundles.Num() - 1; Index >= 0; --Index)
 				{
-					const FItemBundleWithInstanceData& Item = Bundles[Index];
+					const FItemBundle& Item = Bundles[Index];
 					SubContainer->AddItem_IfServer(OldContainer, Item.ItemId, Item.Quantity, false);
 					for (UItemInstanceData* InstanceData : Item.InstanceData)
 					{
@@ -96,7 +100,7 @@ void URecursiveContainerInstanceData::Initialize_Implementation(bool OwnedByCont
 				ensureMsgf(OldContainer->UsedContainerSlotCount == 0,
 					TEXT("RecursiveContainerInstanceData::Initialize_Implementation: Old subcontainer should be empty after transfer."));
 				
-				RepresentedContainer->DestroyComponent();
+				OldContainer->DestroyComponent();
 			}
 			
 			OwningActor->AddOwnedComponent(SubContainer);

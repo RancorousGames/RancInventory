@@ -12,191 +12,53 @@
 USTRUCT(BlueprintType, Category = "RIS | Structs")
 struct RANCINVENTORY_API FItemBundle
 {
-	GENERATED_BODY()
-
-	static const FItemBundle EmptyItemInstance;
-
-	FItemBundle() = default;
-
-	explicit FItemBundle(const FGameplayTag& InItemId) : ItemId(InItemId)
-	{
-	}
-
-	explicit FItemBundle(const FGameplayTag& InItemId, const int32& InQuant) : ItemId(InItemId), Quantity(InQuant)
-	{
-	}
-
-	bool operator==(const FItemBundle& Other) const
-	{
-		return ItemId == Other.ItemId;
-	}
-
-	bool operator!=(const FItemBundle& Other) const
-	{
-		return !(*this == Other);
-	}
-
-	bool operator<(const FItemBundle& Other) const
-	{
-		return ItemId.ToString() < Other.ItemId.ToString();
-	}
-
-	bool IsValid() const
-	{
-		return ItemId.IsValid();
-	}
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RIS")
-	FGameplayTag ItemId;
-    
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RIS")
-	int32 Quantity = 0;
-};
-
-
-USTRUCT(BlueprintType, Category = "RIS | Structs")
-struct RANCINVENTORY_API FTaggedItemBundle
-{
     GENERATED_BODY()
 
-    static const FTaggedItemBundle EmptyItemInstance;
-    
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "RIS")
-    FGameplayTag Tag;
-	
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "RIS")
-	FGameplayTag ItemId;
-    
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "RIS")
-	int32 Quantity = 0;
-	
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "RIS")
-	bool IsBlocked = false;
-	
-    bool IsValid() const
-    {
-        return Tag.IsValid() && ItemId.IsValid() && Quantity > 0;
-    }
-    
-    FTaggedItemBundle(){}
-    FTaggedItemBundle(FGameplayTag InTag, FItemBundle InItemInfo)
-    {
-        ItemId = InItemInfo.ItemId;
-    	Quantity = InItemInfo.Quantity;
-        Tag = InTag;
-    }
-
-    FTaggedItemBundle(FGameplayTag InTag, FGameplayTag InItemId, int32 InQuantity)
-    {
-        FItemBundle bundle = FItemBundle(InItemId, InQuantity);
-        ItemId = bundle.ItemId;
-    	Quantity = bundle.Quantity;
-        Tag = InTag;
-    }
-
-    
-    bool operator==(const FTaggedItemBundle& Other) const
-    {
-        return Tag == Other.Tag && ItemId == Other.ItemId && Quantity == Other.Quantity;
-    }
-
-    bool operator!=(const FTaggedItemBundle& Other) const
-    {
-        return !(*this == Other);
-    }
-
-    bool operator<(const FTaggedItemBundle& Other) const
-    {
-        return Tag.ToString() < Other.Tag.ToString();
-    }
-};
-
-
-// TODO: Figure out if we want to keep this or replace it with instance data
-USTRUCT(BlueprintType, Category = "RIS | Structs")
-struct RANCINVENTORY_API FItemBundleWithInstanceId
-{
-	GENERATED_BODY()
-
-	static const FTaggedItemBundle EmptyItemInstance;
-	
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "RIS")
-	FGameplayTag ItemId;
-    
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "RIS")
-	int32 Quantity = 0;
-	
-	// Optionally defined unique ID for items that has instance data
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "RIS")
-	int32 InstanceId = -1;
-	
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "RIS")
-	bool IsBlocked = false;
-	
-	bool IsValid() const
-	{
-		return ItemId.IsValid() && Quantity > 0;
-	}
-    
-	FItemBundleWithInstanceId(){}
-	FItemBundleWithInstanceId(FGameplayTag InTag, FItemBundle InItemInfo)
-	{
-		ItemId = InItemInfo.ItemId;
-		Quantity = InItemInfo.Quantity;
-	}
-
-    
-	bool operator==(const FTaggedItemBundle& Other) const
-	{
-		return ItemId == Other.ItemId && Quantity == Other.Quantity;
-	}
-
-	bool operator!=(const FTaggedItemBundle& Other) const
-	{
-		return !(*this == Other);
-	}
-};
-
-
-USTRUCT(BlueprintType, Category = "RIS | Structs")
-struct RANCINVENTORY_API FItemBundleWithInstanceData
-{
-    GENERATED_BODY()
-
-    static const FItemBundleWithInstanceData EmptyItemInstance;
-    
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RIS")
-    TArray<UItemInstanceData*> InstanceData;
+	static const TArray<UItemInstanceData*> NoInstances;
+    static const FItemBundle EmptyItemInstance;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RIS")
 	FGameplayTag ItemId;
     
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RIS")
 	int32 Quantity = 0;
+
+	// For instanced items, this will contain the instances. for non instanced items this will be an empty array
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RIS")
+	TArray<UItemInstanceData*> InstanceData;
     
     bool IsValid() const;
 
-    void DestroyQuantity(int32 Quantity, AActor* Owner);
-    
-    int32 ExtractQuantity(int32 InQuantity, TArray<UItemInstanceData*>& StateArrayToAppendTo, AActor* Owner);
+    int32 DestroyQuantity(int32 Quantity, const TArray<UItemInstanceData*>& InstancesToDestroy, AActor* Owner);
 
-    FItemBundleWithInstanceData(){}
+	// Allows partial. If InstancesToExtract are provided then InQuantity is ignored
+    int32 Extract(int32 InQuantity, const TArray<UItemInstanceData*>& InstancesToExtract, TArray<UItemInstanceData*>& StateArrayToAppendTo, AActor* Owner, bool bAllowPartial = true);
 
-	FItemBundleWithInstanceData(FGameplayTag InItemId)
+	// Checks if at least QuantityToCheck exists AND all provided (if any) instances are contained
+	bool Contains(int32 QuantityToCheck, const TArray<UItemInstanceData*>& InstancesToCheck) const;
+	
+    static TArray<int32> ToInstanceIds(const TArray<UItemInstanceData*> Instances);
+	TArray<UItemInstanceData*> FromInstanceIds(const TArray<int32> InstanceIds) const;
+
+    TArray<UItemInstanceData*> GetInstancesFromEnd(int32 Quantity) const;
+	
+    FItemBundle(){}
+
+	FItemBundle(FGameplayTag InItemId)
     {
     	ItemId = InItemId;
     	Quantity = 0;
     	InstanceData = TArray<UItemInstanceData*>();
     }
 	
-    FItemBundleWithInstanceData(FItemBundle InItemInfo, const TArray<UItemInstanceData*>& InstanceData)
+    FItemBundle(FItemBundle InItemInfo, const TArray<UItemInstanceData*>& InstanceData)
     {
         ItemId = InItemInfo.ItemId;
     	Quantity = InItemInfo.Quantity;
         this->InstanceData = InstanceData;
     }
 
-    FItemBundleWithInstanceData(FGameplayTag InItemId, int32 InQuantity, const TArray<UItemInstanceData*>& InstanceData)
+    FItemBundle(FGameplayTag InItemId, int32 InQuantity, const TArray<UItemInstanceData*>& InstanceData)
     {
         ItemId = InItemId;
     	Quantity = InQuantity;
@@ -204,10 +66,10 @@ struct RANCINVENTORY_API FItemBundleWithInstanceData
     }
 
 	// WARNING: This constructor should only be used when it is certain that instance data is not needed for this item type
-	FItemBundleWithInstanceData(FGameplayTag InItemId, int32 InQuantity);
+	FItemBundle(FGameplayTag InItemId, int32 InQuantity);
 
     // This overload will spawn the instance data
-	FItemBundleWithInstanceData(FGameplayTag InItemId, int32 InQuantity, TSubclassOf<UItemInstanceData> InstanceDataClass, AActor* OwnerOfSpawnedInstanceData)
+	FItemBundle(FGameplayTag InItemId, int32 InQuantity, TSubclassOf<UItemInstanceData> InstanceDataClass, AActor* OwnerOfSpawnedInstanceData)
     {
     	ItemId = InItemId;
     	Quantity = InQuantity;
@@ -224,33 +86,142 @@ struct RANCINVENTORY_API FItemBundleWithInstanceData
 		}
     }
     
-    bool operator==(const FItemBundleWithInstanceData& Other) const
+    bool operator==(const FItemBundle& Other) const
     {
         return InstanceData == Other.InstanceData && ItemId == Other.ItemId && Quantity == Other.Quantity;
     }
 
-    bool operator!=(const FItemBundleWithInstanceData& Other) const
+    bool operator!=(const FItemBundle& Other) const
     {
         return !(*this == Other);
     }
 
-    //bool operator<(const FItemBundleWithInstanceData& Other) const
+    //bool operator<(const FItemBundle& Other) const
     //{
     //    return InstanceData->ToString() < Other.InstanceData->ToString();
     //}
 };
 
+
+USTRUCT(BlueprintType, Category = "RIS | Structs")
+struct RANCINVENTORY_API FTaggedItemBundle
+{
+    GENERATED_BODY()
+
+    static const FTaggedItemBundle EmptyItemInstance;
+    
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RIS")
+	FGameplayTag ItemId;
+    
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RIS")
+	int32 Quantity = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "RIS")
+	FGameplayTag Tag;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "RIS")
+	bool IsBlocked = false;
+	
+	// For instanced items, this will contain the instances. for non instanced items this will be an empty array
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RIS")
+	TArray<UItemInstanceData*> InstanceData;
+	
+    bool IsValid() const;
+
+    int32 DestroyQuantity(int32 Quantity, const TArray<UItemInstanceData*>& InstancesToDestroy, AActor* Owner);
+	
+	// Allows partial. If InstancesToExtract are provided then InQuantity is ignored
+    int32 Extract(int32 InQuantity, const TArray<UItemInstanceData*>& SpecificInstancesToExtract, TArray<UItemInstanceData*>& StateArrayToAppendTo, AActor* Owner, bool bAllowPartial = true);
+
+    FTaggedItemBundle(){}
+	
+	// Checks if at least QuantityToCheck exists AND all provided (if any) instances are contained
+	
+	bool Contains(int32 QuantityToCheck, const TArray<UItemInstanceData*>& InstancesToCheck) const;
+	
+	TArray<UItemInstanceData*> FromInstanceIds(const TArray<int32>& InstanceIds) const;
+
+	
+	FTaggedItemBundle(FGameplayTag InTag, FGameplayTag InItemId)
+    {
+    	Tag = InTag;
+    	ItemId = InItemId;
+    	Quantity = 0;
+    	InstanceData = TArray<UItemInstanceData*>();
+    }
+	
+	// This constructor should only be used when it is certain that instance data is not needed for this item type
+	FTaggedItemBundle(FGameplayTag InTag, FGameplayTag InItemId, int32 InQuantity)
+    {
+    	ItemId = InItemId;
+    	Quantity = InQuantity;
+    	Tag = InTag;
+    	InstanceData = TArray<UItemInstanceData*>();
+    }
+	
+    FTaggedItemBundle(FGameplayTag InTag, FItemBundle InItemInfo)
+    {
+    	Tag = InTag;
+        ItemId = InItemInfo.ItemId;
+    	Quantity = InItemInfo.Quantity;
+        this->InstanceData = InItemInfo.InstanceData;
+    }
+
+    FTaggedItemBundle(FGameplayTag InTag, FGameplayTag InItemId, int32 InQuantity, const TArray<UItemInstanceData*>& InstanceData)
+    {
+    	Tag = InTag;
+        ItemId = InItemId;
+    	Quantity = InQuantity;
+        this->InstanceData = InstanceData;
+    }
+
+    // This overload will spawn the instance data
+	FTaggedItemBundle(FGameplayTag InTag, FGameplayTag InItemId, int32 InQuantity, TSubclassOf<UItemInstanceData> InstanceDataClass, AActor* OwnerOfSpawnedInstanceData)
+    {
+    	Tag = InTag;
+    	ItemId = InItemId;
+    	Quantity = InQuantity;
+
+    	for (int32 i = 0; i < InQuantity; ++i)
+		{
+			if (UItemInstanceData* NewInstanceData = NewObject<UItemInstanceData>(OwnerOfSpawnedInstanceData, InstanceDataClass))
+			{
+				NewInstanceData->SetFlags(RF_Transient); // Not saved to disk
+				InstanceData.Add(NewInstanceData);
+
+				OwnerOfSpawnedInstanceData->AddReplicatedSubObject(NewInstanceData);
+			}
+		}
+    }
+    
+    bool operator==(const FTaggedItemBundle& Other) const
+    {
+        return Tag == Other.Tag && InstanceData == Other.InstanceData && ItemId == Other.ItemId && Quantity == Other.Quantity;
+    }
+
+    bool operator!=(const FTaggedItemBundle& Other) const
+    {
+        return !(*this == Other);
+    }
+	
+	bool operator<(const FTaggedItemBundle& Other) const
+	{
+		return Tag.ToString() < Other.Tag.ToString();
+	}
+};
+
+
 // Class to wrap any of the above item bundle types in a unified type since we cant use inheritance
 struct RANCINVENTORY_API FGenericItemBundle
 {
-    using BundleVariant = std::variant<FItemBundle*, FTaggedItemBundle*, FItemBundleWithInstanceData*, std::monostate>;
+    using BundleVariant = std::variant<FItemBundle*, FTaggedItemBundle*, std::monostate>;
     
     BundleVariant Data;
 
     FGenericItemBundle() : Data(std::monostate{}) {}  // Initialize with monostate instead of nullptr
     FGenericItemBundle(FItemBundle* Bundle) : Data(Bundle ? Bundle : BundleVariant(std::monostate{})) {}
     FGenericItemBundle(FTaggedItemBundle* Bundle) : Data(Bundle ? Bundle : BundleVariant(std::monostate{})) {}
-    FGenericItemBundle(FItemBundleWithInstanceData* Bundle) : Data(Bundle ? Bundle : BundleVariant(std::monostate{})) {}
 
     bool IsValid() const 
     {
@@ -262,6 +233,18 @@ struct RANCINVENTORY_API FGenericItemBundle
             else
                 return arg && arg->ItemId.IsValid();
         }, Data);
+    }
+
+	bool Contains(int32 QuantityToCheck, const TArray<UItemInstanceData*>& InstancesToCheck) const 
+    {
+    	if (std::holds_alternative<std::monostate>(Data)) return false;
+    	return std::visit([QuantityToCheck, InstancesToCheck](auto&& arg) -> bool {
+			using T = std::decay_t<decltype(arg)>;
+			if constexpr (std::is_same_v<T, std::monostate>)
+				return false;
+			else
+				return arg && arg->Contains(QuantityToCheck, InstancesToCheck);
+		}, Data);
     }
 
     FGameplayTag GetItemId() const 
@@ -288,6 +271,18 @@ struct RANCINVENTORY_API FGenericItemBundle
         }, Data);
     }
 
+	TArray<UItemInstanceData*>* GetInstances() const 
+	{
+		if (std::holds_alternative<std::monostate>(Data)) return nullptr;
+		return std::visit([]<typename T0>(T0&& arg) -> TArray<UItemInstanceData*>* {
+			using T = std::decay_t<T0>;
+			if constexpr (std::is_same_v<T, std::monostate>)
+				return nullptr;
+			else
+				return arg ? &arg->InstanceData : nullptr;
+		}, Data);
+	}
+
     void SetQuantity(int32 NewQuantity) 
     {
         if (std::holds_alternative<std::monostate>(Data)) return;
@@ -307,7 +302,17 @@ struct RANCINVENTORY_API FGenericItemBundle
                 if (arg) arg->ItemId = NewId;
         }, Data);
     }
-
+	
+	void SetInstances(const TArray<UItemInstanceData*>& NewInstances)
+	{
+		if (std::holds_alternative<std::monostate>(Data)) return;
+		std::visit([&NewInstances](auto&& arg) {
+    				using T = std::decay_t<decltype(arg)>;
+					if constexpr (!std::is_same_v<T, std::monostate>)
+						if (arg) arg->InstanceData = NewInstances;
+				}, Data);
+    }
+	
 	bool IsBlocked() const 
     {
     	// Return false if bundle is FTaggedItemBundle and IsBlocked is true
@@ -351,4 +356,5 @@ struct RANCINVENTORY_API FGenericItemBundle
 			}
 		}, Data);
     }
+
 };

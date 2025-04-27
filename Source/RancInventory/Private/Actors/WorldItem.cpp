@@ -26,7 +26,7 @@ void AWorldItem::BeginPlay()
 	}
 }
 
-void AWorldItem::SetItem(const FItemBundleWithInstanceData& NewItem)
+void AWorldItem::SetItem(const FItemBundle& NewItem)
 {
 	if (IsValid(ItemData))
 	{
@@ -62,6 +62,15 @@ void AWorldItem::Initialize()
 	{
 		UE_LOG(LogTemp, Warning, TEXT("AWorldItem::Initialize: ItemData is null for ItemId: %s"), *RepresentedItem.ItemId.ToString());
 		return;
+	}
+
+	if (RepresentedItem.InstanceData.IsEmpty() && IsValid(ItemData->DefaultInstanceDataTemplate))
+	{
+		for (int32 i = 0; i < RepresentedItem.Quantity; ++i)
+		{
+			UItemInstanceData* InstanceData = NewObject<UItemInstanceData>(ItemData->DefaultInstanceDataTemplate);
+			RepresentedItem.InstanceData.Add(InstanceData);
+		}
 	}
 
 	for (UItemInstanceData* InstanceData : RepresentedItem.InstanceData)
@@ -106,14 +115,13 @@ void AWorldItem::PreReplication(IRepChangedPropertyTracker& ChangedPropertyTrack
 	Super::PreReplication(ChangedPropertyTracker);
 }
 
-
 int32 AWorldItem::ExtractItem_IfServer_Implementation(
-    const FGameplayTag& ItemId, 
-    int32 Quantity, 
-    EItemChangeReason Reason, 
+    const FGameplayTag& ItemId,
+    int32 Quantity,
+    const TArray<UItemInstanceData*>& InstancesToExtract, // Added const reference
+    EItemChangeReason Reason,
     TArray<UItemInstanceData*>& StateArrayToAppendTo)
 {
-    // Validate the input parameters
     if (!ItemId.IsValid())
     {
         UE_LOG(LogTemp, Warning, TEXT("ExtractItem_IfServer failed: Invalid ItemId."));
@@ -123,48 +131,32 @@ int32 AWorldItem::ExtractItem_IfServer_Implementation(
     if (Quantity <= 0)
         return 0;
 
-    // Check if the ItemId matches the represented item
     if (RepresentedItem.ItemId != ItemId)
     {
         UE_LOG(LogTemp, Warning, TEXT("ExtractItem_IfServer failed: ItemId does not match the represented item."));
         return 0;
     }
 
-    // Determine how much can be extracted
-    int32 AvailableQuantity = RepresentedItem.Quantity;
-    int32 QuantityToExtract = FMath::Min(Quantity, AvailableQuantity);
+    // Call the bundle's ExtractQuantity method
+    // 'this' actor acts as the owner for removing replicated subobjects
+    int32 ExtractCount = RepresentedItem.Extract(Quantity, InstancesToExtract, StateArrayToAppendTo, this);
 
-    if (QuantityToExtract <= 0)
+    if (ExtractCount > 0)
     {
-        return 0;
-    }
-
-    // Adjust the represented item's quantity
-    RepresentedItem.Quantity -= QuantityToExtract;
-	
-    if (RepresentedItem.InstanceData.Num() > 0 && QuantityToExtract > 0)
-    {
-        for (int32 i = 0; i < QuantityToExtract; ++i)
+        if (HasAuthority())
         {
-            if (RepresentedItem.InstanceData.Num() > 0)
+            OnRep_Item(); // Trigger replication update if quantity/instances changed
+
+            // Optional: Destroy the world item if it becomes empty
+            if (RepresentedItem.Quantity <= 0)
             {
-                // Transfer the last instance from RepresentedItem to the output array
-                int32 LastIndex = RepresentedItem.InstanceData.Num() - 1;
-            	auto* InstanceData = RepresentedItem.InstanceData[LastIndex];
-            	RemoveReplicatedSubObject(InstanceData);
-                StateArrayToAppendTo.Add(InstanceData);
-                RepresentedItem.InstanceData.RemoveAt(LastIndex);
+                 // Start destruction, important this doesn't happen synchronously as we might need to access its recursively created containers
+                 ConditionalBeginDestroy();
             }
         }
     }
 
-    // Notify replication system if necessary
-    if (HasAuthority())
-    {
-        OnRep_Item();
-    }
-
-    return QuantityToExtract;
+    return ExtractCount;
 }
 
 int32 AWorldItem::GetContainedQuantity_Implementation(const FGameplayTag& ItemId)

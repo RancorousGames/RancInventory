@@ -31,13 +31,14 @@ public:
 	 *
 	 * @param ItemId The ID of the item to extract.
 	 * @param Quantity The amount of the item to extract.
+	 * @param InstancesToExtract The instances of the item to extract.
 	 * @param Reason The reason for the item change.
 	 * @param StateArrayToAppendTo The array to append state data to.
 	 * @return The number of items successfully extracted.
 	 */
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Ranc Inventory")
-	int32 ExtractItem_IfServer(const FGameplayTag& ItemId, int32 Quantity, EItemChangeReason Reason, TArray<UItemInstanceData*>& StateArrayToAppendTo);
-
+	int32 ExtractItem_IfServer(const FGameplayTag& ItemId, int32 Quantity, const TArray<UItemInstanceData*>& InstancesToExtract, EItemChangeReason Reason, TArray<UItemInstanceData*>& StateArrayToAppendTo);
+	
 	/**
 	 * Gets the quantity of a specific item contained in the source.
 	 *

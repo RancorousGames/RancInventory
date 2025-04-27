@@ -300,13 +300,13 @@ public:
 
 	
 	UFUNCTION()
-	void HandleItemAddedToSlot(const FGameplayTag& SlotTag, const UItemStaticData* Data, int32 Quantity, FTaggedItemBundle PreviousItem, EItemChangeReason Reason);
+	void HandleItemAddedToSlot(const FGameplayTag& SlotTag, const UItemStaticData* Data, int32 Quantity, const TArray<UItemInstanceData*>& InstancesAdded, FTaggedItemBundle PreviousItem, EItemChangeReason Reason);
 
 	UFUNCTION()
-	void HandleItemRemovedFromSlot(const FGameplayTag& SlotTag, const UItemStaticData* Data, int32 Quantity, EItemChangeReason Reason);
+	void HandleItemRemovedFromSlot(const FGameplayTag& SlotTag, const UItemStaticData* Data, int32 Quantity, const TArray<UItemInstanceData*>& InstancesRemoved, EItemChangeReason Reason);
 	
 	UFUNCTION()
-	void HandleItemRemovedFromGenericSlot(const UItemStaticData* ItemData, int32 Quantity, EItemChangeReason Reason);
+	void HandleItemRemovedFromGenericSlot(const UItemStaticData* ItemData, int32 Quantity, const TArray<UItemInstanceData*>& InstancesRemoved, EItemChangeReason Reason);
 	
 	UFUNCTION(BlueprintNativeEvent, Category = "Ranc Inventory Weapons|Gear")
 	bool CanAttack(FVector AimLocation = FVector(0,0,0), bool ForceOffHand = false);

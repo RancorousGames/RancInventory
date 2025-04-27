@@ -7,7 +7,7 @@ int32 ULimitedTestItemSource::GetContainedQuantity_Implementation(const FGamepla
 	return SourceRemainder;
 }
 
-int32 ULimitedTestItemSource::ExtractItem_IfServer_Implementation(const FGameplayTag& ItemId, int32 Quantity,
+int32 ULimitedTestItemSource::ExtractItem_IfServer_Implementation(const FGameplayTag& ItemId, int32 Quantity, const TArray<UItemInstanceData*>& _,
 	EItemChangeReason Reason, TArray<UItemInstanceData*>& StateArrayToAppendTo)
 {
 	int32 SupplyableAmount = FMath::Min(SourceRemainder, Quantity);

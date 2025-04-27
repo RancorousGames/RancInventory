@@ -141,12 +141,13 @@ const UWeaponDefinition* UGearManagerComponent::GetOffhandWeaponData()
 	return OffhandSlotWeapon->WeaponData;
 }
 
-void UGearManagerComponent::HandleItemAddedToSlot(const FGameplayTag& SlotTag, const UItemStaticData* Data, int32 Quantity, FTaggedItemBundle PreviousItem, EItemChangeReason Reason)
+void UGearManagerComponent::HandleItemAddedToSlot(const FGameplayTag& SlotTag, const UItemStaticData* Data, int32 Quantity, const TArray<UItemInstanceData*>& InstancesAdded,
+                                                  FTaggedItemBundle PreviousItem, EItemChangeReason Reason)
 {
 	EquipGear(SlotTag, Data, PreviousItem, EGearChangeStep::Request);
 }
 
-void UGearManagerComponent::HandleItemRemovedFromSlot(const FGameplayTag& SlotTag, const UItemStaticData* Data, int32 Quantity, EItemChangeReason Reason)
+void UGearManagerComponent::HandleItemRemovedFromSlot(const FGameplayTag& SlotTag, const UItemStaticData* Data, int32 Quantity, const TArray<UItemInstanceData*>& InstancesRemoved, EItemChangeReason Reason)
 {
 	if (LinkedInventoryComponent->GetItemForTaggedSlot(SlotTag).ItemId != Data->ItemId)
 	{
@@ -154,7 +155,7 @@ void UGearManagerComponent::HandleItemRemovedFromSlot(const FGameplayTag& SlotTa
 	}
 }
 
-void UGearManagerComponent::HandleItemRemovedFromGenericSlot(const UItemStaticData* ItemData, int32 Quantity, EItemChangeReason Reason)
+void UGearManagerComponent::HandleItemRemovedFromGenericSlot(const UItemStaticData* ItemData, int32 Quantity, const TArray<UItemInstanceData*>& InstancesRemoved, EItemChangeReason Reason)
 {
 	if (SelectableWeaponsData.Contains(ItemData) && !LinkedInventoryComponent->Contains(ItemData->ItemId, 1))
 	{
@@ -459,7 +460,7 @@ void UGearManagerComponent::SelectActiveWeapon_Server_Implementation(FGameplayTa
 	}
 	else
 	{
-		LinkedInventoryComponent->MoveItem(ItemData->ItemId, 1, FGameplayTag(), GearSlots[HandSlotIndex].SlotTag);
+		LinkedInventoryComponent->MoveItem(ItemData->ItemId, 1, UItemContainerComponent::NoInstances, FGameplayTag(), GearSlots[HandSlotIndex].SlotTag);
 	}
 }
 

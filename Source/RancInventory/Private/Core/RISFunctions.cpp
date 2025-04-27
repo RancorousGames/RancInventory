@@ -185,7 +185,7 @@ bool URISFunctions::ShouldItemsBeSwapped(const FGameplayTag& Source, const FGame
 	return false;
 }
 
-FRISMoveResult URISFunctions::MoveBetweenSlots(FGenericItemBundle& Source, FGenericItemBundle& Target, bool IgnoreMaxStacks, int32 RequestedQuantity, bool AllowPartial, bool AllowSwap)
+FRISMoveResult URISFunctions::MoveBetweenSlots(FGenericItemBundle& Source, FGenericItemBundle& Target, bool IgnoreMaxStacks, int32 RequestedQuantity, TArray<UItemInstanceData*> InstancesToMove, bool AllowPartial, bool AllowSwap)
 {
 	const UItemStaticData* SourceItemData = URISSubsystem::GetItemDataById(Source.GetItemId());
 	if (!SourceItemData)
@@ -203,7 +203,6 @@ FRISMoveResult URISFunctions::MoveBetweenSlots(FGenericItemBundle& Source, FGene
 	int32 TransferAmount = FMath::Min(RequestedQuantity, Source.GetQuantity());
 
 	bool DoSimpleSwap = false;
-	
 	if (Target.IsValid())
 	{
 		const bool ShouldStack = SourceItemData->MaxStackSize > 1 && Source.GetItemId()== Target.GetItemId();
@@ -217,10 +216,6 @@ FRISMoveResult URISFunctions::MoveBetweenSlots(FGenericItemBundle& Source, FGene
 		TransferAmount = FMath::Min(TransferAmount, RemainingSpace);
 
 		DoSimpleSwap = !ShouldStack && AllowSwap;
-	}
-	else
-	{
-		DoSimpleSwap = TransferAmount >= Source.GetQuantity();
 	}
 
 	if (TransferAmount <= 0)
@@ -240,21 +235,50 @@ FRISMoveResult URISFunctions::MoveBetweenSlots(FGenericItemBundle& Source, FGene
 	{
 		const FGameplayTag TempId = Source.GetItemId();
 		const int32 TempQuantity = Source.GetQuantity();
+		const TArray<UItemInstanceData*> TempInstances = *Source.GetInstances();
 		Source.SetItemId(Target.GetItemId());  // Target might be invalid but that's fine
 		Source.SetQuantity(Target.GetQuantity());
+		Source.SetInstances(*Target.GetInstances());
 		Target.SetItemId(TempId);
 		Target.SetQuantity(TempQuantity);
+		Target.SetInstances(TempInstances);
 		
-		return FRISMoveResult(TransferAmount, Source.IsValid());
+		return FRISMoveResult(TransferAmount, Source.IsValid(), TempInstances);
 	}
 
 	Target.SetItemId(Source.GetItemId());
 	Target.SetQuantity(Target.GetQuantity() + TransferAmount);
 	Source.SetQuantity(Source.GetQuantity() - TransferAmount);
+
+	if (IsValid(SourceItemData->DefaultInstanceDataTemplate))
+	{
+		TArray<UItemInstanceData*>* SourceInstances = Source.GetInstances();
+		TArray<UItemInstanceData*>* TargetInstances = Target.GetInstances();
+
+		if (!InstancesToMove.IsEmpty())
+		{
+			TargetInstances->Append(InstancesToMove);
+			for (UItemInstanceData* Instance : InstancesToMove)
+			{
+				SourceInstances->Remove(Instance);
+			}
+		}
+		else
+		{
+			const int32 SourceInstancesCount = SourceInstances->Num();
+			for (int32 i = SourceInstancesCount - 1; TargetInstances->Num() < TransferAmount && i >= 0; --i)
+			{
+				InstancesToMove.Add(SourceInstances->Last());
+				TargetInstances->Add(SourceInstances->Pop());
+			}
+		}
+	}
+	
 	if (Source.GetQuantity() <= 0)
 	{
 		Source.SetItemId(FItemBundle::EmptyItemInstance.ItemId);
 		Source.SetQuantity(FItemBundle::EmptyItemInstance.Quantity);
+		Source.SetInstances(TArray<UItemInstanceData*>());
 	}
-	return FRISMoveResult(TransferAmount, false);
+	return FRISMoveResult(TransferAmount, DoSimpleSwap, InstancesToMove);
 }

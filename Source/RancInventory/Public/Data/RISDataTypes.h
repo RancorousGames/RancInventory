@@ -39,11 +39,16 @@ struct FRISMoveResult
     FRISMoveResult() = default;
     
     FRISMoveResult(int32 Quantity, bool Swapped) : QuantityMoved(Quantity), WereItemsSwapped(Swapped) {};
+    FRISMoveResult(int32 Quantity, bool Swapped, TArray<UItemInstanceData*> Instances) : QuantityMoved(Quantity), WereItemsSwapped(Swapped), InstancesMoved(Instances) {};
 
+    
     UPROPERTY()
     int32 QuantityMoved = 0;
     UPROPERTY()
     bool WereItemsSwapped = false;
+
+    UPROPERTY()
+    TArray<UItemInstanceData*> InstancesMoved;
 };
 
 

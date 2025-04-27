@@ -196,9 +196,13 @@ TArray<UItemStaticData*> URISSubsystem::GetItemDataArrayById(const TArray<FPrima
 }
 
 int32 URISSubsystem::ExtractItem_IfServer_Implementation(const FGameplayTag& ItemId, int32 Quantity,
+														 const TArray<UItemInstanceData*>& _,
                                                          EItemChangeReason Reason,
                                                          TArray<UItemInstanceData*>& StateArrayToAppendTo)
 {
+	ensureMsgf(_.Num() == 0,
+		TEXT("ExtractItem_IfServer_Implementation: InstancesToExtract should be empty."));
+	
 	return Quantity;
 }
 
@@ -363,7 +367,7 @@ TSubclassOf<AWorldItem> URISSubsystem::GetWorldItemClass(const FGameplayTag& Ite
 }
 
 AWorldItem* URISSubsystem::SpawnWorldItem(UObject* WorldContextObject,
-    FItemBundleWithInstanceData Item,
+    FItemBundle Item,
     const FVector& Location,
     TSubclassOf<AWorldItem> WorldItemClass)
 {
@@ -399,7 +403,16 @@ AWorldItem* URISSubsystem::SpawnWorldItem(UObject* WorldContextObject,
     // Spawn the actor
     AWorldItem* WorldItem = World->SpawnActor<AWorldItem>(FinalWorldItemClass, Location, 
         FRotator::ZeroRotator, SpawnParams);
-    
+
+	if (Item.InstanceData.IsEmpty() && IsValid(ItemData->DefaultInstanceDataTemplate))
+	{
+		for (int32 i = 0; i < Item.Quantity; ++i)
+		{
+			UItemInstanceData* InstanceData = NewObject<UItemInstanceData>(ItemData->DefaultInstanceDataTemplate);
+			Item.InstanceData.Add(InstanceData);
+		}
+	}
+	
     if (WorldItem)
     {
         // Set up the world item
@@ -414,4 +427,20 @@ AWorldItem* URISSubsystem::SpawnWorldItem(UObject* WorldContextObject,
     }
 
     return WorldItem;
+}
+
+TArray<UItemInstanceData*> URISSubsystem::GenerateInstanceData(const FGameplayTag& ItemId, int32 Quantity)
+{
+	TArray<UItemInstanceData*> InstanceDataArray;
+    UItemStaticData* ItemData = AllLoadedItemsByTag.FindRef(ItemId);
+	if (IsValid(ItemData->DefaultInstanceDataTemplate))
+	{
+		for (int32 i = 0; i < Quantity; ++i)
+		{
+			UItemInstanceData* InstanceData = NewObject<UItemInstanceData>(ItemData->DefaultInstanceDataTemplate);
+			InstanceDataArray.Add(InstanceData);
+		}
+	}
+
+	return InstanceDataArray;
 }

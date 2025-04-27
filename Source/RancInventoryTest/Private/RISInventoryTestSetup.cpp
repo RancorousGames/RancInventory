@@ -14,6 +14,8 @@
 #include "Data/ItemBundle.h"
 #include "Data/ItemStaticData.h"
 #include "Data/RecursiveContainerInstanceData.h"
+#include "Data/UsableItemDefinition.h"
+#include "MockClasses/TestUsableItemDefinition.h"
 
 // Define Gameplay Tags
 UE_DEFINE_GAMEPLAY_TAG(LeftHandSlot, "Test.Gameplay.Hands.LeftHand");
@@ -39,6 +41,7 @@ UE_DEFINE_GAMEPLAY_TAG(ItemIdChestArmor, "Test.Items.IDs.ChestArmor");
 UE_DEFINE_GAMEPLAY_TAG(ItemIdGiantBoulder, "Test.Items.IDs.GiantBoulder");
 UE_DEFINE_GAMEPLAY_TAG(ItemIdBlockingOneHandedItem, "Test.Items.IDs.ItemIdBlockingOneHandedItem");
 UE_DEFINE_GAMEPLAY_TAG(ItemIdUnarmed, "Test.Items.IDs.Unarmed");
+UE_DEFINE_GAMEPLAY_TAG(ItemIdBrittleEgg, "Test.Items.IDs.BrittleEgg");
 UE_DEFINE_GAMEPLAY_TAG(ItemIdBrittleCopperKnife, "Test.Items.IDs.BrittleCopperKnife");
 UE_DEFINE_GAMEPLAY_TAG(ItemIdShortbow, "Test.Items.IDs.Shortbow");
 UE_DEFINE_GAMEPLAY_TAG(ItemIdLongbow, "Test.Items.IDs.Longbow");
@@ -219,6 +222,20 @@ public:
 		GiantBoulderData->ItemCategories.AddTag(ItemTypeResource);
 		Subsystem->HardcodeItem(ItemIdGiantBoulder, GiantBoulderData);
 
+		UItemStaticData* BrittleEggs = NewObject<UItemStaticData>(); // Stackable item with durability
+		BrittleEggs->ItemId = ItemIdBrittleEgg;
+		BrittleEggs->ItemName = FName("Eggs from a brittle chicken");
+		BrittleEggs->ItemDescription = FText::FromString("Careful!");
+		BrittleEggs->ItemPrimaryType = ItemTypeResource;
+		BrittleEggs->MaxStackSize = 3;
+		BrittleEggs->ItemWeight = 1;
+		BrittleEggs->ItemCategories.AddTag(ItemTypeResource);
+		UUsableItemDefinition* UsableEggDef = NewObject<UTestUsableItemDefinition>(BrittleEggs);
+		UsableEggDef->QuantityPerUse = 1;
+		BrittleEggs->ItemDefinitions.Add(UsableEggDef);
+		BrittleEggs->DefaultInstanceDataTemplate = NewObject<UItemDurabilityTestInstanceData>(BrittleEggs);	
+		Subsystem->HardcodeItem(ItemIdBrittleEgg, BrittleEggs);
+		
 		UItemStaticData* BrittleCopperKnife = NewObject<UItemStaticData>();
 		BrittleCopperKnife->ItemId = ItemIdBrittleCopperKnife;
 		BrittleCopperKnife->ItemName = FName("Brittle Copper Knife");

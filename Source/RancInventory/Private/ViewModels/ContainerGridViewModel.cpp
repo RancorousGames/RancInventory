@@ -4,7 +4,6 @@
 #include "Core/RISSubsystem.h" // For GetItemDataById
 #include "Data/ItemStaticData.h"
 #include "Core/RISFunctions.h" // For MoveBetweenSlots
-#include "Actors/WorldItem.h" // For PickupItem
 #include "LogRancInventorySystem.h" // For logging
 
 void UContainerGridViewModel::Initialize_Implementation(UItemContainerComponent* ContainerComponent, int32 NumSlots)
@@ -39,7 +38,7 @@ void UContainerGridViewModel::Initialize_Implementation(UItemContainerComponent*
     bIsInitialized = true;
 
     // Initial population of the grid from the container
-    ForceFullGridUpdate();
+    ForceFullUpdate();
 }
 
 void UContainerGridViewModel::BeginDestroy()
@@ -81,12 +80,19 @@ int32 UContainerGridViewModel::DropItemFromGrid(int32 SlotIndex, int32 Quantity)
 
     // Predict visual change
     OperationsToConfirm.Emplace(FRISExpectedOperation(Remove, SourceSlotItem.ItemId, QuantityToDrop));
-    int32 DroppedCount = LinkedContainerComponent->DropItems(SourceSlotItem.ItemId, QuantityToDrop); // Request server action
+    auto InstancesToDrop = SourceSlotItem.GetInstancesFromEnd(QuantityToDrop);
+    int32 DroppedCount = LinkedContainerComponent->DropItems(SourceSlotItem.ItemId, QuantityToDrop, InstancesToDrop); // Request server action
 
     // Update visual state based on prediction (server response will correct later if needed via HandleItemRemoved)
-    if (DroppedCount > 0) // Assume server *might* succeed based on client-side check
+    if (DroppedCount > 0)
     {
         ViewableGridSlots[SlotIndex].Quantity -= DroppedCount; // Use DroppedCount as it's the client's best guess
+        if (ViewableGridSlots[SlotIndex].InstanceData.Num() > 0)
+        {
+            for (int32 i = 0; i < DroppedCount; ++i)
+                ViewableGridSlots[SlotIndex].InstanceData.Pop(EAllowShrinking::No);
+            ViewableGridSlots[SlotIndex].InstanceData.Shrink();
+        }
         if (ViewableGridSlots[SlotIndex].Quantity <= 0)
         {
             ViewableGridSlots[SlotIndex] = FItemBundle::EmptyItemInstance; // Reset the slot
@@ -113,11 +119,11 @@ int32 UContainerGridViewModel::DropItemFromGrid(int32 SlotIndex, int32 Quantity)
 }
 
 int32 UContainerGridViewModel::UseItemFromGrid(int32 SlotIndex)
-{
-	if (!LinkedContainerComponent || !ViewableGridSlots.IsValidIndex(SlotIndex))
+{    
+    if (!LinkedContainerComponent || !ViewableGridSlots.IsValidIndex(SlotIndex))
         return 0;
 
-    const FItemBundle& SourceSlotItem = ViewableGridSlots[SlotIndex];
+    FItemBundle& SourceSlotItem = ViewableGridSlots[SlotIndex];
     if (!SourceSlotItem.IsValid())
         return 0; // Cannot use empty slot
 
@@ -134,12 +140,23 @@ int32 UContainerGridViewModel::UseItemFromGrid(int32 SlotIndex)
          QuantityToConsume = FMath::Min(QuantityToConsume, SourceSlotItem.Quantity); // Can't consume more than available
     }
 
+    if (QuantityToConsume > 1 && SourceSlotItem.InstanceData.Num() > 0)
+    {
+        UE_LOG(LogRISInventory, Error, TEXT("Using item with consume count > 1 and instance data is not currently supported."));
+        return 0;
+    }
+    
+    int32 InstanceIdToConsume = -1;
     if (QuantityToConsume > 0)
     {
         OperationsToConfirm.Emplace(FRISExpectedOperation(Remove, SourceSlotItem.ItemId, QuantityToConsume));
         // Update visual state based on prediction
-        ViewableGridSlots[SlotIndex].Quantity -= QuantityToConsume;
-        if (ViewableGridSlots[SlotIndex].Quantity <= 0)
+        SourceSlotItem.Quantity -= QuantityToConsume;
+        if ( SourceSlotItem.InstanceData.Num() > 0)
+        {
+            InstanceIdToConsume = SourceSlotItem.InstanceData.Pop()->UniqueInstanceId;
+        }
+        if (SourceSlotItem.Quantity <= 0)
         {
              ViewableGridSlots[SlotIndex] = FItemBundle::EmptyItemInstance;
         }
@@ -147,9 +164,9 @@ int32 UContainerGridViewModel::UseItemFromGrid(int32 SlotIndex)
     }
 
     // Request server action
-    LinkedContainerComponent->UseItem(SourceSlotItem.ItemId);
+    LinkedContainerComponent->UseItem(SourceSlotItem.ItemId, InstanceIdToConsume);
 
-    return 0; // Base implementation doesn't know the exact result
+    return QuantityToConsume; // Base implementation doesn't know the exact result
 }
 
 bool UContainerGridViewModel::SplitItemInGrid_Implementation(int32 SourceSlotIndex, int32 TargetSlotIndex, int32 Quantity)
@@ -174,27 +191,28 @@ bool UContainerGridViewModel::MoveItemInGrid_Internal(int32 SourceSlotIndex, int
         return false;
     }
 
-    FItemBundle& SourceItemBundle = ViewableGridSlots[SourceSlotIndex];
-    FItemBundle& TargetItemBundle = ViewableGridSlots[TargetSlotIndex];
-
-    // Convert to generic bundles for MoveBetweenSlots function
-    FGenericItemBundle SourceItem(&SourceItemBundle);
-    FGenericItemBundle TargetItem(&TargetItemBundle);
+    FItemBundle& SourceItem = ViewableGridSlots[SourceSlotIndex];
+    FItemBundle& TargetItem = ViewableGridSlots[TargetSlotIndex];
 
     if (!SourceItem.IsValid()) return false; // Cannot move/split from empty
 
-    int32 QuantityToMove = IsSplit ? InQuantity : SourceItem.GetQuantity();
+    int32 QuantityToMove = IsSplit ? InQuantity : SourceItem.Quantity;
     if (QuantityToMove <= 0) return false;
 
-    if (IsSplit && QuantityToMove > SourceItem.GetQuantity())
+    auto InstancesToMove = SourceItem.GetInstancesFromEnd(QuantityToMove);
+
+    if (IsSplit && QuantityToMove > SourceItem.Quantity)
     {
-        UE_LOG(LogRISInventory, Warning, TEXT("Cannot split %d items, only %d available in source slot %d."), QuantityToMove, SourceItem.GetQuantity(), SourceSlotIndex);
+        UE_LOG(LogRISInventory, Warning, TEXT("Cannot split %d items, only %d available in source slot %d."), QuantityToMove, SourceItem.Quantity, SourceSlotIndex);
         return false; // Cannot split more than available
     }
 
     // Perform the visual move/split using the helper function
     // For grid-to-grid, no server validation needed, just visual changes.
-    FRISMoveResult MoveResult = URISFunctions::MoveBetweenSlots(SourceItem, TargetItem, false, QuantityToMove, !IsSplit); // Allow swap only if not splitting
+    
+    FGenericItemBundle SourceItemGB(&SourceItem);
+    FGenericItemBundle TargetItemGB(&TargetItem);
+    FRISMoveResult MoveResult = URISFunctions::MoveBetweenSlots(SourceItemGB, TargetItemGB, false, QuantityToMove, UItemContainerComponent::NoInstances, !IsSplit); // Allow swap only if not splitting
 
     // If the move was visually successful, broadcast updates
     if (MoveResult.QuantityMoved > 0 || MoveResult.WereItemsSwapped)
@@ -234,11 +252,12 @@ bool UContainerGridViewModel::CanGridSlotReceiveItem_Implementation(const FGamep
     return false; // Different item types or slot not stackable
 }
 
+/*
 void UContainerGridViewModel::PickupItemToContainer(AWorldItem* WorldItem, bool DestroyAfterPickup)
 {
 	if (!WorldItem || !LinkedContainerComponent) return;
 
-    const FItemBundleWithInstanceData& ItemToPickup = WorldItem->RepresentedItem;
+    const FItemBundle& ItemToPickup = WorldItem->RepresentedItem;
     if (!ItemToPickup.IsValid()) return;
 
     // Check if the container *can* fundamentally receive the item (ignoring visual slots for now)
@@ -330,9 +349,7 @@ void UContainerGridViewModel::PickupItemToContainer(AWorldItem* WorldItem, bool 
              }
          }
      }
-
-
-}
+}*/
 
 bool UContainerGridViewModel::AssertViewModelSettled() const
 {
@@ -345,7 +362,7 @@ bool UContainerGridViewModel::AssertViewModelSettled() const
     if (LinkedContainerComponent)
     {
         TMap<FGameplayTag, int32> ContainerQuantities;
-        for (const auto& Item : LinkedContainerComponent->GetAllContainerItems())
+        for (const auto& Item : LinkedContainerComponent->GetAllItems())
         {
             ContainerQuantities.Add(Item.ItemId, Item.Quantity);
         }
@@ -353,6 +370,7 @@ bool UContainerGridViewModel::AssertViewModelSettled() const
         TMap<FGameplayTag, int32> ViewModelQuantities;
         for (const FItemBundle& Slot : ViewableGridSlots)
         {
+            ensureMsgf(Slot.InstanceData.IsEmpty() || Slot.InstanceData.Num() == Slot.Quantity, TEXT("ContainerViewModel: Slot has %d instances but quantity %d."), Slot.InstanceData.Num(), Slot.Quantity);
             if (Slot.IsValid())
             {
                 ViewModelQuantities.FindOrAdd(Slot.ItemId) += Slot.Quantity;
@@ -393,7 +411,7 @@ bool UContainerGridViewModel::AssertViewModelSettled() const
 
 // --- Event Handlers ---
 
-void UContainerGridViewModel::HandleItemAdded_Implementation(const UItemStaticData* ItemData, int32 Quantity, EItemChangeReason Reason)
+void UContainerGridViewModel::HandleItemAdded_Implementation(const UItemStaticData* ItemData, int32 Quantity, const TArray<UItemInstanceData*>& InstancesAdded, EItemChangeReason Reason)
 {
     if (!ItemData || Quantity <= 0) return;
 
@@ -420,7 +438,7 @@ void UContainerGridViewModel::HandleItemAdded_Implementation(const UItemStaticDa
     while (RemainingItems > 0)
     {
         int32 SlotIndex = FindGridSlotIndexForItem(ItemData->ItemId, RemainingItems);
-        if (SlotIndex == -1)
+        if (SlotIndex < 0)
         {
             UE_LOG(LogRISInventory, Error, TEXT("HandleItemAdded: No available visual slot found for server-added item %s."), *ItemData->ItemId.ToString());
             // Consider ForceFullGridUpdate() as a fallback?
@@ -428,32 +446,34 @@ void UContainerGridViewModel::HandleItemAdded_Implementation(const UItemStaticDa
         }
 
         FItemBundle& TargetSlot = ViewableGridSlots[SlotIndex];
-        int32 CanAddToSlot = ItemData->MaxStackSize > 1 ? ItemData->MaxStackSize : 1;
+        int32 AddableQuantity = ItemData->MaxStackSize > 1 ? ItemData->MaxStackSize : 1;
          if (TargetSlot.IsValid() && TargetSlot.ItemId == ItemData->ItemId) {
-             CanAddToSlot -= TargetSlot.Quantity;
+             AddableQuantity -= TargetSlot.Quantity;
          } else if (!TargetSlot.IsValid()) {
              TargetSlot.ItemId = ItemData->ItemId;
              TargetSlot.Quantity = 0;
+             TargetSlot.InstanceData.Empty();
          } else {
              UE_LOG(LogRISInventory, Error, TEXT("HandleItemAdded: FindGridSlotIndexForItem returned incompatible slot %d."), SlotIndex);
              break; // Should not happen
          }
 
-        int32 ActuallyAddedToSlot = FMath::Min(RemainingItems, CanAddToSlot);
+        int32 ActuallyAddedToSlot = FMath::Min(RemainingItems, AddableQuantity);
         if (ActuallyAddedToSlot <= 0) {
              // Indicates logic error or full visual grid
               UE_LOG(LogRISInventory, Warning, TEXT("HandleItemAdded: Could not add to found slot %d (already full?). Forcing full update."), SlotIndex);
-              ForceFullGridUpdate(); // Force resync if we get stuck
+              ForceFullUpdate(); // Force resync if we get stuck
               break;
         }
 
         TargetSlot.Quantity += ActuallyAddedToSlot;
+        TargetSlot.InstanceData.Append(InstancesAdded);
         RemainingItems -= ActuallyAddedToSlot;
         OnGridSlotUpdated.Broadcast(SlotIndex);
     }
 }
 
-void UContainerGridViewModel::HandleItemRemoved_Implementation(const UItemStaticData* ItemData, int32 Quantity, EItemChangeReason Reason)
+void UContainerGridViewModel::HandleItemRemoved_Implementation(const UItemStaticData* ItemData, int32 Quantity, const TArray<UItemInstanceData*>& InstancesRemoved, EItemChangeReason Reason)
 {
     if (!ItemData || Quantity <= 0) return;
 
@@ -461,7 +481,7 @@ void UContainerGridViewModel::HandleItemRemoved_Implementation(const UItemStatic
     for (int32 i = OperationsToConfirm.Num() - 1; i >= 0; --i)
     {
         // Only confirm Remove operations for the grid (no TaggedSlot)
-        if (OperationsToConfirm[i].Operation == ERISSlotOperation::Remove &&
+        if (OperationsToConfirm[i].Operation == Remove &&
             !OperationsToConfirm[i].TaggedSlot.IsValid() &&
             OperationsToConfirm[i].ItemId == ItemData->ItemId &&
             OperationsToConfirm[i].Quantity == Quantity)
@@ -480,25 +500,46 @@ void UContainerGridViewModel::HandleItemRemoved_Implementation(const UItemStatic
         FItemBundle& CurrentSlot = ViewableGridSlots[SlotIndex];
         if (CurrentSlot.IsValid() && CurrentSlot.ItemId == ItemData->ItemId)
         {
-            int32 CanRemoveFromSlot = FMath::Min(RemainingToRemove, CurrentSlot.Quantity);
-            if (CanRemoveFromSlot > 0)
+            if (!InstancesRemoved.IsEmpty())
             {
-                CurrentSlot.Quantity -= CanRemoveFromSlot;
-                RemainingToRemove -= CanRemoveFromSlot;
+                ensureMsgf(CurrentSlot.InstanceData.Num() == CurrentSlot.Quantity, TEXT("HandleItemRemoved: Instance data count mismatch in slot %d for item %s."), SlotIndex, *ItemData->ItemId.ToString());
 
+                CurrentSlot.InstanceData.RemoveAll([&InstancesRemoved](UItemInstanceData* Instance) {
+                    return InstancesRemoved.Contains(Instance);
+                });
+                int32 OldQuantity = CurrentSlot.Quantity;
+                CurrentSlot.Quantity = CurrentSlot.InstanceData.Num();
+                
                 if (CurrentSlot.Quantity <= 0)
+                    CurrentSlot = FItemBundle::EmptyItemInstance;
+                
+                if (OldQuantity != CurrentSlot.Quantity)
                 {
-                    CurrentSlot = FItemBundle::EmptyItemInstance; // Reset slot
+                    RemainingToRemove -= (OldQuantity - CurrentSlot.Quantity);
+                    OnGridSlotUpdated.Broadcast(SlotIndex);
                 }
-                OnGridSlotUpdated.Broadcast(SlotIndex);
+            }
+            else
+            {
+                int32 CanRemoveFromSlot = FMath::Min(RemainingToRemove, CurrentSlot.Quantity);
+                if (CanRemoveFromSlot > 0)
+                {
+                    CurrentSlot.Quantity -= CanRemoveFromSlot;
+                    RemainingToRemove -= CanRemoveFromSlot;
+
+                    if (CurrentSlot.Quantity <= 0)
+                        CurrentSlot = FItemBundle::EmptyItemInstance; // Reset slot
+                    
+                    OnGridSlotUpdated.Broadcast(SlotIndex);
+                }
             }
         }
     }
 
     if (RemainingToRemove > 0)
     {
-        UE_LOG(LogRISInventory, Warning, TEXT("HandleItemRemoved: Could not remove %d items of type %s visually. Forcing full update."), RemainingToRemove, *ItemData->ItemId.ToString());
-        ForceFullGridUpdate(); // Resync if visual state is inconsistent
+        UE_LOG(LogRISInventory, Error, TEXT("HandleItemRemoved: Could not remove %d items of type %s visually. Forcing full update."), RemainingToRemove, *ItemData->ItemId.ToString());
+        ForceFullUpdate(); // Resync if visual state is inconsistent
     }
 }
 
@@ -555,7 +596,7 @@ int32 UContainerGridViewModel::FindGridSlotIndexForItem_Implementation(const FGa
     return FirstEmptySlot;
 }
 
-void UContainerGridViewModel::ForceFullGridUpdate_Implementation()
+void UContainerGridViewModel::ForceFullUpdate_Implementation()
 {
     if (!LinkedContainerComponent)
     {
@@ -570,8 +611,8 @@ void UContainerGridViewModel::ForceFullGridUpdate_Implementation()
     OperationsToConfirm.Empty(); // Clear pending operations as we are forcing state
 
     // Re-populate based on the actual container state
-    TArray<FItemBundleWithInstanceData> ActualItems = LinkedContainerComponent->GetAllContainerItems();
-    for (const FItemBundleWithInstanceData& BackingItem : ActualItems)
+    TArray<FItemBundle> ActualItems = LinkedContainerComponent->GetAllItems();
+    for (const FItemBundle& BackingItem : ActualItems)
     {
         if (BackingItem.Quantity <= 0) continue; // Skip empty/invalid items
 
