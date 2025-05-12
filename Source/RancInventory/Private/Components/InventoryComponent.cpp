@@ -3,11 +3,9 @@
 #include "Components\InventoryComponent.h"
 
 #include <ObjectArray.h>
-#include <variant>
 #include <GameFramework/Actor.h>
 #include <Engine/AssetManager.h>
 
-#include "IDetailTreeNode.h"
 #include "LogRancInventorySystem.h"
 #include "Algo/AnyOf.h"
 #include "Data/RecipeData.h"
@@ -18,9 +16,10 @@
 #include "Net/Core/PushModel/PushModel.h"
 
 
-UInventoryComponent::UInventoryComponent(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
+UInventoryComponent::UInventoryComponent(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer),
+	Subsystem(nullptr)
 {
-    PrimaryComponentTick.bCanEverTick = false;
+	PrimaryComponentTick.bCanEverTick = false;
 	bReplicateUsingRegisteredSubObjectList = true;
 }
 
@@ -44,35 +43,6 @@ void UInventoryComponent::InitializeComponent()
 	CheckAndUpdateRecipeAvailability();
 }
 
-void UInventoryComponent::UpdateWeightAndSlots()
-{
-	// First update weight and slots as if all items were in the generic slots
-	Super::UpdateWeightAndSlots();
-
-	// then subtract the slots of the tagged items
-	for (const FTaggedItemBundle& TaggedInstance : TaggedSlotItems)
-	{
-		if (!TaggedInstance.IsValid()) continue;
-		if (const UItemStaticData* const ItemData = URISSubsystem::GetItemDataById(
-			TaggedInstance.ItemId))
-		{
-			int32 SlotsTakenPerStack = 1;
-			if (JigsawMode)
-			{
-				if (JigsawMode)
-				{
-					SlotsTakenPerStack = ItemData->JigsawSizeX * ItemData->JigsawSizeY;
-				}
-			}
-
-			UsedContainerSlotCount -= FMath::CeilToInt(
-				TaggedInstance.Quantity / static_cast<float>(ItemData->MaxStackSize)) * SlotsTakenPerStack;
-		}
-	}
-
-	ensureMsgf(UsedContainerSlotCount <= MaxSlotCount, TEXT("Used slot count is higher than max slot count!"));
-}
-
 void UInventoryComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
@@ -84,18 +54,160 @@ void UInventoryComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& 
 	DOREPLIFETIME(UInventoryComponent, AllUnlockedRecipes);
 }
 
+bool UInventoryComponent::CanReceiveItemInTaggedSlot(const FGameplayTag& ItemId, int32 QuantityToReceive, const FGameplayTag& TargetTaggedSlot, bool SwapBackAllowed) const
+{
+	const UItemStaticData* ItemData = URISSubsystem::GetItemDataById(ItemId);
+	if (BadItemData(ItemData, ItemId)) return false;
+
+	int32 ReceivableQuantity = GetReceivableQuantityForTaggedSlot(ItemData, TargetTaggedSlot, QuantityToReceive, false, SwapBackAllowed);
+
+	return ReceivableQuantity >= QuantityToReceive;
+}
+
+int32 UInventoryComponent::GetReceivableQuantityForTaggedSlot(const UItemStaticData* ItemData, const FGameplayTag& TargetTaggedSlot, int32 RequestedQuantity, bool AllowPartial, bool AllowSwapback) const
+{
+	if (BadItemData(ItemData)) return 0;
+
+	if (ContainedInUniversalSlot(TargetTaggedSlot))
+	{
+		// loop over UniversalTaggedExclusiveCategoriesSlots and look for matching slot
+		for (const FUniversalTaggedSlot& UniSlot : UniversalTaggedSlots)
+		{
+			// If the item has the exclusive category tag and the slot is not the universal slot, then it is exclusive to some other universal slot and is not compatible
+			if (TargetTaggedSlot != UniSlot.Slot && UniSlot.ExclusiveToSlotCategory.IsValid() &&
+				ItemData->ItemCategories.HasTag(UniSlot.ExclusiveToSlotCategory))
+			{
+				return 0;
+			}
+		}
+		
+		if (!AllowSwapback && WouldItemMoveIndirectlyViolateBlocking(TargetTaggedSlot, ItemData))
+		{
+			return 0;
+		}
+	
+	}
+	else // Specialized tagged slot
+	{
+		if (!ItemData->ItemCategories.HasTag(TargetTaggedSlot))
+			return 0;
+	}
+
+	const FTaggedItemBundle& ItemInSlot = GetItemForTaggedSlot(TargetTaggedSlot);
+	int32 ViableQuantity =  FMath::Min(ItemData->MaxStackSize, RequestedQuantity);
+
+	if (ItemInSlot.ItemId == ItemData->ItemId)
+	{
+		if (!AllowSwapback || ItemData->MaxStackSize > 1)
+			ViableQuantity = FMath::Min(ViableQuantity,ItemData->MaxStackSize - ItemInSlot.Quantity);
+	}
+	else if (ItemInSlot.IsValid() && !AllowSwapback)
+	{
+		return 0;
+	}
+	
+	if (ItemInSlot.IsBlocked && !AllowSwapback)
+		return 0;
+	
+	if (!ItemInSlot.IsValid())
+		return ViableQuantity;
+
+	if (!AllowPartial && ViableQuantity < RequestedQuantity)
+		return 0;
+
+	return ViableQuantity;
+}
+
+int32 UInventoryComponent::GetContainerOnlyItemQuantity(const FGameplayTag& ItemId) const
+{
+	int32 QuantityInContainer = GetQuantityTotal_Implementation(ItemId);
+
+	for (const FTaggedItemBundle& TaggedSlot : TaggedSlotItems)
+	{
+		if (TaggedSlot.ItemId == ItemId)
+		{
+			QuantityInContainer -= TaggedSlot.Quantity;
+		}
+	}
+
+	return QuantityInContainer;
+}
+
+// Override that also accounts for tagged slots
+int32 UInventoryComponent::GetReceivableQuantity(const UItemStaticData* ItemData, int32 RequestedQuantity, bool AllowPartial, bool SwapBackAllowed) const
+{
+	if (BadItemData(ItemData)) return 0;
+
+	const int32 ViableQuantityByWeight = GetQuantityContainerCanReceiveByWeight(ItemData);
+
+	int32 ViableQuantityBySlots = GetQuantityContainerCanReceiveBySlots(ItemData);
+
+	// Then add any available in the tagged slots
+	for (const FGameplayTag& SlotTag : SpecializedTaggedSlots)
+	{
+		ViableQuantityBySlots += GetReceivableQuantityForTaggedSlot(ItemData, SlotTag);
+	}
+
+	TArray<FGameplayTag> WouldBeBlockedSlots = TArray<FGameplayTag>();
+	for (const FUniversalTaggedSlot& UniversalSlot : UniversalTaggedSlots)
+	{
+		if (WouldBeBlockedSlots.Contains(UniversalSlot.Slot))
+			continue;
+
+		int32 QuantityThisSlotCanTake = GetReceivableQuantityForTaggedSlot(ItemData, UniversalSlot.Slot);
+		ViableQuantityBySlots += QuantityThisSlotCanTake;
+		if (QuantityThisSlotCanTake > 0 && UniversalSlot.UniversalSlotToBlock.IsValid() && ItemData->ItemCategories.
+			HasTag(UniversalSlot.RequiredItemCategoryToActivateBlocking))
+		{
+			WouldBeBlockedSlots.Add(UniversalSlot.UniversalSlotToBlock);
+		}
+	}
+
+	if (SwapBackAllowed && ViableQuantityBySlots == 0) ViableQuantityBySlots = ItemData->MaxStackSize; // If we are allowed to swap back (max 1 item) then we will have the slots at least one stack
+	
+	int32 FinalViableQuantity =  FMath::Min(RequestedQuantity, FMath::Min(ViableQuantityByWeight, ViableQuantityBySlots));
+
+	return FinalViableQuantity;
+}
+
+int32 UInventoryComponent::GetReceivableQuantityContainerOnly(const UItemStaticData* ItemData, int32 RequestedQuantity,
+	bool AllowPartial, bool SwapBackAllowed) const
+{
+	if (BadItemData(ItemData)) return 0;
+
+	const int32 ViableQuantityByWeight = GetQuantityContainerCanReceiveByWeight(ItemData);
+	int32 ViableQuantityBySlotCount = GetQuantityContainerCanReceiveBySlots(ItemData);
+
+	if (SwapBackAllowed && ViableQuantityBySlotCount == 0) ViableQuantityBySlotCount = ItemData->MaxStackSize; // If we are allowed to swap back (max 1 item) then we will have the slots at least one stack
+
+	int32 FinalViableQuantity = FMath::Min(ViableQuantityBySlotCount, ViableQuantityByWeight);
+
+	if (!AllowPartial && FinalViableQuantity < RequestedQuantity) return 0;
+
+	return FMath::Min(FinalViableQuantity, RequestedQuantity);
+}
+
 int32 UInventoryComponent::ExtractItemImpl_IfServer(const FGameplayTag& ItemId, int32 Quantity,
-												    const TArray<UItemInstanceData*>& InstancesToExtract,
+                                                    const TArray<UItemInstanceData*>& InstancesToExtract,
                                                     EItemChangeReason Reason,
                                                     TArray<UItemInstanceData*>& InstanceArrayToAppendTo,
-                                                    bool SuppressEvents, bool SuppressUpdate)
+                                                    bool AllowPartial, bool SuppressEvents, bool SuppressUpdate)
 {
 	// TODO: Ignore quantity if InstancesToExtract is not empty
 	// TODO: Check if SuppressUpdate makes sense here. Anyone uses false? Ensure we broadcast itemsaddedtocontainer
+
+	if (AllowPartial && !InstancesToExtract.IsEmpty())
+	{
+		UE_LOG(LogRISInventory, Error, TEXT("ExtractItemImpl_IfServer: AllowPartial with InstancesToDestroy is not currently supported."));
+		return 0;
+	}
+
 	
 	const int32 ExtractedFromContainer = Super::ExtractItemImpl_IfServer(
-		ItemId, Quantity, InstancesToExtract, Reason, InstanceArrayToAppendTo, true); // Allows partial
+		ItemId, Quantity, InstancesToExtract, Reason, InstanceArrayToAppendTo, AllowPartial, true);
 
+	if (ExtractedFromContainer <= 0) return 0;
+	
 	if (!InstancesToExtract.IsEmpty())
 	{
 		// Remove specific instances
@@ -140,11 +252,7 @@ int32 UInventoryComponent::ExtractItemFromTaggedSlot_IfServer(const FGameplayTag
                                                               EItemChangeReason Reason,
                                                               TArray<UItemInstanceData*>& InstanceArrayToAppendTo)
 {
-	if (GetOwnerRole() < ROLE_Authority && GetOwnerRole() != ROLE_None)
-	{
-		UE_LOG(LogRISInventory, Warning, TEXT("ExtractItemFromTaggedSlot_IfServer called on non-authority!"));
-		return 0;
-	}
+	if (IsClient("ExtractItemFromTaggedSlot_IfServer called on non-authority!")) return 0;
 
 	int32 Index = GetIndexForTaggedSlot(TaggedSlot);
 	if (Index == INDEX_NONE || !TaggedSlotItems[Index].Contains(Quantity, InstancesToExtract))
@@ -155,10 +263,14 @@ int32 UInventoryComponent::ExtractItemFromTaggedSlot_IfServer(const FGameplayTag
 	}
 	
 	const int32 ExtractedFromContainer = Super::ExtractItemImpl_IfServer(
-		ItemId, Quantity, InstancesToExtract, Reason, InstanceArrayToAppendTo, true);
+		ItemId, Quantity, InstancesToExtract, Reason, InstanceArrayToAppendTo, false, true, true);
 
-	RemoveQuantityFromTaggedSlot_IfServer(TaggedSlot, ExtractedFromContainer, InstancesToExtract, Reason, false, false);
 
+	if (ExtractedFromContainer > 0)
+		RemoveQuantityFromTaggedSlot_IfServer(TaggedSlot, ExtractedFromContainer, InstancesToExtract, Reason, false, false); // publishes events
+
+	UpdateWeightAndSlots();
+	
 	return ExtractedFromContainer;
 }
 
@@ -205,79 +317,74 @@ void UInventoryComponent::UpdateBlockingState(FGameplayTag SlotTag, const UItemS
 ////////////////////////////////////////////////////// TAGGED SLOTS ///////////////////////////////////////////////////////
 int32 UInventoryComponent::AddItemToTaggedSlot_IfServer(TScriptInterface<IItemSource> ItemSource,
                                                         const FGameplayTag& SlotTag, const FGameplayTag& ItemId,
-                                                        int32 RequestedQuantity, bool AllowPartial)
+                                                        int32 RequestedQuantity, bool AllowPartial, bool PushOutExistingItem)
 {
 	// Reminder: Items in tagged slots are duplicated in container
 
-	if (GetOwnerRole() < ROLE_Authority && GetOwnerRole() != ROLE_None)
-	{
-		UE_LOG(LogRISInventory, Warning, TEXT("AddItemsToTaggedSlot_IfServer called on non-authority!"));
-		return 0;
-	}
-
+	if (IsClient("AddItemsToTaggedSlot_IfServer called on non-authority!")) return 0;
+	
 	UItemStaticData* ItemData = URISSubsystem::GetItemDataById(ItemId);
+	if (BadItemData(ItemData, ItemId)) return 0;
+	
+	int32 ViableQuantity = GetReceivableQuantityForTaggedSlot(ItemData, SlotTag, RequestedQuantity, AllowPartial, PushOutExistingItem);
 
-	// New check for slot item compatibility and weight capacity
-	if (!IsTaggedSlotCompatible(ItemId, SlotTag))
-	{
-		UE_LOG(LogRISInventory, Warning, TEXT("Item %s cannot be added to the tagged slot %s"), *ItemId.ToString(),
-		       *SlotTag.ToString());
+	if (ViableQuantity == 0 || (ViableQuantity < RequestedQuantity && !AllowPartial))
 		return 0;
-	}
-
+	
+	// Attempt to automatically unblock if needed (original logic preserved here before main validation)
 	if (WouldItemMoveIndirectlyViolateBlocking(SlotTag, ItemData))
 	{
-		// This means an item in a slot that would be blocked by this item is already equipped, so try to unequip it
+		if (!PushOutExistingItem) return 0;
+		
 		const FUniversalTaggedSlot* UniversalSlotDefinition = UniversalTaggedSlots.FindByPredicate(
 			[&SlotTag](const FUniversalTaggedSlot& UniSlot) { return UniSlot.Slot == SlotTag; });
 
-		auto ExistingItem = GetItemForTaggedSlot(UniversalSlotDefinition->UniversalSlotToBlock);
-		if (MoveItem_ServerImpl(ExistingItem.ItemId, ExistingItem.Quantity, NoInstances,
-		                        UniversalSlotDefinition->UniversalSlotToBlock,
-		                        FGameplayTag::EmptyTag) != ExistingItem.Quantity)
+		if (UniversalSlotDefinition) // Should be non-null if WouldItem... returned true
 		{
-			// We could not unequip the blocking item, so we can't add this item
-			return 0;
+			auto ExistingItem = GetItemForTaggedSlot(UniversalSlotDefinition->UniversalSlotToBlock);
+			if (MoveItem_ServerImpl(ExistingItem.ItemId, ExistingItem.Quantity, NoInstances,
+			                        UniversalSlotDefinition->UniversalSlotToBlock,
+			                        FGameplayTag::EmptyTag) != ExistingItem.Quantity)
+			{
+				// We could not unequip the blocking item, so we can't add this item
+				UE_LOG(LogRISInventory, Log, TEXT("AddItemsToTaggedSlot_IfServer: Failed to auto-unequip blocking item from %s to allow adding %s to %s."),
+					*UniversalSlotDefinition->UniversalSlotToBlock.ToString(), *ItemId.ToString(), *SlotTag.ToString());
+				return 0;
+			}
+			UE_LOG(LogRISInventory, Log, TEXT("AddItemsToTaggedSlot_IfServer: Auto-unequipped item from %s to allow adding %s to %s."),
+				*UniversalSlotDefinition->UniversalSlotToBlock.ToString(), *ItemId.ToString(), *SlotTag.ToString());
 		}
 	}
 
-	// Locate the existing item in the tagged slot
-	const int32 Index = GetIndexForTaggedSlot(SlotTag); // -1 if not found
-
+	// Get existing item in the slot and attempt to move it out
 	FTaggedItemBundle* SlotItem = nullptr;
-	int32 QuantityToAdd = RequestedQuantity;
-	if (TaggedSlotItems.IsValidIndex(Index))
+	int32 Index = GetIndexForTaggedSlot(SlotTag);
+	if (Index != INDEX_NONE)
 	{
 		SlotItem = &TaggedSlotItems[Index];
-
-		if (SlotItem->IsBlocked)
+	}
+	if (SlotItem && SlotItem->IsValid() && SlotItem->ItemId != ItemId)
+	{
+		// Move the existing item out of the tagged slot
+		int32 PreMoveQuantity = SlotItem->Quantity;
+		int32 MovedQuantity = MoveItem_ServerImpl(SlotItem->ItemId, SlotItem->Quantity, NoInstances, SlotTag, FGameplayTag::EmptyTag);
+		if (MovedQuantity != PreMoveQuantity)
 		{
+			UE_LOG(LogRISInventory, Warning, TEXT("AddItemsToTaggedSlot_IfServer: Failed to move existing item %s from %s to container. Aborting tagged slot add."),
+				*SlotItem->ItemId.ToString(), *SlotTag.ToString());
 			return 0;
 		}
 
-		if (SlotItem && SlotItem->IsValid())
-		{
-			if ((SlotItem->ItemId != ItemId || ItemData->MaxStackSize == 1))
-			{
-				return 0; // Slot taken
-			}
-
-			QuantityToAdd = FMath::Min(RequestedQuantity, ItemData->MaxStackSize - SlotItem->Quantity);
-
-			if ((!AllowPartial && QuantityToAdd < RequestedQuantity) || QuantityToAdd == 0)
-			{
-				return 0; // Slot can't accept all
-			}
-		}
+		SlotItem = nullptr;
 	}
 
-	// We also need to add to container as items are duplicated between the containers instances and the tagged slots, but we suppres
-	QuantityToAdd = Super::AddItem_ServerImpl(ItemSource, ItemId, QuantityToAdd, AllowPartial, true, true);
+	// Must succeed
+	int32 ActualAddedToContainer = Super::AddItemWithInstances_IfServer(ItemSource, ItemId, ViableQuantity, NoInstances, false, true, true);
 
-	if (QuantityToAdd == 0)
-	{
+	// IMPORTANT: If adding to the container failed or added less than expected (e.g., due to weight limit hit JUST before adding to container),
+	// we should not proceed to add to the tagged slot visually/logically.
+	if (ActualAddedToContainer < ViableQuantity)
 		return 0;
-	}
 
 	FTaggedItemBundle PreviousItem = SlotItem ? *SlotItem : FTaggedItemBundle();
 
@@ -288,29 +395,96 @@ int32 UInventoryComponent::AddItemToTaggedSlot_IfServer(TScriptInterface<IItemSo
 		SlotItem->Tag = SlotTag;
 		SlotItem->Quantity = 0;
 	}
+	else if (SlotItem->IsBlocked)
+	{
+		if (!PushOutExistingItem) return 0;
+
+		// Loop through UniversalTaggedSlots and find the one thats blocking us and try to push it out
+		for (const FUniversalTaggedSlot& UniSlot : UniversalTaggedSlots)
+		{
+			if (UniSlot.UniversalSlotToBlock == SlotTag)
+			{
+				auto BlockingItem = GetItemForTaggedSlot(UniSlot.Slot);
+				bool IsBlockCauser = URISSubsystem::GetItemDataById(BlockingItem.ItemId)->ItemCategories.HasTag(UniSlot.RequiredItemCategoryToActivateBlocking);
+				if (!BlockingItem.IsValid() || !IsBlockCauser)
+					continue;
+
+				int32 PreMoveQuantity = BlockingItem.Quantity;
+				// We have found the item causing the blocking
+				int32 QuantityMoved = MoveItem_ServerImpl(BlockingItem.ItemId, BlockingItem.Quantity, NoInstances,
+					UniSlot.Slot, FGameplayTag::EmptyTag, false, FGameplayTag::EmptyTag, 0, false, true);
+
+				Index = GetIndexForTaggedSlot(SlotTag);
+				if (Index != INDEX_NONE)
+					SlotItem = &TaggedSlotItems[Index];
+				
+				// For some INSANE reason, this fails when both values are 1........
+				if (QuantityMoved < PreMoveQuantity)
+				{
+					// We couldn't kick out the existing item so we have to give up
+					return 0;
+				}
+				break;
+			}
+		}
+
+		SlotItem->Quantity = 0;
+		SlotItem->InstanceData.Empty();
+		UpdateBlockingState(SlotTag, ItemData, false);
+
+		ensureMsgf(!SlotItem->IsBlocked,
+		           TEXT("AddItemsToTaggedSlot_IfServer: Slot %s remained block after clearing! Multiple items blocking the same slot is not supported"), *SlotTag.ToString());
+	}
+	// Ensure ItemId is set, especially if the slot was newly created or previously held a different item
 	SlotItem->ItemId = ItemId;
 
 	TArray<UItemInstanceData*> AddedInstances;
-	if (IsValid(ItemData->DefaultInstanceDataTemplate))
+	if (ItemData->UsesInstances())
 	{
-		auto* ContainerInstance = FindItemInstance(ItemId);
-		ensureMsgf(ContainerInstance, TEXT("Item %s not found in container when adding to tagged slot"), *ItemId.ToString());
-		
-		for (int32 i = ContainerInstance->InstanceData.Num() - 1; AddedInstances.Num() < QuantityToAdd; --i)
-			AddedInstances.Add(ContainerInstance->InstanceData[i]);
-		SlotItem->InstanceData.Append(AddedInstances);
+		// Fetch the instances that were *actually* added to the container in the Super::AddItem_ServerImpl call
+		if (auto* ContainerInstance = FindItemInstance(ItemId)) {
+			// Get the last 'ActualAddedToContainer' instances from the container bundle.
+			// This assumes AddItem_ServerImpl adds instances to the end.
+			int32 NumInContainer = ContainerInstance->InstanceData.Num();
+			int32 StartIndex = FMath::Max(0, NumInContainer - ActualAddedToContainer);
+			for (int32 i = StartIndex; i < NumInContainer; ++i) {
+				if(ContainerInstance->InstanceData.IsValidIndex(i)) { // Extra safety check
+					AddedInstances.Add(ContainerInstance->InstanceData[i]);
+				} else {
+					UE_LOG(LogRISInventory, Error, TEXT("AddItemsToTaggedSlot_IfServer: Invalid instance index %d accessed in container for %s."), i, *ItemId.ToString());
+				}
+			}
+			// Sanity check
+			if(AddedInstances.Num() != ActualAddedToContainer && ActualAddedToContainer > 0) {
+				 UE_LOG(LogRISInventory, Error, TEXT("AddItemsToTaggedSlot_IfServer: Instance count mismatch. Expected %d, Got %d for %s."), ActualAddedToContainer, AddedInstances.Num(), *ItemId.ToString());
+				 // Correct the count based on actual instances fetched
+				 ActualAddedToContainer = AddedInstances.Num();
+			}
+			SlotItem->InstanceData.Append(AddedInstances);
+		} else {
+			 UE_LOG(LogRISInventory, Error, TEXT("AddItemsToTaggedSlot_IfServer: ContainerInstance for %s not found after Super::AddItem_ServerImpl! Tagged slot instance data will be missing."), *ItemId.ToString());
+			 ActualAddedToContainer = 0; // Cannot proceed without container instance
+		}
 	}
 
+	// If instance fetching failed or adjusted the count, ensure we only add that many
+	if (ActualAddedToContainer <= 0) {
+		// If the slot was newly created, remove it again.
+		if (!PreviousItem.IsValid() && SlotItem) {
+			TaggedSlotItems.RemoveSingleSwap(*SlotItem); // Assuming Add creates at end or find index again
+		}
+		return 0; // Nothing was actually added visually/logically to the tagged slot
+	}
+	
+	SlotItem->Quantity += ActualAddedToContainer;
+
 	UpdateBlockingState(SlotTag, ItemData, true);
-
-	SlotItem->Quantity += QuantityToAdd;
-
 	UpdateWeightAndSlots();
 
-	OnItemAddedToTaggedSlot.Broadcast(SlotTag, ItemData, QuantityToAdd, AddedInstances, PreviousItem, EItemChangeReason::Added);
+	OnItemAddedToTaggedSlot.Broadcast(SlotTag, ItemData, ActualAddedToContainer, AddedInstances, PreviousItem, EItemChangeReason::Added);
 	MARK_PROPERTY_DIRTY_FROM_NAME(UInventoryComponent, TaggedSlotItems, this);
 
-	return QuantityToAdd;
+	return ActualAddedToContainer;
 }
 
 int32 UInventoryComponent::AddItemToAnySlot(TScriptInterface<IItemSource> ItemSource, const FGameplayTag& ItemId,
@@ -318,119 +492,171 @@ int32 UInventoryComponent::AddItemToAnySlot(TScriptInterface<IItemSource> ItemSo
                                             bool AllowPartial, bool SuppressEvents, bool SuppressUpdate)
 {
 	const auto* ItemData = URISSubsystem::GetItemDataById(ItemId);
-	if (!ItemData)
+	if (!ItemData || RequestedQuantity <= 0)
 	{
-		UE_LOG(LogRISInventory, Warning, TEXT("Could not find item data for item: %s"), *ItemId.ToString());
 		return 0;
 	}
 
-	const int32 AcceptableQuantity = GetReceivableQuantity(ItemId); // Counts only container
+	// Use the inventory-specific implementation which considers tagged slots
+	int32 ViableQuantity = GetReceivableQuantity(ItemData);
 
-	const int32 QuantityToAdd = FMath::Min(AcceptableQuantity, RequestedQuantity);
+	ViableQuantity = AllowPartial ? FMath::Min(ViableQuantity, RequestedQuantity) : (ViableQuantity >= RequestedQuantity ? RequestedQuantity : 0) ;
 
-	if (QuantityToAdd <= 0 || (!AllowPartial && QuantityToAdd < RequestedQuantity))
+	if (ViableQuantity <= 0)
 		return 0;
 
-	// Distribution plan should not try to add to left hand as left hand already has sticks!
+	// Get the distribution plan based on the *actual* quantity we are trying to add.
 	TArray<std::tuple<FGameplayTag, int32>> DistributionPlan = GetItemDistributionPlan(
-		ItemData, QuantityToAdd, PreferTaggedSlots);
+		ItemData, ViableQuantity, PreferTaggedSlots);
 
-	const int32 ActualAdded = Super::AddItem_ServerImpl(ItemSource, ItemId, QuantityToAdd, AllowPartial, true, true);
+	// First, add the *total* amount to the base container conceptually. This extracts from the source.
+	// Dont allow partial as we already validated any partial amounts so it must succeed
+	const int32 ActualAddedToContainer = Super::AddItemWithInstances_IfServer(ItemSource, ItemId, ViableQuantity, NoInstances, false, true, true);
 
-	if (GetOwnerRole() >= ROLE_Authority || GetOwnerRole() == ROLE_None)
-		ensureMsgf(ActualAdded == QuantityToAdd, TEXT("Failed to add all items to container despite quantity calculated"));
+	// If the base container couldn't accept the items (e.g., source dried up unexpectedly), abort.
+	if (ActualAddedToContainer < ViableQuantity)
+	{
+		UE_LOG(LogRISInventory, Error, TEXT("AddItemToAnySlot: AddItem_ServerImpl failed to add %s (Calculated Viable: %d, Actual: %d). Aborting."), *ItemId.ToString(), ViableQuantity, ActualAddedToContainer);
+		return 0;
+	}
 	
-	auto* ContainerInstance = FindItemInstance(ItemId);
+	auto* ContainerInstance = FindItemInstanceMutable(ItemId); // Get mutable pointer to the container item bundle
+	if (!ContainerInstance && ActualAddedToContainer > 0)
+	{
+		 UE_LOG(LogRISInventory, Error, TEXT("AddItemToAnySlot: Failed to find container instance for %s after adding %d items! Aborting distribution."), *ItemId.ToString(), ActualAddedToContainer);
+		 // Consider how to handle this - maybe just return ActualAddedToContainer as added to generic?
+		 return 0; // Abort distribution if container state is inconsistent
+	}
+
 	int32 QuantityDistributed = 0;
 	int32 QuantityAddedToGenericSlot = 0;
-	int32 NextInstanceIndex = 0;
+    TArray<UItemInstanceData*> InstancesForGenericSlotsEvent;
+
+	TArray<TTuple<FGameplayTag, int32, TArray<UItemInstanceData*>, FTaggedItemBundle>> TaggedSlotAdditions; // First entry is always generic slot
+
+    int32 InstanceSourceIndex = ContainerInstance ? FMath::Max(0, ContainerInstance->InstanceData.Num() - ActualAddedToContainer) : 0; // Start index for instances added
+	
 	for (const std::tuple<FGameplayTag, int32>& Plan : DistributionPlan)
 	{
 		const FGameplayTag& SlotTag = std::get<0>(Plan);
-		const int32 QuantityToAddSlot = std::get<1>(Plan);
+		const int32 ViableQuantitySlot = std::get<1>(Plan);
+		int32 QuantityRemainingInPlan = ActualAddedToContainer - QuantityDistributed;
 
-		if (SlotTag.IsValid())
+		// Defensive check: Don't try to distribute more than what was actually added to the container
+		if (ViableQuantitySlot > QuantityRemainingInPlan) {
+			 UE_LOG(LogRISInventory, Error, TEXT("AddItemToAnySlot: Distribution plan requests %d for %s, but only %d remain available from container add. Adjusting."), ViableQuantitySlot, SlotTag.IsValid() ? *SlotTag.ToString() : TEXT("Generic"), QuantityRemainingInPlan);
+			 // Adjust ViableQuantitySlot if needed, though ideally the plan matches ActualAddedToContainer
+			 const_cast<int32&>(ViableQuantitySlot) = QuantityRemainingInPlan; // Modifying tuple element - use with caution or rebuild plan
+			 if (ViableQuantitySlot <= 0) continue; // Skip if nothing left to distribute here
+		}
+
+		TArray<UItemInstanceData*> InstancesForThisSlot;
+		if (ContainerInstance && ItemData->UsesInstances())
 		{
-			TArray<UItemInstanceData*> InstancesAdded;
-			if (IsValid(ItemData->DefaultInstanceDataTemplate))
+			InstancesForThisSlot.Reserve(ViableQuantitySlot);
+			int32 EndIndex = FMath::Min(InstanceSourceIndex + ViableQuantitySlot, ContainerInstance->InstanceData.Num());
+			for (int32 i = InstanceSourceIndex; i < EndIndex; ++i)
 			{
-				InstancesAdded.Reserve(QuantityToAddSlot);
-				for (int32 i = QuantityDistributed; i < QuantityDistributed + QuantityToAddSlot; ++i)
-				{
-					InstancesAdded.Add(ContainerInstance->InstanceData[NextInstanceIndex]);
-					++NextInstanceIndex;
-				}
+				if(ContainerInstance->InstanceData.IsValidIndex(i)) // Safety check
+					InstancesForThisSlot.Add(ContainerInstance->InstanceData[i]);
 			}
-			
-			FTaggedItemBundle PreviousItem = GetItemForTaggedSlot(SlotTag);
-			// We do a move because the item has already been added to the container
-			const int32 ActualAddedQuantity = MoveItem_ServerImpl(ItemId, QuantityToAddSlot, InstancesAdded, FGameplayTag::EmptyTag,
+			InstanceSourceIndex = EndIndex; // Move the index forward
+
+            // Verify fetched instance count matches expected quantity for this slot
+			if (InstancesForThisSlot.Num() != ViableQuantitySlot) {
+                 UE_LOG(LogRISInventory, Error, TEXT("AddItemToAnySlot: Instance count mismatch for distribution step. Slot: %s, Expected: %d, Got: %d"), SlotTag.IsValid() ? *SlotTag.ToString() : TEXT("Generic"), ViableQuantitySlot, InstancesForThisSlot.Num());
+                 // Correct quantity based on actual instances for this step
+                 const_cast<int32&>(ViableQuantitySlot) = InstancesForThisSlot.Num();
+                 if (ViableQuantitySlot <= 0) continue;
+            }
+		}
+
+		if (SlotTag.IsValid()) // Target is a tagged slot
+		{
+			// Suppress events/updates for the internal move, we broadcast consolidated events later
+			FTaggedItemBundle PrevItemState = GetItemForTaggedSlot(SlotTag); // Get state *before* move
+
+			// Use MoveItem_ServerImpl to transfer from generic container (SourceTag empty) to the target tagged slot
+			const int32 ActualMovedQuantity = MoveItem_ServerImpl(ItemId, ViableQuantitySlot, InstancesForThisSlot, FGameplayTag::EmptyTag,
 			                                                      SlotTag, false, FGameplayTag(), 0, true, true, false);
 
-			UpdateBlockingState(SlotTag, ItemData, true);
-
-			if (!SuppressEvents)
-				OnItemAddedToTaggedSlot.Broadcast(SlotTag, ItemData, ActualAddedQuantity, InstancesAdded, PreviousItem,
-			                                  EItemChangeReason::Added);
-
-			ensureMsgf(ActualAddedQuantity == QuantityToAddSlot,
-			           TEXT("Failed to add all items to tagged slot despite plan calculated"));
+			if (ActualMovedQuantity != ViableQuantitySlot)
+			{
+				UE_LOG(LogRISInventory, Warning, TEXT("AddItemToAnySlot: Failed internal move of %d/%d %s to tagged slot %s. Items remain in generic."),
+					ActualMovedQuantity, ViableQuantitySlot, *ItemId.ToString(), *SlotTag.ToString());
+				// Items that failed to move stay in generic. Add them to the generic count.
+				QuantityAddedToGenericSlot += ViableQuantitySlot - ActualMovedQuantity;
+				// Also collect instances that failed to move for the generic event
+				if (!InstancesForThisSlot.IsEmpty()) {
+					 // This is tricky - need to know *which* instances failed.
+					 // For now, assume all instances intended for this slot failed if ActualMovedQuantity == 0
+					 // A more robust way would be needed if partial internal moves were common/expected.
+					 if(ActualMovedQuantity == 0) InstancesForGenericSlotsEvent.Append(InstancesForThisSlot);
+                     // If partial move, log warning, instances remain associated with generic
+                     else UE_LOG(LogRISInventory, Warning, TEXT("AddItemToAnySlot: Partial internal move occurred. Instance tracking for events might be imprecise."));
+				}
+			} else {
+                // Successful move, collect instances for the specific tagged slot event
+				TaggedSlotAdditions.Add(TTuple<FGameplayTag, int32, TArray<UItemInstanceData*>, FTaggedItemBundle>(
+					SlotTag, ActualMovedQuantity, InstancesForThisSlot, PrevItemState));
+            }
+			QuantityDistributed += ActualMovedQuantity; // Only count what was actually moved internally
 		}
-		else
+		else // Target is generic slot
 		{
-			QuantityAddedToGenericSlot += QuantityToAddSlot;
+			QuantityAddedToGenericSlot += ViableQuantitySlot;
+			InstancesForGenericSlotsEvent.Append(InstancesForThisSlot); // Collect instances staying in generic
+			QuantityDistributed += ViableQuantitySlot;
 		}
 	}
 
-	if (QuantityAddedToGenericSlot > 0)
+	// --- Final Event Broadcasting and Updates ---
+	if (!SuppressEvents)
 	{
-		TArray<UItemInstanceData*> InstancesAdded;
-		if (IsValid(ItemData->DefaultInstanceDataTemplate))
-		{
-			InstancesAdded.Reserve(QuantityAddedToGenericSlot);
-			for (int32 i = 0; i < QuantityAddedToGenericSlot; ++i)
-			{
-				InstancesAdded.Add(ContainerInstance->InstanceData[NextInstanceIndex]);
-				++NextInstanceIndex;
-			}
-		}
-
-		if (!SuppressEvents)
-			OnItemAddedToContainer.Broadcast(ItemData, QuantityAddedToGenericSlot, InstancesAdded, EItemChangeReason::Added);
+		// Broadcast for items added/remaining in the generic container
+		if (QuantityAddedToGenericSlot > 0)
+			OnItemAddedToContainer.Broadcast(ItemData, QuantityAddedToGenericSlot, InstancesForGenericSlotsEvent, EItemChangeReason::Added);
+		
+        // Broadcast for items added to each tagged slot
+        for (const auto& Tuple : TaggedSlotAdditions)
+        {
+             const FGameplayTag& Slot = Tuple.Get<0>();
+             int32 Quantity = Tuple.Get<1>();
+             const TArray<UItemInstanceData*>& Instances = Tuple.Get<2>();
+             const FTaggedItemBundle PrevItem = Tuple.Get<3>();
+             OnItemAddedToTaggedSlot.Broadcast(Slot, ItemData, Quantity, Instances, PrevItem, EItemChangeReason::Added);
+        }
 	}
 
 	if (!SuppressUpdate)
 		UpdateWeightAndSlots();
 
-	return QuantityToAdd; // Total quantity successfully added across slots
+	// Return the total quantity successfully added to the component initially
+	return ActualAddedToContainer;
 }
 
 
+
 void UInventoryComponent::PickupItem_Server_Implementation(AWorldItem* WorldItem,
-                                                           EPreferredSlotPolicy PreferTaggedSlots,
-                                                           bool DestroyAfterPickup)
+														   EPreferredSlotPolicy PreferTaggedSlots,
+														   bool DestroyAfterPickup)
 {
+	if (!WorldItem || !WorldItem->RepresentedItem.IsValid()) return;
+
 	FGameplayTag ItemId = WorldItem->RepresentedItem.ItemId;
-	const int32 QuantityAdded = AddItemToAnySlot(WorldItem, ItemId, WorldItem->RepresentedItem.Quantity,
-	                                             PreferTaggedSlots);
+	int32 QuantityToPickup = WorldItem->RepresentedItem.Quantity;
 
-	if (QuantityAdded == 0) return;
+	// Use AddItemToAnySlot to handle adding the item from the WorldItem source
+	// AddItemToAnySlot internally calls AddItem_ServerImpl which calls WorldItem->ExtractItem_IfServer
+	/*const int32 QuantityAdded =*/ AddItemToAnySlot(WorldItem, ItemId, QuantityToPickup, PreferTaggedSlots, true);
 
-	if (!WorldItem->RepresentedItem.IsValid())
+	// Check the WorldItem's state *after* AddItemToAnySlot has potentially extracted from it
+	if (DestroyAfterPickup && WorldItem && !WorldItem->IsGarbageEliminationEnabled()) // Check if already being destroyed
 	{
-		// destroy the actor
-		if (DestroyAfterPickup)
+		// Re-check quantity on world item as ExtractItem should have modified it
+		int32 RemainingQuantity = WorldItem->GetQuantityTotal_Implementation(ItemId);
+		if (RemainingQuantity <= 0)
 			WorldItem->Destroy();
-	}
-	else
-	{
-		// update the item quantity
-		WorldItem->RepresentedItem.Quantity -= QuantityAdded;
-		if (WorldItem->RepresentedItem.Quantity <= 0 && DestroyAfterPickup)
-		{
-			// destroy the actor
-			WorldItem->Destroy();
-		}
 	}
 }
 
@@ -440,10 +666,7 @@ int32 UInventoryComponent::RemoveQuantityFromTaggedSlot_IfServer(FGameplayTag Sl
                                                                  bool AllowPartial, bool DestroyFromContainer,
                                                                  bool SuppressEvents, bool SuppressUpdate)
 {
-	if (GetOwnerRole() < ROLE_Authority && GetOwnerRole() != ROLE_None)
-	{
-		return 0;
-	}
+	if (IsClient("RemoveQuantityFromTaggedSlot_IfServer")) return 0;
 
 	if (AllowPartial && InstancesToRemove.Num() > 0)
 	{
@@ -455,7 +678,7 @@ int32 UInventoryComponent::RemoveQuantityFromTaggedSlot_IfServer(FGameplayTag Sl
 
 	if (IndexToRemoveAt < 0)
 	{
-		UE_LOG(LogRISInventory, Warning, TEXT("Tagged slot %s does not exist"), *SlotTag.ToString());
+		UE_LOG(LogRISInventory, Warning, TEXT("RemoveQuantityFromTaggedSlot_IfServer: Tagged slot %s not found"), *SlotTag.ToString());
 		return 0;
 	}
 
@@ -463,7 +686,7 @@ int32 UInventoryComponent::RemoveQuantityFromTaggedSlot_IfServer(FGameplayTag Sl
 
 	if (!TaggedBundleToRemoveFrom || !TaggedBundleToRemoveFrom->IsValid())
 	{
-		UE_LOG(LogRISInventory, Warning, TEXT("Tagged slot %s is empty"), *SlotTag.ToString());
+		UE_LOG(LogRISInventory, Warning, TEXT("RemoveQuantityFromTaggedSlot_IfServer: Tagged slot %s is empty"), *SlotTag.ToString());
 		return 0;
 	}
 
@@ -473,9 +696,9 @@ int32 UInventoryComponent::RemoveQuantityFromTaggedSlot_IfServer(FGameplayTag Sl
 		return 0;
 	}
 
-	const int32 MaxPossibleToRemove = FMath::Min(QuantityToRemove, TaggedBundleToRemoveFrom->Quantity);
+	const int32 ViableQuantity = FMath::Min(QuantityToRemove, TaggedBundleToRemoveFrom->Quantity);
 
-	if (MaxPossibleToRemove <= 0)
+	if (ViableQuantity <= 0)
 	{
 		return 0;
 	}
@@ -490,15 +713,15 @@ int32 UInventoryComponent::RemoveQuantityFromTaggedSlot_IfServer(FGameplayTag Sl
 	if (DestroyFromContainer)
 	{
 		auto* ContainerInstance = FindItemInstance(RemovedId);
-		if (!InstancesToRemove.IsEmpty() && !ContainerInstance->Contains(MaxPossibleToRemove, InstancesToRemove))
+		if (!InstancesToRemove.IsEmpty() && !ContainerInstance->Contains(ViableQuantity, InstancesToRemove))
 		{
 			ensureMsgf(false, TEXT("Container does not contain specified items even though slot %s has it"), *SlotTag.ToString());
 			return 0;
 		}
 
-		ActualRemovedQuantity = Super::DestroyItemImpl(RemovedId, MaxPossibleToRemove, InstancesToRemove, Reason, true, true, true);
+		ActualRemovedQuantity = Super::DestroyItemImpl(RemovedId, ViableQuantity, InstancesToRemove, Reason, true, true, true);
 
-		ensureMsgf(InstancesToRemove.IsEmpty() || ActualRemovedQuantity == MaxPossibleToRemove,
+		ensureMsgf(InstancesToRemove.IsEmpty() || ActualRemovedQuantity == ViableQuantity,
 		           TEXT("Failed to remove all items from tagged slot despite quantity calculated"));
 		
 		if (ActualRemovedQuantity <= 0)
@@ -509,7 +732,7 @@ int32 UInventoryComponent::RemoveQuantityFromTaggedSlot_IfServer(FGameplayTag Sl
 	else
 	{
 		// If specific instances are provided then they are contained 
-		ActualRemovedQuantity = MaxPossibleToRemove;
+		ActualRemovedQuantity = ViableQuantity;
 	}
 
     // Only modify InstanceData array if it's supposed to have data
@@ -591,7 +814,7 @@ void UInventoryComponent::MoveItem_Server_Implementation(const FGameplayTag& Ite
 }
 
 int32 UInventoryComponent::MoveItem_ServerImpl(const FGameplayTag& ItemId, int32 RequestedQuantity,
-											   TArray<UItemInstanceData*> InstancesToMove,
+                                               TArray<UItemInstanceData*> InstancesToMove,
                                                const FGameplayTag& SourceTaggedSlot,
                                                const FGameplayTag& TargetTaggedSlot, bool AllowAutomaticSwapping,
                                                const FGameplayTag& SwapItemId, int32 SwapQuantity,
@@ -599,188 +822,138 @@ int32 UInventoryComponent::MoveItem_ServerImpl(const FGameplayTag& ItemId, int32
                                                bool SuppressUpdate,
                                                bool SimulateMoveOnly)
 {
-	if (GetOwnerRole() < ROLE_Authority && GetOwnerRole() != ROLE_None)
-	{
-		UE_LOG(LogRISInventory, Warning, TEXT("MoveItemsToTaggedSlot_ServerImpl called on non-authority!"));
-		return 0;
-	}
-
-	const bool SourceIsTaggedSlot = SourceTaggedSlot.IsValid();
-	const bool TargetIsTaggedSlot = TargetTaggedSlot.IsValid();
-
-	if (!SourceIsTaggedSlot && !TargetIsTaggedSlot)
-	{
-		UE_LOG(LogRISInventory, Warning, TEXT("Moving to and from container is not meaningful"));
-		return 0;
-	}
+	if (IsClient("MoveItemsToTaggedSlot_ServerImpl called on non-authority!")) return 0;
+		
+	const bool SourceIsTaggedSlot = SourceTaggedSlot.IsValid(); // Keep for logic flow
+	const bool TargetIsTaggedSlot = TargetTaggedSlot.IsValid(); // Keep for logic flow
 
 	FGenericItemBundle SourceItem;
-	int32 SourceItemContainerIndex = -1;
 	int32 SourceTaggedSlotIndex = -1;
 	if (SourceIsTaggedSlot)
 	{
 		SourceTaggedSlotIndex = GetIndexForTaggedSlot(SourceTaggedSlot);
-		if (!TaggedSlotItems.IsValidIndex(SourceTaggedSlotIndex))
-		{
-			UE_LOG(LogRISInventory, Warning, TEXT("MoveItem: Source tagged slot does not exist"));
-			return 0;
-		}
-
-
+        // If validation passed, index should be valid. Add defensive check just in case.
+        if (!TaggedSlotItems.IsValidIndex(SourceTaggedSlotIndex)) {
+            UE_LOG(LogRISInventory, Warning, TEXT("MoveItem_ServerImpl: Tried to move from invalid tagged slot %s"), *SourceTaggedSlot.ToString());
+            return 0;
+        }
 		SourceItem = &TaggedSlotItems[SourceTaggedSlotIndex];
 	}
 	else
 	{
-		for (int i = 0; i < ItemsVer.Items.Num(); i++)
-		{
-			if (ItemsVer.Items[i].ItemId == ItemId)
-			{
-				SourceItemContainerIndex = i;
-				SourceItem = &ItemsVer.Items[i];
-				break;
-			}
-		}
-
-		if (!SourceItem.IsValid())
-		{
-			UE_LOG(LogRISInventory, Warning, TEXT("MoveItem: Source container item does not exist"));
-			return 0;
-		}
+        // Find the item in the container (validation confirmed it exists)
+        FItemBundle* FoundSourceInContainer = FindItemInstanceMutable(ItemId);
+         if (!FoundSourceInContainer) {
+             UE_LOG(LogRISInventory, Warning, TEXT("MoveItem_ServerImpl: Source item %s not found in container."), *ItemId.ToString());
+             return 0;
+         }
+        SourceItem = FoundSourceInContainer;
 	}
 
-	
-	if (!InstancesToMove.IsEmpty() && !SourceItem.Contains(RequestedQuantity, InstancesToMove))
-	{
-		UE_LOG(LogRISInventory, Warning, TEXT("MoveItem: Source item does not contain specific instances"));
-		return 0;
-	}
-
-	bool SwapBackRequested = SwapItemId.IsValid() && SwapQuantity > 0;
+	bool SwapBackRequested = SwapItemId.IsValid() && SwapQuantity > 0; // Original check
 
 	FGenericItemBundle TargetItem;
-	const UItemStaticData* TargetItemData = nullptr;
+	const UItemStaticData* TargetItemData = nullptr; // Keep for logic below
 	if (TargetIsTaggedSlot)
 	{
-		if (!IsTaggedSlotCompatible(ItemId, TargetTaggedSlot))
-		{
-			UE_LOG(LogRISInventory, Warning, TEXT("Item is not compatible with the target slot"));
-			return 0;
-		}
-
-		const int32 TargetIndex = GetIndexForTaggedSlot(TargetTaggedSlot);
+		const int32 TargetIndex = GetIndexForTaggedSlot(TargetTaggedSlot); // Find existing or needs adding
 
 		if (!TaggedSlotItems.IsValidIndex(TargetIndex))
 		{
-			if (!SpecializedTaggedSlots.Contains(TargetTaggedSlot) &&
-				!ContainedInUniversalSlot(TargetTaggedSlot))
+            // If validation passed, it means the slot is compatible and exists logically. Add it visually.
+			if (SpecializedTaggedSlots.Contains(TargetTaggedSlot) || ContainedInUniversalSlot(TargetTaggedSlot))
 			{
-				UE_LOG(LogRISInventory, Warning, TEXT("Target tagged slot does not exist"));
-				return 0;
-			}
-
-			TaggedSlotItems.Add(FTaggedItemBundle(TargetTaggedSlot, FItemBundle::EmptyItemInstance));
-			TargetItem = &TaggedSlotItems.Last();
+				TaggedSlotItems.Add(FTaggedItemBundle(TargetTaggedSlot, FItemBundle::EmptyItemInstance));
+				TargetItem = &TaggedSlotItems.Last();
+			} else {
+                 UE_LOG(LogRISInventory, Error, TEXT("MoveItem_ServerImpl: Target tagged slot %s not configured post-validation."), *TargetTaggedSlot.ToString());
+                 return 0;
+            }
 		}
 		else
 		{
 			TargetItem = &TaggedSlotItems[TargetIndex];
 		}
 
-		if (TargetIndex >= 0)
+		if (TargetItem.IsValid()) // Check if the fetched/created bundle is valid
 		{
 			TargetItemData = URISSubsystem::GetItemDataById(TargetItem.GetItemId());
-			if (TargetItemData)
-			// TargetIndex might be valid but targetitemdata invalid if the slot was added for locking purposes without an item
-			{
-				if (TargetItem.GetItemId() == ItemId)
-				{
-					RequestedQuantity = FMath::Min(RequestedQuantity,
-					                               TargetItemData->MaxStackSize > 1
-						                               ? TargetItemData->MaxStackSize - TargetItem.GetQuantity()
-						                               : 0);
-
-					if (RequestedQuantity <= 0)
-						return 0;
-				}
-			}
 		}
 	}
-	else
+	else // Target is Container
 	{
+        // Original logic to find target in container
 		if (SwapBackRequested)
-			TargetItem = FindItemInstanceMutable(SwapItemId);
+        {
+            FItemBundle* FoundSwapTarget = FindItemInstanceMutable(SwapItemId);
+            if (!FoundSwapTarget) {
+                 UE_LOG(LogRISInventory, Error, TEXT("MoveItem_ServerImpl: Target container swap item %s not found post-validation."), *SwapItemId.ToString());
+                 return 0;
+            }
+			TargetItem = FoundSwapTarget;
+        }
 		else
-			TargetItem = FindItemInstanceMutable(ItemId);
+        {
+            // Find existing stack of the item being moved
+            FItemBundle* FoundStackTarget = FindItemInstanceMutable(ItemId);
+            if (!FoundStackTarget) {
+                // Item doesn't exist in container yet. Represent conceptually.
+                // Subsequent logic (ReceiveExtractedItems) handles actual addition.
+                static FItemBundle TempEmptyContainerTarget;
+                TempEmptyContainerTarget = FItemBundle(ItemId, 0);
+                TargetItem = &TempEmptyContainerTarget;
+            } else {
+			    TargetItem = FoundStackTarget;
+            }
+        }
 
 		if (TargetItem.IsValid())
 		{
 			TargetItemData = URISSubsystem::GetItemDataById(TargetItem.GetItemId());
 		}
-
-		ensureMsgf(TargetItem.IsValid(), TEXT("Target item not found"));
 	}
 
-	if (TargetItem.IsBlocked())
-		return 0;
+	if (!SourceItem.IsValid()) return 0;
+	auto* SourceItemData = URISSubsystem::GetItemDataById(SourceItem.GetItemId());
 
-	if (TargetItem.IsValid() && SourceIsTaggedSlot && URISFunctions::ShouldItemsBeSwapped(
-			SourceItem.GetItemId(), TargetItem.GetItemId()) &&
-		(!IsTaggedSlotCompatible(TargetItem.GetItemId(), SourceTaggedSlot) ||
-			WouldItemMoveIndirectlyViolateBlocking(SourceTaggedSlot, TargetItemData)))
-	{
-		UE_LOG(LogRISInventory, Warning, TEXT("Target Item is not compatible with the source slot"));
+	int32 TargetQuantity = TargetItem.GetQuantity();     // Capture pre-move state for events
+	if (SwapBackRequested && TargetQuantity < SwapQuantity)
 		return 0;
-	}
-
-	if (!AllowAutomaticSwapping && TargetItem.GetItemId().IsValid() && SourceItem.GetItemId() != TargetItem.GetItemId())
-		return 0;
-
-
-	const auto SourceItemData = URISSubsystem::GetItemDataById(SourceItem.GetItemId());
-	if (!SourceItemData)
-	{
-		UE_LOG(LogRISInventory, Warning, TEXT("Source item data not found"));
-		return 0;
-	}
+	
+	// Allow partial
+	int32 ValidatedQuantity = FMath::Min(SourceItem.GetQuantity(), RequestedQuantity);
 
 	if (TargetIsTaggedSlot)
-		RequestedQuantity = FMath::Min(RequestedQuantity, SourceItemData->MaxStackSize);
-
-	if (TargetItem.GetItemId().IsValid())
 	{
-		const bool ShouldStack = SourceItemData->MaxStackSize > 1 && SourceItem.GetItemId() == TargetItem.GetItemId();
-		if (!SwapBackRequested && !ShouldStack && SourceItem.GetQuantity() > RequestedQuantity)
-		{
-			return 0;
-		}
+		ValidatedQuantity = FMath::Min(ValidatedQuantity, GetReceivableQuantityForTaggedSlot(SourceItemData, TargetTaggedSlot, RequestedQuantity, true, SwapBackRequested));
 	}
 	else
 	{
-		if (SwapBackRequested && ((TargetIsTaggedSlot && TargetItem.GetItemId() != SwapItemId) || TargetItem.
-			GetQuantity() < SwapQuantity))
-		{
-			UE_LOG(LogRISInventory, Warning, TEXT("Requested swap was invalid"));
-			return 0;
-		}
+		ValidatedQuantity = FMath::Min(ValidatedQuantity, GetReceivableQuantity(SourceItemData, ValidatedQuantity, true, SwapBackRequested));
 	}
 
-
-	if (WouldItemMoveIndirectlyViolateBlocking(TargetTaggedSlot, SourceItemData))
+	// If we are swapping back into a tagged slot then we need to do some additional validation
+	if (SwapBackRequested && SourceIsTaggedSlot && GetReceivableQuantityForTaggedSlot(URISSubsystem::GetItemDataById(SwapItemId), SourceTaggedSlot, SwapQuantity, false, true) < SwapQuantity)
 	{
 		return 0;
 	}
+	
+	if (SimulateMoveOnly) return ValidatedQuantity;
+	
+	// Now execute the move - Use 'QuantityToMove' from validation result
+	//int32 MovedQuantity = FMath::Min(RequestedQuantity, SourceItem.GetQuantity()); // Original calculation - replace RequestedQuantity with QuantityToMove
+    // int32 MovedQuantity = QuantityToMove; // Directly use the validated quantity. Min check against source already done by validation.
+                                          // Keeping original name `MovedQuantity` for minimal diff, assigned from `QuantityToMove`.
+    int32 MovedQuantity = ValidatedQuantity;
 
+	int32 SourceQuantity = SourceItem.GetQuantity();     // Capture pre-move state for events
+	const FGameplayTag& SourceItemId = SourceItem.GetItemId(); // Capture pre-move state for events
+	const FGameplayTag& TargetItemId = TargetItem.GetItemId(); // Capture pre-move state for events
+    TArray<UItemInstanceData*> TargetInstancesBeforeMove = *TargetItem.GetInstances(); // Capture pre-move state
 
-	// Now execute the move
-	int32 MovedQuantity = FMath::Min(RequestedQuantity, SourceItem.GetQuantity());
-	int32 SourceQuantity = SourceItem.GetQuantity();
-	const FGameplayTag& SourceItemId = SourceItem.GetItemId();
-	int32 TargetQuantity = TargetItem.GetQuantity();
-	const FGameplayTag& TargetItemId = TargetItem.GetItemId();
+    // SimulateMoveOnly already handled by the validation block replacement
 
-	if (SimulateMoveOnly) return MovedQuantity;
-
-	if (MovedQuantity <= 0)
+	if (MovedQuantity <= 0) // Should be caught by validation, but keep as safety.
 		return 0;
 
 	if (SourceIsTaggedSlot && TargetIsTaggedSlot)
@@ -956,16 +1129,205 @@ int32 UInventoryComponent::MoveItem_ServerImpl(const FGameplayTag& ItemId, int32
 	return MovedQuantity;
 }
 
+void UInventoryComponent::MoveBetweenContainers_ServerImpl(UItemContainerComponent* SourceComponent,
+												           UItemContainerComponent* TargetComponent,
+												           const FGameplayTag& ItemId,
+												           int32 Quantity,
+												           const TArray<int32>& InstanceIdsToMove,
+												           const FGameplayTag& SourceTaggedSlot,
+												           const FGameplayTag& TargetTaggedSlot)
+{
+    if (!TargetComponent || !IsValid(TargetComponent) || Quantity <= 0 || !ItemId.IsValid()) return;
+	
+    FGenericItemBundle SourceBundleWrapper;
+    FTaggedItemBundle* FoundTaggedBundlePtr = nullptr;
+
+    if (SourceTaggedSlot.IsValid())
+    {
+        UInventoryComponent* SourceInventoryComp = Cast<UInventoryComponent>(SourceComponent);
+        if (!SourceInventoryComp) return;
+        int32 SourceIdx = SourceInventoryComp->GetIndexForTaggedSlot(SourceTaggedSlot);
+        if (!SourceInventoryComp->TaggedSlotItems.IsValidIndex(SourceIdx)) return;
+        FoundTaggedBundlePtr = &SourceInventoryComp->TaggedSlotItems[SourceIdx];
+        SourceBundleWrapper = FGenericItemBundle(FoundTaggedBundlePtr);
+    }
+    else
+    {
+	    FItemBundle* FoundGridBundlePtr = nullptr;
+	    FoundGridBundlePtr = SourceComponent->FindItemInstanceMutable(ItemId);
+        if (!FoundGridBundlePtr) return;
+        SourceBundleWrapper = FGenericItemBundle(FoundGridBundlePtr);
+    }
+
+    if (!SourceBundleWrapper.IsValid() || SourceBundleWrapper.GetItemId() != ItemId) return;
+
+    TArray<UItemInstanceData*>* SourceInstanceDataArrayPtr = SourceBundleWrapper.GetInstances();
+    if (!SourceInstanceDataArrayPtr) return;
+
+    TArray<UItemInstanceData*> InstancesToMovePtrs;
+    if (!InstanceIdsToMove.IsEmpty())
+    {
+        InstancesToMovePtrs = SourceBundleWrapper.FromInstanceIds(InstanceIdsToMove);
+        if (InstancesToMovePtrs.Num() != InstanceIdsToMove.Num()) return;
+    }
+
+    int32 QuantityToExtract = InstancesToMovePtrs.IsEmpty() ? Quantity : InstancesToMovePtrs.Num();
+    if (SourceBundleWrapper.GetQuantity() < QuantityToExtract) return; // Check quantity before extraction
+
+    TArray<UItemInstanceData*> ExtractedInstances;
+    int32 ExtractedQuantity = 0;
+    EItemChangeReason ExtractReason = EItemChangeReason::Transferred;
+
+	auto* ItemData = URISSubsystem::GetItemDataById(ItemId);
+    if (TargetTaggedSlot.IsValid())
+	{
+    	UInventoryComponent* TargetInventoryComp = Cast<UInventoryComponent>(TargetComponent);
+    	ensureMsgf(TargetInventoryComp, TEXT("RequestMoveItemToOtherContainer_Server: TargetTaggedSlot specified, but TargetComponent is not a UInventoryComponent. Move failed."));
+		// Target is an Inventory, use its more specific validation
+		QuantityToExtract = TargetInventoryComp->GetReceivableQuantityForTaggedSlot(ItemData, TargetTaggedSlot, QuantityToExtract, true, true);
+	}
+	else
+	{
+		// Target is a basic Container
+		if (TargetTaggedSlot.IsValid())
+		{
+			UE_LOG(LogRISInventory, Error, TEXT("RequestMoveItemToOtherContainer_Server: TargetTaggedSlot specified, but TargetComponent is not a UInventoryComponent. Move failed."));
+			return; // Cannot move to tagged slot of basic container
+		}
+		// Validate against the generic container part using base validation
+		QuantityToExtract = TargetComponent->GetReceivableQuantity(ItemData, QuantityToExtract, true, true);
+	}
+	
+    if (FoundTaggedBundlePtr)
+    {
+        UInventoryComponent* SourceInventoryComp = CastChecked<UInventoryComponent>(SourceComponent);
+        ExtractedQuantity = SourceInventoryComp->ExtractItemFromTaggedSlot_IfServer(
+            SourceTaggedSlot, ItemId, QuantityToExtract, InstancesToMovePtrs, ExtractReason, ExtractedInstances);
+    }
+    else
+    {
+        ExtractedQuantity = SourceComponent->ExtractItemImpl_IfServer(
+            ItemId, QuantityToExtract, InstancesToMovePtrs, ExtractReason, ExtractedInstances, false, false, false);
+    }
+
+    if (ExtractedQuantity > 0)
+    {
+        int32 ActuallyAdded = 0;
+        if (TargetTaggedSlot.IsValid())
+        {
+            UInventoryComponent* TargetInventoryComp = Cast<UInventoryComponent>(TargetComponent);
+            if (!TargetInventoryComp)
+            {
+                SourceComponent->SpawnItemIntoWorldFromContainer_ServerImpl(ItemId, ExtractedQuantity, FVector(1e+300, 0,0), ExtractedInstances);
+                return;
+            }
+
+            // Add extracted items to the target's generic container first
+            int32 ReceivedByTargetContainer = TargetInventoryComp->ReceiveExtractedItems_IfServer(ItemId, ExtractedQuantity, ExtractedInstances, false);
+            if(ReceivedByTargetContainer > 0)
+            {
+                 TArray<UItemInstanceData*> InstancesActuallyInTargetContainer;
+                 if(const FItemBundle* TargetContainerBundle = TargetInventoryComp->FindItemInstance(ItemId)) {
+                     TSet<UItemInstanceData*> ExtractedSet(ExtractedInstances);
+                     for(UItemInstanceData* InstInTarget : TargetContainerBundle->InstanceData) {
+                         if(ExtractedSet.Contains(InstInTarget)) InstancesActuallyInTargetContainer.Add(InstInTarget);
+                     }
+                 }
+
+                 // Move the successfully received items internally to the target tagged slot
+                 ActuallyAdded = TargetInventoryComp->MoveItem_ServerImpl(
+                     ItemId, ReceivedByTargetContainer, InstancesActuallyInTargetContainer, FGameplayTag(), TargetTaggedSlot,
+                     false, FGameplayTag(), 0, false, false );
+
+                 if(ActuallyAdded != ReceivedByTargetContainer)
+                 {
+	                 UE_LOG(LogRISInventory, Error, TEXT("RequestMove: Failed internal move generic->tagged in target despite validation.."));
+
+                 	// Remove ActuallyAdded from InstancesActuallyInTargetContainer
+                 	for (int32 i = InstancesActuallyInTargetContainer.Num() - 1; ActuallyAdded > 0 && i >= 0; --i)
+				 		if (InstancesActuallyInTargetContainer[i])
+				 		{
+				 			InstancesActuallyInTargetContainer.RemoveAt(i);
+				 			--ActuallyAdded;
+				 		}
+                 	
+                 	TargetInventoryComp->DestroyItemImpl(ItemId, ReceivedByTargetContainer - ActuallyAdded, InstancesActuallyInTargetContainer, EItemChangeReason::Moved, true, true, true);
+                 }
+            }
+            else {
+                 SourceComponent->SpawnItemIntoWorldFromContainer_ServerImpl(ItemId, ExtractedQuantity, FVector(1e+300, 0,0), ExtractedInstances);
+                 return;
+            }
+        }
+        else
+        {
+             ActuallyAdded = TargetComponent->ReceiveExtractedItems_IfServer(ItemId, ExtractedQuantity, ExtractedInstances);
+        }
+
+        if (ActuallyAdded < ExtractedQuantity)
+        {
+            int32 QuantityToReturnOrDrop = ExtractedQuantity - ActuallyAdded;
+            TArray<UItemInstanceData*> InstancesToReturnOrDrop;
+            TSet<UItemInstanceData*> AddedInstanceSet; // Determine which instances were successfully added to target
+             const FItemBundle* FinalTargetBundle = TargetComponent->FindItemInstance(ItemId);
+             if(FinalTargetBundle) AddedInstanceSet.Append(FinalTargetBundle->InstanceData);
+             if(TargetTaggedSlot.IsValid()) {
+	             if(UInventoryComponent* TargetInv = Cast<UInventoryComponent>(TargetComponent)) {
+                       const FTaggedItemBundle* FinalTargetTaggedBundle = TargetInv->TaggedSlotItems.FindByPredicate([&](const FTaggedItemBundle& B){ return B.Tag == TargetTaggedSlot; });
+                       if(FinalTargetTaggedBundle && FinalTargetTaggedBundle->IsValid()) AddedInstanceSet.Append(FinalTargetTaggedBundle->InstanceData);
+                  }
+             }
+             for(UItemInstanceData* ExtractedInst : ExtractedInstances) {
+                 if(!AddedInstanceSet.Contains(ExtractedInst)) InstancesToReturnOrDrop.Add(ExtractedInst);
+             }
+
+            // Attempt to return the leftovers to the source component (this)
+            int32 ReturnedToSource = SourceComponent->ReceiveExtractedItems_IfServer(ItemId, QuantityToReturnOrDrop, InstancesToReturnOrDrop);
+            if (ReturnedToSource < QuantityToReturnOrDrop)
+            {
+                TArray<UItemInstanceData*> InstancesToDrop;
+                TSet<UItemInstanceData*> ReturnedInstanceSet; // Determine which instances were successfully returned
+                 const FItemBundle* FinalSourceBundleGeneric = SourceComponent->FindItemInstance(ItemId);
+                 if(FinalSourceBundleGeneric) ReturnedInstanceSet.Append(FinalSourceBundleGeneric->InstanceData);
+                 if(SourceTaggedSlot.IsValid()) {
+	                 if(UInventoryComponent* SourceInv = Cast<UInventoryComponent>(SourceComponent)) {
+                           const FTaggedItemBundle* FinalSourceTaggedBundle = SourceInv->TaggedSlotItems.FindByPredicate([&](const FTaggedItemBundle& B){ return B.Tag == SourceTaggedSlot; });
+                           if(FinalSourceTaggedBundle && FinalSourceTaggedBundle->IsValid()) ReturnedInstanceSet.Append(FinalSourceTaggedBundle->InstanceData);
+                      }
+                 }
+                 for(UItemInstanceData* InstToReturn : InstancesToReturnOrDrop) {
+                     if(!ReturnedInstanceSet.Contains(InstToReturn)) InstancesToDrop.Add(InstToReturn);
+                 }
+                SourceComponent->SpawnItemIntoWorldFromContainer_ServerImpl(ItemId, InstancesToDrop.Num(), FVector(1e+300, 0,0), InstancesToDrop);
+            }
+            else if (SourceTaggedSlot.IsValid() && ReturnedToSource > 0)
+            {
+                 UInventoryComponent* SourceInventoryComp = CastChecked<UInventoryComponent>(SourceComponent);
+                 TArray<UItemInstanceData*> ActualReturnedInstances; // Determine which specific instances made it back to generic
+                 if(const FItemBundle* ReturnedBundle = SourceComponent->FindItemInstance(ItemId)) {
+                       TSet<UItemInstanceData*> InstToReturnSet(InstancesToReturnOrDrop);
+                       for(UItemInstanceData* ReturnedInst : ReturnedBundle->InstanceData) {
+                            if(InstToReturnSet.Contains(ReturnedInst)) ActualReturnedInstances.Add(ReturnedInst);
+                       }
+                  }
+                 int32 MovedBackToTagged = SourceInventoryComp->MoveItem_ServerImpl(ItemId, ReturnedToSource, ActualReturnedInstances, FGameplayTag(), SourceTaggedSlot, false, FGameplayTag(), 0, false, false);
+                 if (MovedBackToTagged != ReturnedToSource) UE_LOG(LogRISInventory, Warning, TEXT("RequestMove: Failed internal move generic->tagged in source after return."));
+            }
+        }
+    }
+}
+
+
 void UInventoryComponent::PickupItem(AWorldItem* WorldItem, EPreferredSlotPolicy PreferTaggedSlots,
                                      bool DestroyAfterPickup)
 {
-	if (!WorldItem)
+	if (!IsValid(WorldItem))
 	{
 		UE_LOG(LogRISInventory, Warning, TEXT("PickupItem called with null world item"));
 		return;
 	}
 
-	if (GetOwnerRole() < ROLE_Authority && GetOwnerRole() != ROLE_None)
+	if (IsClient())
 	{
 		const UItemStaticData* ItemData = URISSubsystem::GetItemDataById(WorldItem->RepresentedItem.ItemId);
 		TArray<std::tuple<FGameplayTag, int32>> DistributionPlan = GetItemDistributionPlan(
@@ -973,17 +1335,17 @@ void UInventoryComponent::PickupItem(AWorldItem* WorldItem, EPreferredSlotPolicy
 		for (const std::tuple<FGameplayTag, int32>& Plan : DistributionPlan)
 		{
 			const FGameplayTag& SlotTag = std::get<0>(Plan);
-			const int32 QuantityToAddSlot = std::get<1>(Plan);
+			const int32 ViableQuantitySlot = std::get<1>(Plan);
 
 			if (SlotTag.IsValid())
 			{
 				RequestedOperationsToServer.Add(
-					FRISExpectedOperation(AddTagged, SlotTag, WorldItem->RepresentedItem.ItemId, QuantityToAddSlot));
+					FRISExpectedOperation(AddTagged, SlotTag, WorldItem->RepresentedItem.ItemId, ViableQuantitySlot));
 			}
 			else
 			{
 				RequestedOperationsToServer.Add(
-					FRISExpectedOperation(Add, WorldItem->RepresentedItem.ItemId, QuantityToAddSlot));
+					FRISExpectedOperation(Add, WorldItem->RepresentedItem.ItemId, ViableQuantitySlot));
 			}
 		}
 	}
@@ -997,7 +1359,7 @@ int32 UInventoryComponent::MoveItem(const FGameplayTag& ItemId, int32 Quantity,
                                     const FGameplayTag& TargetTaggedSlot,
                                     const FGameplayTag& SwapItemId, int32 SwapQuantity)
 {
-	if (GetOwnerRole() < ROLE_Authority && GetOwnerRole() != ROLE_None)
+	if (IsClient())
 	{
 		// TODO: Make sure tests dont rely on return value so we can set return type to void
 		MoveItem_Server(ItemId, Quantity, FItemBundle::ToInstanceIds(InstancesToMove), SourceTaggedSlot, TargetTaggedSlot, SwapItemId, SwapQuantity);
@@ -1020,134 +1382,34 @@ int32 UInventoryComponent::ValidateMoveItem(const FGameplayTag& ItemId, int32 Qu
 	                           true, true, true);
 }
 
-
-bool UInventoryComponent::CanTaggedSlotReceiveItem(const FItemBundle& ItemInstance,
-                                                   const FGameplayTag& SlotTag) const
+bool UInventoryComponent::ContainsInTaggedSlot_BP(const FGameplayTag& SlotTag, const FGameplayTag& ItemId, int32 Quantity) const
 {
-	return IsTaggedSlotCompatible(ItemInstance.ItemId, SlotTag);
+    // Calls the virtual function with an empty instance array for quantity check
+    return ContainsInTaggedSlot(SlotTag, ItemId, Quantity, NoInstances);
 }
 
-int32 UInventoryComponent::GetQuantityOfItemTaggedSlotCanReceive(const FGameplayTag& ItemId,
-                                                                 const FGameplayTag& SlotTag) const
+bool UInventoryComponent::ContainsInTaggedSlot(const FGameplayTag& SlotTag, const FGameplayTag& ItemId, int32 Quantity, const TArray<UItemInstanceData*>& InstancesToLookFor) const
 {
-	const UItemStaticData* ItemData = URISSubsystem::GetItemDataById(ItemId);
-	if (!ItemData)
-	{
-		UE_LOG(LogRISInventory, Warning, TEXT("Could not find item data for item: %s"), *ItemId.ToString());
-		return 0; // Item data not found
-	}
+    if (!SlotTag.IsValid())
+    {
+        return false;
+    }
 
-	int32 QuantityThatCanBeAddedToTaggedSlots = 0;
+    const FTaggedItemBundle& ItemInSlot = GetItemForTaggedSlot(SlotTag);
 
-	// check for compatibility and blocked status
-	if (IsTaggedSlotCompatible(ItemId, SlotTag) && !GetItemForTaggedSlot(SlotTag).IsBlocked)
-	{
-		// Check if slot is blocked
-		const FTaggedItemBundle& ItemInSlot = GetItemForTaggedSlot(SlotTag);
-		if (ItemInSlot.IsValid() && ItemInSlot.IsBlocked)
-		{
-			return 0;
-		}
+    if (!ItemInSlot.IsValid() || ItemInSlot.ItemId != ItemId)
+    {
+        // Slot is empty, invalid, or contains the wrong item
+         return (Quantity <= 0 && InstancesToLookFor.Num() == 0); // Only true if asking for nothing
+    }
 
-		if (WouldItemMoveIndirectlyViolateBlocking(SlotTag, ItemData))
-			return 0;
-
-		if (ItemInSlot.IsValid() && ItemInSlot.ItemId == ItemId)
-		{
-			QuantityThatCanBeAddedToTaggedSlots += ItemData->MaxStackSize > 1
-				                                       ? ItemData->MaxStackSize - ItemInSlot.Quantity
-				                                       : 0;
-		}
-		else if (!ItemInSlot.IsValid())
-		{
-			QuantityThatCanBeAddedToTaggedSlots += ItemData->MaxStackSize > 1 ? ItemData->MaxStackSize : 1;
-		}
-	}
-
-	return QuantityThatCanBeAddedToTaggedSlots;
-}
-
-int32 UInventoryComponent::GetContainerOnlyItemQuantity(const FGameplayTag& ItemId) const
-{
-	int32 QuantityInContainer = GetQuantityTotal(ItemId);
-
-	for (const FTaggedItemBundle& TaggedSlot : TaggedSlotItems)
-	{
-		if (TaggedSlot.ItemId == ItemId)
-		{
-			QuantityInContainer -= TaggedSlot.Quantity;
-		}
-	}
-
-	return QuantityInContainer;
-}
-
-
-int32 UInventoryComponent::DropFromTaggedSlot(const FGameplayTag& SlotTag, int32 Quantity, const TArray<UItemInstanceData*>& InstancesToDrop, FVector RelativeDropLocation)
-{
-	// On client the below is just a guess
-	const FTaggedItemBundle Item = GetItemForTaggedSlot(SlotTag);
-	if (!Item.IsValid()) return 0;
-	int32 QuantityToDrop = FMath::Min(Quantity, Item.Quantity);
-
-	if (GetOwnerRole() < ROLE_Authority && GetOwnerRole() != ROLE_None)
-		RequestedOperationsToServer.Add(FRISExpectedOperation(RemoveTagged, SlotTag, QuantityToDrop));
-
-	DropFromTaggedSlot_Server(SlotTag, Quantity, FItemBundle::ToInstanceIds(InstancesToDrop), RelativeDropLocation);
-
-	return QuantityToDrop;
-}
-
-void UInventoryComponent::DropFromTaggedSlot_Server_Implementation(const FGameplayTag& SlotTag, int32 Quantity, const TArray<int32>& InstanceIdsToDrop, 
-                                                                   FVector RelativeDropLocation)
-{
-	TArray<UItemInstanceData*> InstancesToDrop;
-	if (!InstanceIdsToDrop.IsEmpty())
-	{
-		int32 TagedSlotIndex = GetIndexForTaggedSlot(SlotTag);
-		FTaggedItemBundle* TaggedSlot = &TaggedSlotItems[TagedSlotIndex];
-		InstancesToDrop = TaggedSlot->FromInstanceIds(InstanceIdsToDrop);
-	}
-	DropFromTaggedSlot_ServerImpl(SlotTag, Quantity, InstancesToDrop, RelativeDropLocation);
-}
-
-void UInventoryComponent::DropFromTaggedSlot_ServerImpl(const FGameplayTag& SlotTag, int32 Quantity, const TArray<UItemInstanceData*>& InstancesToDrop, 
-																   FVector RelativeDropLocation)
-{
-	const int32 Index = GetIndexForTaggedSlot(SlotTag);
-	const FTaggedItemBundle& Item = TaggedSlotItems[Index];
-	if (!Item.Tag.IsValid())
-	{
-		UE_LOG(LogRISInventory, Warning, TEXT("DropFromTaggedSlot called with invalid slot tag"));
-		return;
-	}
-
-	FGameplayTag ItemId = Item.ItemId;
-
-	const FTaggedItemBundle ItemContained = GetItemForTaggedSlot(SlotTag);
-	int32 QuantityToDrop = 0;
-	if (ItemContained.IsValid() && ItemContained.ItemId == ItemId)
-	{
-		QuantityToDrop = FMath::Min(Quantity, ItemContained.Quantity);
-	}
-
-	TArray<UItemInstanceData*> InstanceArrayToAppendTo;
-	ExtractItemFromTaggedSlot_IfServer(SlotTag, Item.ItemId, QuantityToDrop, InstancesToDrop, EItemChangeReason::Dropped,
-	                                   InstanceArrayToAppendTo);
-
-	// Spawn item in the world and update state
-	SpawnItemIntoWorldFromContainer_ServerImpl(ItemId, QuantityToDrop, RelativeDropLocation, InstanceArrayToAppendTo);
+    // Use the FTaggedItemBundle::Contains helper function
+    return ItemInSlot.Contains(Quantity, InstancesToLookFor);
 }
 
 int32 UInventoryComponent::RemoveAnyItemFromTaggedSlot_IfServer(FGameplayTag SlotTag)
 {
-	// Ensure execution on server or standalone
-	if (GetOwnerRole() < ROLE_Authority && GetOwnerRole() != ROLE_None)
-	{
-		UE_LOG(LogRISInventory, Warning, TEXT("ClearTaggedSlot_IfServer called on client for %s. Request ignored."), *SlotTag.ToString());
-		// In a real setup, you might queue an RPC request here instead of just returning 0.
-		return 0;
-	}
+	if (IsClient("ClearTaggedSlot_IfServer called on client for %s. Request ignored.")) return 0;
 
 	// Find the item in the specified slot
 	const FTaggedItemBundle& ItemInSlot = GetItemForTaggedSlot(SlotTag);
@@ -1203,11 +1465,7 @@ int32 UInventoryComponent::UseItemFromTaggedSlot(const FGameplayTag& SlotTag, in
 	auto ItemId = Item.ItemId;
 
 	const auto* ItemData = URISSubsystem::GetItemDataById(ItemId);
-	if (!ItemData)
-	{
-		UE_LOG(LogRISInventory, Warning, TEXT("Could not find item data for item: %s"), *ItemId.ToString());
-		return 0;
-	}
+	if (BadItemData(ItemData, ItemId)) return 0;
 
 	const UUsableItemDefinition* UsableItem = ItemData->GetItemDefinition<UUsableItemDefinition>();
 
@@ -1219,7 +1477,7 @@ int32 UInventoryComponent::UseItemFromTaggedSlot(const FGameplayTag& SlotTag, in
 
 	int32 QuantityToRemove = UsableItem->QuantityPerUse;
 
-	if (GetOwnerRole() < ROLE_Authority && GetOwnerRole() != ROLE_None)
+	if (IsClient())
 		RequestedOperationsToServer.Add(FRISExpectedOperation(RemoveTagged, SlotTag, QuantityToRemove));
 
 	UseItemFromTaggedSlot_Server(SlotTag, ItemToUseInstanceId);
@@ -1234,7 +1492,7 @@ void UInventoryComponent::UseItemFromTaggedSlot_Server_Implementation(const FGam
 	if (Item.Tag.IsValid())
 	{
 		UItemInstanceData* const* FoundPtr = (ItemToUseInstanceId >= 0)
-			? Item.InstanceData.FindByPredicate([=](UItemInstanceData* Instance) { return Instance->UniqueInstanceId == ItemToUseInstanceId; })
+			? Item.InstanceData.FindByPredicate([=](const UItemInstanceData* Instance) { return Instance->UniqueInstanceId == ItemToUseInstanceId; })
 			: nullptr;
 		UItemInstanceData* ItemInstance = FoundPtr ? *FoundPtr : nullptr;
 
@@ -1242,11 +1500,8 @@ void UInventoryComponent::UseItemFromTaggedSlot_Server_Implementation(const FGam
 		
 		const auto ItemId = Item.ItemId;
 		const UItemStaticData* ItemData = URISSubsystem::GetItemDataById(ItemId);
-		if (!ItemData)
-		{
-			UE_LOG(LogRISInventory, Warning, TEXT("Could not find item data for item: %s"), *ItemId.ToString());
-			return;
-		}
+		
+		if (BadItemData(ItemData, ItemId)) return;
 
 		UUsableItemDefinition* UsableItem = ItemData->GetItemDefinition<UUsableItemDefinition>();
 
@@ -1294,16 +1549,6 @@ void UInventoryComponent::SetTaggedSlotBlocked(FGameplayTag Slot, bool IsBlocked
 	}
 }
 
-bool UInventoryComponent::CanItemBeEquippedInUniversalSlot(const FGameplayTag& ItemId,
-                                                           const FUniversalTaggedSlot& Slot, bool IgnoreBlocking) const
-{
-	UItemStaticData* ItemData = URISSubsystem::GetItemDataById(ItemId);
-	int32 Index = GetIndexForTaggedSlot(Slot.Slot);
-	return IsTaggedSlotCompatible(ItemId, Slot.Slot) &&
-		(IgnoreBlocking || !WouldItemMoveIndirectlyViolateBlocking(Slot.Slot, ItemData)) &&
-		(IgnoreBlocking || !TaggedSlotItems.IsValidIndex(Index) || !TaggedSlotItems[Index].IsBlocked);
-}
-
 bool UInventoryComponent::IsTaggedSlotBlocked(const FGameplayTag& Slot) const
 {
 	return GetItemForTaggedSlot(Slot).IsBlocked;
@@ -1321,8 +1566,13 @@ int32 UInventoryComponent::GetIndexForTaggedSlot(const FGameplayTag& SlotTag) co
 	return -1;
 }
 
-int32 UInventoryComponent::AddItem_ServerImpl(TScriptInterface<IItemSource> ItemSource, const FGameplayTag& ItemId,
-                                              int32 RequestedQuantity, bool AllowPartial, bool SuppressEvents, bool SuppressUpdate)
+int32 UInventoryComponent::AddItemWithInstances_IfServer(TScriptInterface<IItemSource> ItemSource,
+		const FGameplayTag& ItemId,
+		int32 RequestedQuantity,
+		const TArray<UItemInstanceData*>& InstancesToExtract,
+		bool AllowPartial,
+		bool SuppressEvents,
+		bool SuppressUpdate)
 {
 	return AddItemToAnySlot(ItemSource, ItemId, RequestedQuantity, EPreferredSlotPolicy::PreferSpecializedTaggedSlot,
 	                        AllowPartial, SuppressEvents, SuppressUpdate);
@@ -1403,53 +1653,12 @@ void UInventoryComponent::DetectAndPublishContainerChanges()
 	}*/
 }
 
-bool UInventoryComponent::IsTaggedSlotCompatible(const FGameplayTag& ItemId, const FGameplayTag& SlotTag) const
-{
-	const UItemStaticData* ItemData = URISSubsystem::GetItemDataById(ItemId);
-	if (!ItemData)
-	{
-		return false; // Item data not found, assume slot cannot receive item
-	}
-
-	if (ContainedInUniversalSlot(SlotTag))
-	{
-		// loop over UniversalTaggedExclusiveCategoriesSlots and look for matching slot
-		for (const FUniversalTaggedSlot& UniSlot : UniversalTaggedSlots)
-		{
-			// If the item has the exclusive category tag and the slot is not the universal slot, then it is exclusive to some other universal aslot and is not compatible
-			if (SlotTag != UniSlot.Slot && UniSlot.ExclusiveToSlotCategory.IsValid() &&
-				ItemData->ItemCategories.HasTag(UniSlot.ExclusiveToSlotCategory))
-			{
-				return false;
-			}
-		}
-
-		return true;
-	}
-
-	if (ItemData->ItemCategories.HasTag(SlotTag))
-	{
-		return true; // Item is not compatible with specialized tagged slot
-	}
-
-	return false;
-}
-
-bool UInventoryComponent::IsItemInTaggedSlotValid(const FGameplayTag SlotTag) const
-{
-	const FTaggedItemBundle* Item = TaggedSlotItems.FindByPredicate([&SlotTag](const FTaggedItemBundle& Item)
-	{
-		return Item.Tag == SlotTag;
-	});
-	return Item && Item->IsValid();
-}
-
 TArray<std::tuple<FGameplayTag, int32>> UInventoryComponent::GetItemDistributionPlan(
-	const UItemStaticData* ItemData, int32 QuantityToAdd, EPreferredSlotPolicy PreferTaggedSlots)
+	const UItemStaticData* ItemData, int32 ViableQuantity, EPreferredSlotPolicy PreferTaggedSlots)
 {
 	TArray<std::tuple<FGameplayTag, int32>> DistributionPlan;
 
-	if (QuantityToAdd <= 0 || !ItemData)
+	if (ViableQuantity <= 0 || !ItemData)
 		return DistributionPlan;
 
 	const FGameplayTag& ItemId = ItemData->ItemId;
@@ -1466,56 +1675,57 @@ TArray<std::tuple<FGameplayTag, int32>> UInventoryComponent::GetItemDistribution
 		// First we need to check for any partially filled slots that we can top off first
 		for (FTaggedItemBundle& Item : TaggedSlotItems)
 		{
-			if (TotalQuantityDistributed >= QuantityToAdd) break;
+			if (TotalQuantityDistributed >= ViableQuantity) break;
 			if (Item.ItemId == ItemId && !Item.IsBlocked)
 			{
-				int32 QuantityToAddToSlot = FMath::Min(QuantityToAdd, ItemData->MaxStackSize - Item.Quantity);
-				if (QuantityToAddToSlot > 0 && QuantityToAddToSlot < ItemData->MaxStackSize)
+				int32 ViableQuantityToSlot = FMath::Min(ViableQuantity, ItemData->MaxStackSize - Item.Quantity);
+				if (ViableQuantityToSlot > 0 && ViableQuantityToSlot < ItemData->MaxStackSize)
 				{
 					TaggedSlotsToExclude.Add(Item.Tag);
-					DistributionPlan.Add(std::make_tuple(Item.Tag, QuantityToAddToSlot));
-					TotalQuantityDistributed += QuantityToAddToSlot;
+					DistributionPlan.Add(std::make_tuple(Item.Tag, ViableQuantityToSlot));
+					TotalQuantityDistributed += ViableQuantityToSlot;
 				}
 			}
 		}
 
 		for (FItemBundle& Item : ItemsVer.Items)
 		{
-			if (TotalQuantityDistributed >= QuantityToAdd) break;
+			if (TotalQuantityDistributed >= ViableQuantity) break;
 			if (Item.ItemId == ItemId)
 			{
 				int32 Remainder = Item.Quantity % ItemData->MaxStackSize;
 				int32 NeededToFill = (Remainder == 0) ? 0 : (ItemData->MaxStackSize - Remainder);
-				int32 QuantityToAddToGeneric = FMath::Min(NeededToFill, QuantityToAdd - TotalQuantityDistributed);
-				if (QuantityToAddToGeneric > 0)
+				int32 ViableQuantityToGeneric = FMath::Min(NeededToFill, ViableQuantity - TotalQuantityDistributed);
+				if (ViableQuantityToGeneric > 0)
 				{
-					DistributionPlan.Add(std::make_tuple(FGameplayTag::EmptyTag, QuantityToAddToGeneric));
-					TotalQuantityDistributed += QuantityToAddToGeneric;
+					DistributionPlan.Add(std::make_tuple(FGameplayTag::EmptyTag, ViableQuantityToGeneric));
+					TotalQuantityDistributed += ViableQuantityToGeneric;
 				}
 			}
 		}
 	}
+	
+	const int32 QuantityContainersGenericSlotsCanReceive = Super::GetReceivableQuantity(ItemData); // this only considers slotcount=generic slots for slot limits
 
 	if (PreferTaggedSlots == EPreferredSlotPolicy::PreferGenericInventory)
 	{
-		const int32 QuantityContainersGenericSlotsCanReceive = Super::GetReceivableQuantityImpl(ItemId);
 		// Try adding to generic slots first if not preferring tagged slots
-		QuantityDistributedToGenericSlots += FMath::Min(QuantityToAdd - TotalQuantityDistributed,
+		QuantityDistributedToGenericSlots += FMath::Min(ViableQuantity - TotalQuantityDistributed,
 		                                                QuantityContainersGenericSlotsCanReceive);
 		TotalQuantityDistributed += QuantityDistributedToGenericSlots;
 	}
 
 	// Proceed to try adding to tagged slots if PreferTaggedSlots is true or if there's remaining quantity
-	if (PreferTaggedSlots != EPreferredSlotPolicy::PreferGenericInventory || TotalQuantityDistributed < QuantityToAdd)
+	if (PreferTaggedSlots != EPreferredSlotPolicy::PreferGenericInventory || TotalQuantityDistributed < ViableQuantity)
 	{
 		// if ItemsToAdd is valid that means we haven't extracted the full quantity yet
 		for (const FGameplayTag& SlotTag : SpecializedTaggedSlots)
 		{
-			if (TotalQuantityDistributed >= QuantityToAdd) break;
+			if (TotalQuantityDistributed >= ViableQuantity) break;
 			if (TaggedSlotsToExclude.Contains(SlotTag)) continue;
 
-			int32 AddedToTaggedSlot = FMath::Min(QuantityToAdd - TotalQuantityDistributed,
-			                                     GetQuantityOfItemTaggedSlotCanReceive(ItemId, SlotTag));
+			int32 AddedToTaggedSlot = FMath::Min(ViableQuantity - TotalQuantityDistributed,
+			                                     GetReceivableQuantityForTaggedSlot(ItemData, SlotTag));
 
 			if (AddedToTaggedSlot > 0)
 			{
@@ -1529,12 +1739,12 @@ TArray<std::tuple<FGameplayTag, int32>> UInventoryComponent::GetItemDistribution
 		// First check universal slots for slots that are strongly preferred by the item
 		for (const FUniversalTaggedSlot& SlotTag : UniversalTaggedSlots)
 		{
-			if (TotalQuantityDistributed >= QuantityToAdd) break;
+			if (TotalQuantityDistributed >= ViableQuantity) break;
 
 			if (ItemData->ItemCategories.HasTag(SlotTag.Slot) && !BlockedSlots.Contains(SlotTag.Slot))
 			{
-				int32 AddedToTaggedSlot = FMath::Min(QuantityToAdd - TotalQuantityDistributed,
-				                                     GetQuantityOfItemTaggedSlotCanReceive(ItemId, SlotTag.Slot));
+				int32 AddedToTaggedSlot = FMath::Min(ViableQuantity - TotalQuantityDistributed,
+				                                     GetReceivableQuantityForTaggedSlot(ItemData, SlotTag.Slot));
 				if (AddedToTaggedSlot > 0)
 				{
 					DistributionPlan.Add(std::make_tuple(SlotTag.Slot, AddedToTaggedSlot));
@@ -1550,22 +1760,22 @@ TArray<std::tuple<FGameplayTag, int32>> UInventoryComponent::GetItemDistribution
 		}
 
 		if (PreferTaggedSlots == EPreferredSlotPolicy::PreferSpecializedTaggedSlot && TotalQuantityDistributed <
-			QuantityToAdd)
+			ViableQuantity)
 		{
-			int32 AddedToDistributedSecondRound = FMath::Min(QuantityToAdd - TotalQuantityDistributed,
-			                                                 Super::GetReceivableQuantityImpl(ItemId));
+			int32 AddedToDistributedSecondRound = FMath::Min(ViableQuantity - TotalQuantityDistributed,
+			                                                 Super::GetReceivableQuantity(ItemData));
 			QuantityDistributedToGenericSlots += AddedToDistributedSecondRound;
 			TotalQuantityDistributed += AddedToDistributedSecondRound;
 		}
 
 		for (const FUniversalTaggedSlot& SlotTag : UniversalTaggedSlots)
 		{
-			if (TotalQuantityDistributed >= QuantityToAdd) break;
+			if (TotalQuantityDistributed >= ViableQuantity) break;
 
 			if (BlockedSlots.Contains(SlotTag.Slot)) continue;
 
-			int32 AddedToTaggedSlot = FMath::Min(QuantityToAdd - TotalQuantityDistributed,
-			                                     GetQuantityOfItemTaggedSlotCanReceive(ItemId, SlotTag.Slot));
+			int32 AddedToTaggedSlot = FMath::Min(ViableQuantity - TotalQuantityDistributed,
+			                                     GetReceivableQuantityForTaggedSlot(ItemData, SlotTag.Slot));
 			if (AddedToTaggedSlot > 0)
 			{
 				DistributionPlan.Add(std::make_tuple(SlotTag.Slot, AddedToTaggedSlot));
@@ -1581,14 +1791,14 @@ TArray<std::tuple<FGameplayTag, int32>> UInventoryComponent::GetItemDistribution
 	}
 
 	// Any remaining quantity must be added to generic slots
-	int32 FinalAddedtoGenericSlots = QuantityToAdd - TotalQuantityDistributed;
+	int32 FinalAddedtoGenericSlots = ViableQuantity - TotalQuantityDistributed;
 	QuantityDistributedToGenericSlots += FinalAddedtoGenericSlots;
 	TotalQuantityDistributed += FinalAddedtoGenericSlots;
 
 	if (QuantityDistributedToGenericSlots > 0)
 		DistributionPlan.Add(std::make_tuple(FGameplayTag::EmptyTag, QuantityDistributedToGenericSlots));
 
-	ensureMsgf(TotalQuantityDistributed == QuantityToAdd,
+	ensureMsgf(TotalQuantityDistributed == ViableQuantity,
 	           TEXT("Quantity distributed does not match requested quantity"));
 
 	return DistributionPlan;
@@ -1753,10 +1963,7 @@ void UInventoryComponent::CraftRecipeId_Server_Implementation(const FPrimaryRISR
 
 bool UInventoryComponent::CraftRecipe_IfServer(const UObjectRecipeData* Recipe)
 {
-	if (GetOwnerRole() < ROLE_Authority && GetOwnerRole() != ROLE_None)
-	{
-		return false;
-	}
+	if (IsClient("CraftRecipe_IfServer")) return false;
 
 	bool bSuccess = false;
 	if (Recipe && CanCraftRecipe(Recipe))
@@ -1776,8 +1983,8 @@ bool UInventoryComponent::CraftRecipe_IfServer(const UObjectRecipeData* Recipe)
 		if (const UItemRecipeData* ItemRecipe = Cast<UItemRecipeData>(Recipe))
 		{
 			const FItemBundle CraftedItem = FItemBundle(ItemRecipe->ResultingItemId, ItemRecipe->QuantityCreated);
-			const int32 QuantityAdded = Super::AddItem_ServerImpl(Subsystem, CraftedItem.ItemId, CraftedItem.Quantity,
-			                                                      false);
+			const int32 QuantityAdded = Super::AddItemWithInstances_IfServer(Subsystem, CraftedItem.ItemId, CraftedItem.Quantity, NoInstances, 
+			                                                      true);
 			if (QuantityAdded < ItemRecipe->QuantityCreated)
 			{
 				UE_LOG(LogRISInventory, Display, TEXT("Failed to add crafted item to inventory, dropping item instead"));
@@ -1789,10 +1996,11 @@ bool UInventoryComponent::CraftRecipe_IfServer(const UObjectRecipeData* Recipe)
 				}
 
 				TArray<UItemInstanceData*> DroppingItemState;
-				Execute_ExtractItem_IfServer(Subsystem, CraftedItem.ItemId, CraftedItem.Quantity - QuantityAdded, NoInstances,
-				                             EItemChangeReason::Transformed, DroppingItemState);
+				Subsystem->ExtractItem_IfServer_Implementation(CraftedItem.ItemId, CraftedItem.Quantity - QuantityAdded, NoInstances,
+				                             EItemChangeReason::Transformed, DroppingItemState, false);
 
-				DropItemFromContainer_Server(CraftedItem.ItemId, CraftedItem.Quantity - QuantityAdded, TArray<int32>());
+				SpawnItemIntoWorldFromContainer_ServerImpl(
+					CraftedItem.ItemId, CraftedItem.Quantity - QuantityAdded, FVector(1e+300, 0, 0), DroppingItemState);
 			}
 		}
 		else
@@ -1864,10 +2072,66 @@ void UInventoryComponent::CheckAndUpdateRecipeAvailability()
 	OnAvailableRecipesUpdated.Broadcast();
 }
 
+
+int32 UInventoryComponent::DropFromTaggedSlot(const FGameplayTag& SlotTag, int32 Quantity, const TArray<UItemInstanceData*>& InstancesToDrop, FVector RelativeDropLocation)
+{
+	// On client the below is just a guess
+	const FTaggedItemBundle Item = GetItemForTaggedSlot(SlotTag);
+	if (!Item.IsValid()) return 0;
+	int32 QuantityToDrop = FMath::Min(Quantity, Item.Quantity);
+
+	if (IsClient())
+		RequestedOperationsToServer.Add(FRISExpectedOperation(RemoveTagged, SlotTag, QuantityToDrop));
+
+	DropFromTaggedSlot_Server(SlotTag, Quantity, FItemBundle::ToInstanceIds(InstancesToDrop), RelativeDropLocation);
+
+	return QuantityToDrop;
+}
+
+void UInventoryComponent::DropFromTaggedSlot_Server_Implementation(const FGameplayTag& SlotTag, int32 Quantity, const TArray<int32>& InstanceIdsToDrop, 
+                                                                   FVector RelativeDropLocation)
+{
+	TArray<UItemInstanceData*> InstancesToDrop;
+	if (!InstanceIdsToDrop.IsEmpty())
+	{
+		int32 TagedSlotIndex = GetIndexForTaggedSlot(SlotTag);
+		FTaggedItemBundle* TaggedSlot = &TaggedSlotItems[TagedSlotIndex];
+		InstancesToDrop = TaggedSlot->FromInstanceIds(InstanceIdsToDrop);
+	}
+	DropFromTaggedSlot_ServerImpl(SlotTag, Quantity, InstancesToDrop, RelativeDropLocation);
+}
+
+void UInventoryComponent::DropFromTaggedSlot_ServerImpl(const FGameplayTag& SlotTag, int32 Quantity, const TArray<UItemInstanceData*>& InstancesToDrop, 
+																   FVector RelativeDropLocation)
+{
+	const int32 Index = GetIndexForTaggedSlot(SlotTag);
+	const FTaggedItemBundle& Item = TaggedSlotItems[Index];
+	if (!Item.Tag.IsValid())
+	{
+		UE_LOG(LogRISInventory, Warning, TEXT("DropFromTaggedSlot called with invalid slot tag"));
+		return;
+	}
+
+	FGameplayTag ItemId = Item.ItemId;
+
+	const FTaggedItemBundle ItemContained = GetItemForTaggedSlot(SlotTag);
+	int32 QuantityToDrop = 0;
+	if (ItemContained.IsValid() && ItemContained.ItemId == ItemId)
+	{
+		QuantityToDrop = FMath::Min(Quantity, ItemContained.Quantity);
+	}
+
+	TArray<UItemInstanceData*> InstanceArrayToAppendTo;
+	ExtractItemFromTaggedSlot_IfServer(SlotTag, Item.ItemId, QuantityToDrop, InstancesToDrop, EItemChangeReason::Dropped,
+	                                   InstanceArrayToAppendTo);
+
+	// Spawn item in the world and update state
+	SpawnItemIntoWorldFromContainer_ServerImpl(ItemId, QuantityToDrop, RelativeDropLocation, InstanceArrayToAppendTo);
+}
+
 int32 UInventoryComponent::DropAllItems_ServerImpl()
 {
 	int32 DroppedCount = 0;
-	const float AngleStep = 360.f / ItemsVer.Items.Num();
 
 	for (int i = TaggedSlotItems.Num() - 1; i >= 0; i--)
 	{
@@ -1878,14 +2142,7 @@ int32 UInventoryComponent::DropAllItems_ServerImpl()
 	}
 
 	TaggedSlotItems.Empty();
-
-	for (int i = ItemsVer.Items.Num() - 1; i >= 0; i--)
-	{
-		FVector DropLocation = GetOwner()->GetActorForwardVector() * DefaultDropDistance + FVector(
-			FMath::FRand() * 100, FMath::FRand() * 100, 100);
-		DropItemFromContainer_Server(ItemsVer.Items[i].ItemId, ItemsVer.Items[i].Quantity, TArray<int32>(), DropLocation);
-		DroppedCount++;
-	}
+	Super::DropAllItems_ServerImpl();
 
 	return DroppedCount;
 }
@@ -1893,23 +2150,14 @@ int32 UInventoryComponent::DropAllItems_ServerImpl()
 int32 UInventoryComponent::DestroyItemImpl(const FGameplayTag& ItemId, int32 Quantity, TArray<UItemInstanceData*> InstancesToDestroy, EItemChangeReason Reason,
                                            bool AllowPartial, bool SuppressEvents, bool SuppressUpdate)
 {
-	if (AllowPartial && !InstancesToDestroy.IsEmpty())
-	{
-		UE_LOG(LogRISInventory, Error, TEXT("DestroyItemImpl: AllowPartial with InstancesToDestroy is not currently supported."));
-		return 0;
-	}
-
 	TArray<UItemInstanceData*> ThrowAwayInstances;
-	return ExtractItemImpl_IfServer(ItemId, Quantity, InstancesToDestroy, Reason, ThrowAwayInstances, SuppressEvents, SuppressUpdate);
+	return ExtractItemImpl_IfServer(ItemId, Quantity, InstancesToDestroy, Reason,ThrowAwayInstances,
+	                                AllowPartial, SuppressEvents, SuppressUpdate);
 }
 
 void UInventoryComponent::ClearServerImpl()
 {
-	if (GetOwnerRole() < ROLE_Authority && GetOwnerRole() != ROLE_None)
-	{
-		UE_LOG(LogRISInventory, Warning, TEXT("ClearInventory called on non-authority!"));
-		return;
-	}
+	if (IsClient("ClearInventory called on non-authority!")) return;
 
 	int Num = TaggedSlotItems.Num();
 	for (int i = Num - 1; i >= 0; i--)
@@ -1937,46 +2185,34 @@ void UInventoryComponent::ClearServerImpl()
 	UpdateWeightAndSlots();
 }
 
-int32 UInventoryComponent::GetReceivableQuantityImpl(const FGameplayTag& ItemId) const
+
+void UInventoryComponent::UpdateWeightAndSlots()
 {
-	const UItemStaticData* ItemData = URISSubsystem::GetItemDataById(ItemId);
-	if (!ItemData)
+	// First update weight and slots as if all items were in the generic slots
+	Super::UpdateWeightAndSlots();
+
+	// then subtract the slots of the tagged items
+	for (const FTaggedItemBundle& TaggedInstance : TaggedSlotItems)
 	{
-		UE_LOG(LogRISInventory, Warning, TEXT("Could not find item data for item: %s"), *ItemId.ToString());
-		return 0; // Item data not found
-	}
-
-	const int32 AcceptableQuantityByWeight = GetQuantityContainerCanReceiveByWeight(ItemData);
-
-	int32 AcceptableQuantityBySlots = GetQuantityContainerCanReceiveBySlots(ItemData);
-
-	// Then add any available in the tagged slots
-	for (const FGameplayTag& SlotTag : SpecializedTaggedSlots)
-	{
-		AcceptableQuantityBySlots += GetQuantityOfItemTaggedSlotCanReceive(ItemId, SlotTag);
-	}
-
-	TArray<FGameplayTag> BlockedSlots = TArray<FGameplayTag>();
-	for (const FUniversalTaggedSlot& UniversalSlot : UniversalTaggedSlots)
-	{
-		if (BlockedSlots.Contains(UniversalSlot.Slot))
-			continue;
-
-		int32 QuantityThisSlotCanTake = GetQuantityOfItemTaggedSlotCanReceive(ItemId, UniversalSlot.Slot);
-		AcceptableQuantityBySlots += QuantityThisSlotCanTake;
-		if (QuantityThisSlotCanTake > 0 && UniversalSlot.UniversalSlotToBlock.IsValid() && ItemData->ItemCategories.
-			HasTag(UniversalSlot.RequiredItemCategoryToActivateBlocking))
+		if (!TaggedInstance.IsValid()) continue;
+		if (const UItemStaticData* const ItemData = URISSubsystem::GetItemDataById(
+			TaggedInstance.ItemId))
 		{
-			BlockedSlots.Add(UniversalSlot.UniversalSlotToBlock);
+			int32 SlotsTakenPerStack = 1;
+			if (JigsawMode)
+			{
+				if (JigsawMode)
+				{
+					SlotsTakenPerStack = ItemData->JigsawSizeX * ItemData->JigsawSizeY;
+				}
+			}
+
+			UsedContainerSlotCount -= FMath::CeilToInt(
+				TaggedInstance.Quantity / static_cast<float>(ItemData->MaxStackSize)) * SlotsTakenPerStack;
 		}
 	}
 
-	int32 FinalAcceptableQuantity = FMath::Min(AcceptableQuantityByWeight, AcceptableQuantityBySlots);
-	if (OnValidateAddItemToContainer.IsBound())
-		FinalAcceptableQuantity = FMath::Min(FinalAcceptableQuantity,
-		                                     OnValidateAddItemToContainer.Execute(ItemId, FinalAcceptableQuantity));
-
-	return FinalAcceptableQuantity;
+	ensureMsgf(UsedContainerSlotCount <= MaxSlotCount, TEXT("Used slot count is higher than max slot count!"));
 }
 
 void UInventoryComponent::OnInventoryItemAddedHandler(const UItemStaticData* ItemData, int32 Quantity,

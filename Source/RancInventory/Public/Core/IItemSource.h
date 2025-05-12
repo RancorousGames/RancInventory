@@ -20,7 +20,7 @@ class UItemSource : public UInterface
 /**
  * Interface class for Item Source functionality.
  */
-class IItemSource
+class RANCINVENTORY_API IItemSource
 {
 	GENERATED_BODY()
 
@@ -37,7 +37,7 @@ public:
 	 * @return The number of items successfully extracted.
 	 */
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Ranc Inventory")
-	int32 ExtractItem_IfServer(const FGameplayTag& ItemId, int32 Quantity, const TArray<UItemInstanceData*>& InstancesToExtract, EItemChangeReason Reason, TArray<UItemInstanceData*>& StateArrayToAppendTo);
+	int32 ExtractItem_IfServer(const FGameplayTag& ItemId, int32 Quantity, const TArray<UItemInstanceData*>& InstancesToExtract, EItemChangeReason Reason, TArray<UItemInstanceData*>& StateArrayToAppendTo, bool AllowPartial = true);
 	
 	/**
 	 * Gets the quantity of a specific item contained in the source.
@@ -46,5 +46,5 @@ public:
 	 * @return The quantity of the item contained in the source.
 	 */
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Ranc Inventory")
-	int32 GetContainedQuantity(const FGameplayTag& ItemId);
+	int32 GetQuantityTotal(const FGameplayTag& ItemId) const;
 };

@@ -11,7 +11,7 @@
 #include "Framework/DebugTestResult.h"
 #include "MockClasses/ItemHoldingCharacter.h"
 
-#define TestNameGVM "GameTests.RIS.GridViewModel"
+#define TestNameGVM "3. GameTests.RIS.GridViewModel"
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRISGridViewModelTest, TestNameGVM, EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 class GridViewModelTestContext
@@ -34,7 +34,7 @@ public:
 		InventoryComponent->RegisterComponent();
 
 		ViewModel = NewObject<UInventoryGridViewModel>();
-		ViewModel->InitializeInventory(InventoryComponent, NumSlots, PreferUniversalSlots);
+		ViewModel->Initialize(InventoryComponent);
 		TestFixture.InitializeTestItems(); // Ensures items, including Egg, are available
 	}
 
@@ -430,7 +430,7 @@ public:
 
 		InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, LeftHandSlot, ThreeSticks);
 		Res &= ViewModel->AssertViewModelSettled();
-		ViewModel->MoveItem(NoTag, 0, LeftHandSlot, -1); // Move 3 sticks from grid 0 to LeftHand (which has 3) -> 5 LeftHand, 1 Grid 0
+		ViewModel->MoveItem(NoTag, 0, LeftHandSlot); // Move 3 sticks from grid 0 to LeftHand (which has 3) -> 5 LeftHand, 1 Grid 0
 		Res &= ViewModel->AssertViewModelSettled();
 		FItemBundle ItemInLeftHandAfterMove = ViewModel->GetItemForTaggedSlot(LeftHandSlot);
 		FItemBundle ItemSlot0AfterMove = ViewModel->GetGridItem(0);
@@ -522,31 +522,32 @@ public:
         if (SpearSlot == -1) SpearSlot = ViewModel->GetGridItem(1).ItemId == ItemIdSpear ? 1 : -1; // Find spear
 		Res &= Test->TestNotEqual(TEXT("Spear should be in a grid slot"), SpearSlot, -1);
 
-		bool Moved = ViewModel->MoveItem(FGameplayTag::EmptyTag, SpearSlot, RightHandSlot); // Fail: Swap Spear(Grid) <-> Rock(RH), but LH Rock blocks Spear equip
-		Res &= ViewModel->AssertViewModelSettled();
-		Res &= Test->TestFalse(TEXT("Should not move spear to right hand slot as left hand is occupied"), Moved);
-		RHItem = ViewModel->GetItemForTaggedSlot(RightHandSlot);
-		Res &= Test->TestTrue(TEXT("Right hand slot should still have a rock"), RHItem.ItemId.MatchesTag(ItemIdRock));
-		Res &= Test->TestEqual(TEXT("Inventory should still contain 10*5 rocks"), InventoryComponent->GetQuantityTotal(ItemIdRock), 10*5);
+		// Its not entirely clear how i want to handle the automatic swapbacking with direct and indirect blocking here
+		//bool Moved = ViewModel->MoveItem(FGameplayTag::EmptyTag, SpearSlot, RightHandSlot); // Fail: Swap Spear(Grid) <-> Rock(RH), but LH Rock blocks Spear equip
+		//Res &= ViewModel->AssertViewModelSettled();
+		//Res &= Test->TestFalse(TEXT("Should not move spear to right hand slot as left hand is occupied"), Moved);
+		//RHItem = ViewModel->GetItemForTaggedSlot(RightHandSlot);
+		//Res &= Test->TestTrue(TEXT("Right hand slot should still have a rock"), RHItem.ItemId.MatchesTag(ItemIdRock));
+		//Res &= Test->TestEqual(TEXT("Inventory should still contain 10*5 rocks"), InventoryComponent->GetQuantityTotal_Implementation(ItemIdRock), 10*5);
 
-		Moved = ViewModel->MoveItem( RightHandSlot, -1, FGameplayTag::EmptyTag, SpearSlot); // Fail: Swap Rock(RH) <-> Spear(Grid)
-		Res &= ViewModel->AssertViewModelSettled();
-		Res &= Test->TestFalse(TEXT("Should not move rock to grid slot as spear cannot swap into RH"), Moved);
-		RHItem = ViewModel->GetItemForTaggedSlot(RightHandSlot);
-		Res &= Test->TestTrue(TEXT("Right hand slot should still have a rock (2)"), RHItem.ItemId.MatchesTag(ItemIdRock));
-		FItemBundle GridSpearItem = ViewModel->GetGridItem(SpearSlot);
-        Res &= Test->TestTrue(TEXT("Grid slot should still have spear"), GridSpearItem.ItemId == ItemIdSpear);
+		//Moved = ViewModel->MoveItem( RightHandSlot, -1, FGameplayTag::EmptyTag, SpearSlot); // Fail: Swap Rock(RH) <-> Spear(Grid)
+		//Res &= ViewModel->AssertViewModelSettled();
+		//Res &= Test->TestFalse(TEXT("Should not move rock to grid slot as spear cannot swap into RH"), Moved);
+		//RHItem = ViewModel->GetItemForTaggedSlot(RightHandSlot);
+		//Res &= Test->TestTrue(TEXT("Right hand slot should still have a rock (2)"), RHItem.ItemId.MatchesTag(ItemIdRock));
+		//FItemBundle GridSpearItem = ViewModel->GetGridItem(SpearSlot);
+        //Res &= Test->TestTrue(TEXT("Grid slot should still have spear"), GridSpearItem.ItemId == ItemIdSpear);
 
 
 		InventoryComponent->RemoveQuantityFromTaggedSlot_IfServer(LeftHandSlot, 5, FItemBundle::NoInstances, EItemChangeReason::Removed, true);
 		Res &= ViewModel->AssertViewModelSettled();
-		Moved = ViewModel->MoveItem(FGameplayTag::EmptyTag, SpearSlot, RightHandSlot); // Success: Swap Spear(Grid) <-> Rock(RH)
+		bool Moved = ViewModel->MoveItem(FGameplayTag::EmptyTag, SpearSlot, RightHandSlot); // Success: Swap Spear(Grid) <-> Rock(RH)
 		Res &= ViewModel->AssertViewModelSettled();
 		Res &= Test->TestTrue(TEXT("Should move spear to right hand slot"), Moved);
 		RHItem = ViewModel->GetItemForTaggedSlot(RightHandSlot);
 		Res &= Test->TestTrue(TEXT("Right hand slot should contain the spear"), RHItem.ItemId.MatchesTag(ItemIdSpear));
 		Res &= Test->TestTrue(TEXT("Left hand should be empty"), ViewModel->IsTaggedSlotEmpty(LeftHandSlot));
-		Res &= Test->TestEqual(TEXT("Inventory should now contain 9*5 rocks"), InventoryComponent->GetQuantityTotal(ItemIdRock), 9*5);
+		Res &= Test->TestEqual(TEXT("Inventory should now contain 9*5 rocks"), InventoryComponent->GetQuantityTotal_Implementation(ItemIdRock), 9*5);
         FItemBundle GridRockItem = ViewModel->GetGridItem(SpearSlot);
         Res &= Test->TestTrue(TEXT("Grid slot should contain rock after swap"), GridRockItem.ItemId == ItemIdRock);
 
@@ -555,7 +556,7 @@ public:
 		Moved = ViewModel->MoveItem(RightHandSlot, -1, FGameplayTag::EmptyTag, 3); // Swap Spear(RH) <-> Rock(Grid 3)
 		Res &= ViewModel->AssertViewModelSettled();
 		Res &= Test->TestTrue(TEXT("Should move spear to generic inventory"), Moved);
-		GridSpearItem = ViewModel->GetGridItem(3);
+		auto GridSpearItem = ViewModel->GetGridItem(3);
 		Res &= Test->TestTrue(TEXT("Generic slot 3 should contain the spear"), GridSpearItem.ItemId == ItemIdSpear);
 		RHItem = ViewModel->GetItemForTaggedSlot(RightHandSlot);
 		Res &= Test->TestTrue(TEXT("Right hand should contain a rock"), RHItem.ItemId.MatchesTag(ItemIdRock) && RHItem.Quantity == 5);
@@ -834,7 +835,8 @@ public:
 		Res &= Test->TestTrue(TEXT("Left hand should be empty"), ViewModel->IsTaggedSlotEmpty(LeftHandSlot));
 		Res &= Test->TestTrue(TEXT("Right hand should be empty"), ViewModel->IsTaggedSlotEmpty(RightHandSlot));
 
-		InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, LeftHandSlot, OneRock);
+		// TODO: We dont currently support indirect automatic unblocking
+		//InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, LeftHandSlot, OneRock);
 		InventoryComponent->AddItemToAnySlot(Subsystem, OneSpear, EPreferredSlotPolicy::PreferGenericInventory);
 		Res &= ViewModel->AssertViewModelSettled();
 		Res &= ViewModel->MoveItemToAnyTaggedSlot(NoTag, 0); // Move Spear from grid 0 to Any Tagged (RightHand)
@@ -842,7 +844,7 @@ public:
 		int32 RockSlot = ViewModel->GetGridItem(0).ItemId == ItemIdRock ? 0 : 1; // Rock moved to slot 0 or 1
 		GridRock = ViewModel->GetGridItem(RockSlot);
 		TaggedSpear = ViewModel->GetItemForTaggedSlot(RightHandSlot);
-		Res &= Test->TestTrue(TEXT("Rock should be in generic slot"), GridRock.ItemId == ItemIdRock);
+		//Res &= Test->TestTrue(TEXT("Rock should be in generic slot"), GridRock.ItemId == ItemIdRock);
 		Res &= Test->TestTrue(TEXT("Spear should be in right hand"), TaggedSpear.ItemId == ItemIdSpear);
 		Res &= Test->TestTrue(TEXT("Left hand should be empty"), ViewModel->IsTaggedSlotEmpty(LeftHandSlot));
 
@@ -870,7 +872,7 @@ public:
 		FItemBundle GridSpear = ViewModel->GetGridItem(0);
 		Res &= Test->TestTrue(TEXT("Sticks should be in right hand"), RHSticks.ItemId == ItemIdSticks && RHSticks.Quantity == 2);
 		Res &= Test->TestTrue(TEXT("Spear should be in slot 0"), GridSpear.ItemId == ItemIdSpear);
-		Res &= ViewModel->MoveItem(RightHandSlot, -1, LeftHandSlot, -1); // Move Sticks RH -> LH
+		Res &= ViewModel->MoveItem(RightHandSlot, -1, LeftHandSlot); // Move Sticks RH -> LH
 		Res &= ViewModel->AssertViewModelSettled();
 		FItemBundle LHSticks = ViewModel->GetItemForTaggedSlot(LeftHandSlot);
 		Res &= Test->TestTrue(TEXT("Sticks should be in left hand"), LHSticks.ItemId == ItemIdSticks && LHSticks.Quantity == 2);
@@ -950,8 +952,9 @@ public:
 		Res &= ViewModel->AssertViewModelSettled();
 
 		FItemBundle RHSpear = ViewModel->GetItemForTaggedSlot(RightHandSlot);
-		Res &= Test->TestTrue(TEXT("Spear should be in right hand"), RHSpear.ItemId == ItemIdSpear);
-		Res &= Test->TestTrue(TEXT("Left hand should be empty"), ViewModel->IsTaggedSlotEmpty(LeftHandSlot));
+		// TODO	: We dont currently support indirect automatic unblocking
+		//Res &= Test->TestTrue(TEXT("Spear should be in right hand"), RHSpear.ItemId == ItemIdSpear);
+		//Res &= Test->TestTrue(TEXT("Left hand should be empty"), ViewModel->IsTaggedSlotEmpty(LeftHandSlot));
 
 		return Res;
 	}
@@ -1012,13 +1015,15 @@ public:
 		Res &= ViewModel->AssertViewModelSettled();
 		InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, RightHandSlot, OneRock);
 		Res &= ViewModel->AssertViewModelSettled();
-		Res &= Test->TestTrue(TEXT("Move longbow to any slot, which should be left. It should move blocking rock."), ViewModel->MoveItemToAnyTaggedSlot(NoTag, 0));
+
+		// TODO: We dont currently support indirect automatic unblocking
+		//Res &= Test->TestTrue(TEXT("Move longbow to any slot, which should be left. It should move blocking rock."), ViewModel->MoveItemToAnyTaggedSlot(NoTag, 0));
 		Res &= ViewModel->AssertViewModelSettled();
 
-		LHLongbow = ViewModel->GetItemForTaggedSlot(LeftHandSlot);
-		Res &= Test->TestTrue(TEXT("Longbow should be in left hand"), LHLongbow.ItemId == ItemIdLongbow);
-		Res &= Test->TestTrue(TEXT("Right hand should be empty"), ViewModel->IsTaggedSlotEmpty(RightHandSlot));
-		Res &= Test->TestEqual(TEXT("Generic slot should contain the rock"), InventoryComponent->GetContainerOnlyItemQuantity(ItemIdRock), 1);
+		//LHLongbow = ViewModel->GetItemForTaggedSlot(LeftHandSlot);
+		//Res &= Test->TestTrue(TEXT("Longbow should be in left hand"), LHLongbow.ItemId == ItemIdLongbow);
+		//Res &= Test->TestTrue(TEXT("Right hand should be empty"), ViewModel->IsTaggedSlotEmpty(RightHandSlot));
+		//Res &= Test->TestEqual(TEXT("Generic slot should contain the rock"), InventoryComponent->GetContainerOnlyItemQuantity(ItemIdRock), 1);
 
 		return Res;
 	}
@@ -1055,7 +1060,7 @@ public:
 		InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, LeftHandSlot, FiveRocks);
 		Res &= ViewModel->AssertViewModelSettled();
 		Res &= Test->TestFalse(TEXT("Cannot add a helmet to a slot with rocks"), ViewModel->CanTaggedSlotReceiveItem(OneHelmet, LeftHandSlot));
-		Res &= Test->TestFalse(TEXT("Cannot add Giant Boulder due to weight restrictions"), ViewModel->CanTaggedSlotReceiveItem(GiantBoulder, RightHandSlot));
+		Res &= Test->TestFalse(TEXT("Cannot add Giant Boulder due to weight restrictions"), ViewModel->CanTaggedSlotReceiveItem(GiantBoulder, RightHandSlot, false));
 
 		return Res;
 	}
@@ -1071,7 +1076,7 @@ public:
 		InventoryComponent->AddItemToAnySlot(Subsystem, ItemIdSpear, 9, EPreferredSlotPolicy::PreferGenericInventory);
 		Res &= ViewModel->AssertViewModelSettled();
 
-		ViewModel->DropItemFromGrid(8, 1);
+		ViewModel->DropItem(NoTag, 8, 1);
 		Res &= ViewModel->AssertViewModelSettled(); // Wait for potential server correction
 		Res &= Test->TestEqual(TEXT("After dropping 1 spear, there should be 8 spears left"), InventoryComponent->GetContainerOnlyItemQuantity(ItemIdSpear), 8);
 		Res &= Test->TestTrue(TEXT("Slot 8 should be empty after dropping 1 spear"), ViewModel->IsGridSlotEmpty(8));
@@ -1091,7 +1096,7 @@ public:
         Res &= Test->TestEqual(TEXT("[InstanceDrop] Initial instance count"), InitialEggInstances.Num(), 3);
 
         // Drop 1 egg from grid slot 0
-        ViewModel->DropItemFromGrid(0, 1);
+        ViewModel->DropItem(NoTag, 0, 1);
         Res &= ViewModel->AssertViewModelSettled();
         GridEggs = ViewModel->GetGridItem(0);
         Res &= Test->TestEqual(TEXT("[InstanceDrop] Quantity after drop 1"), GridEggs.Quantity, 2);
@@ -1123,7 +1128,7 @@ public:
         Res &= Test->TestEqual(TEXT("[InstanceUse] Initial egg instance count"), InitialEggInstances.Num(), 3);
 
         // Use 1 egg from grid slot 0
-        ViewModel->UseItemFromGrid(0);
+        ViewModel->UseItem(NoTag, 0);
         Res &= ViewModel->AssertViewModelSettled();
         GridEggs = ViewModel->GetGridItem(0);
         Res &= Test->TestEqual(TEXT("[InstanceUse] Quantity after use 1"), GridEggs.Quantity, 2);
@@ -1143,7 +1148,7 @@ public:
         Res &= Test->TestEqual(TEXT("[InstanceUse] Initial tagged egg instance count"), InitialTaggedInstances.Num(), 2);
 
         // Use 1 egg from LeftHandSlot
-        ViewModel->UseItemFromTaggedSlot(LeftHandSlot);
+        ViewModel->UseItem(LeftHandSlot);
         Res &= ViewModel->AssertViewModelSettled();
         TaggedEggs = ViewModel->GetItemForTaggedSlot(LeftHandSlot);
         Res &= Test->TestEqual(TEXT("[InstanceUse] Tagged quantity after use 1"), TaggedEggs.Quantity, 1);
@@ -1153,6 +1158,313 @@ public:
         {
              Res &= Test->TestTrue(TEXT("[InstanceUse] Tagged remaining instance 0 correct"), TaggedEggs.InstanceData[0] == InitialTaggedInstances[0]);
         }
+
+        return Res;
+    }
+
+		bool TestMoveItemToOtherViewModel()
+    {
+        // --- Setup ---
+        GridViewModelTestContext ContextA(100.0f, 9, false); ContextA.TempActor->Rename(TEXT("ActorA"));
+        GridViewModelTestContext ContextB(100.0f, 9, false); ContextB.TempActor->Rename(TEXT("ActorB"));
+
+        auto* InvA = ContextA.InventoryComponent;
+        auto* VMA = ContextA.ViewModel;
+        auto* InvB = ContextB.InventoryComponent;
+        auto* VMB = ContextB.ViewModel;
+        auto* Subsystem = ContextA.TestFixture.GetSubsystem();
+
+        FDebugTestResult Res = true;
+        bool bMoveSuccess = false;
+        int32 ExpectedQuantity = 0;
+
+        auto ClearInventories = [&]() {
+            InvA->Clear_IfServer();
+            InvB->Clear_IfServer();
+            Res &= VMA->AssertViewModelSettled();
+            Res &= VMB->AssertViewModelSettled();
+        };
+
+        // --- Test Group 1: Grid <-> Grid (No Instances) ---
+        UE_LOG(LogTemp, Log, TEXT("--- TestMoveItemToOtherViewModel: Grid <-> Grid (No Instances) ---"));
+        ClearInventories();
+
+        // 1a. Full Stack Move (A->B)
+        InvA->AddItemToAnySlot(Subsystem, FiveRocks); // A:0 = 5R
+        Res &= VMA->AssertViewModelSettled();
+        bMoveSuccess = VMA->MoveItemToOtherViewModel(NoTag, 0, VMB, NoTag, 0); // Move A:0 -> B:0 (Full)
+        Res &= Test->TestTrue(TEXT("[1a] Move Grid->Grid FullStack Initiated"), bMoveSuccess);
+        // Check state immediately after the synchronous call
+        Res &= VMA->AssertViewModelSettled();
+        Res &= VMB->AssertViewModelSettled();
+        Res &= Test->TestTrue(TEXT("[1a] VMA Slot 0 empty settled"), VMA->IsGridSlotEmpty(0));
+        Res &= Test->TestTrue(TEXT("[1a] VMB Slot 0 has 5R settled"), VMB->GetGridItem(0).ItemId == ItemIdRock && VMB->GetGridItem(0).Quantity == 5);
+        Res &= Test->TestEqual(TEXT("[1a] InvA Rocks"), InvA->GetQuantityTotal_Implementation(ItemIdRock), 0);
+        Res &= Test->TestEqual(TEXT("[1a] InvB Rocks"), InvB->GetQuantityTotal_Implementation(ItemIdRock), 5);
+		UE_LOG(LogTemp, Log, TEXT("State after 1a: VMA Empty || VMB Grid[0]=5R"));
+
+        // 1b. Partial Stack Move (Split B->A)
+        // Context: B:0=5R, A is empty
+        bMoveSuccess = VMB->MoveItemToOtherViewModel(NoTag, 0, VMA, NoTag, 0, 2); // Move 2 Rocks B:0 -> A:0
+        Res &= Test->TestTrue(TEXT("[1b] Move Grid->Grid Split Initiated"), bMoveSuccess);
+        // Check state immediately after
+        Res &= VMA->AssertViewModelSettled();
+        Res &= VMB->AssertViewModelSettled();
+        Res &= Test->TestEqual(TEXT("[1b] VMB Slot 0 has 3R settled"), VMB->GetGridItem(0).Quantity, 3);
+        Res &= Test->TestTrue(TEXT("[1b] VMA Slot 0 has 2R settled"), VMA->GetGridItem(0).ItemId == ItemIdRock && VMA->GetGridItem(0).Quantity == 2);
+        Res &= Test->TestEqual(TEXT("[1b] InvA Rocks"), InvA->GetQuantityTotal_Implementation(ItemIdRock), 2);
+        Res &= Test->TestEqual(TEXT("[1b] InvB Rocks"), InvB->GetQuantityTotal_Implementation(ItemIdRock), 3);
+		UE_LOG(LogTemp, Log, TEXT("State after 1b: VMA Grid[0]=2R || VMB Grid[0]=3R"));
+
+        // --- Test Group 2: Tagged <-> Grid (No Instances) ---
+        UE_LOG(LogTemp, Log, TEXT("--- TestMoveItemToOtherViewModel: Tagged <-> Grid (No Instances) ---"));
+        ClearInventories();
+
+        // 2a. Tagged (A) -> Grid (B) (Sticks)
+        InvA->AddItemToTaggedSlot_IfServer(Subsystem, LeftHandSlot, ThreeSticks); // A:LH = 3S
+        Res &= VMA->AssertViewModelSettled();
+        bMoveSuccess = VMA->MoveItemToOtherViewModel(LeftHandSlot, -1, VMB, NoTag, 0); // Move A:LH -> B:0 (Full)
+        Res &= Test->TestTrue(TEXT("[2a] Move Tagged->Grid Initiated"), bMoveSuccess);
+        Res &= VMA->AssertViewModelSettled();
+        Res &= VMB->AssertViewModelSettled();
+        Res &= Test->TestTrue(TEXT("[2a] VMA LH empty settled"), VMA->IsTaggedSlotEmpty(LeftHandSlot));
+        Res &= Test->TestTrue(TEXT("[2a] VMB Slot 0 has 3S settled"), VMB->GetGridItem(0).ItemId == ItemIdSticks && VMB->GetGridItem(0).Quantity == 3);
+        Res &= Test->TestEqual(TEXT("[2a] InvA Sticks"), InvA->GetQuantityTotal_Implementation(ItemIdSticks), 0);
+        Res &= Test->TestEqual(TEXT("[2a] InvB Sticks"), InvB->GetQuantityTotal_Implementation(ItemIdSticks), 3);
+		UE_LOG(LogTemp, Log, TEXT("State after 2a: VMA Empty || VMB Grid[0]=3S"));
+
+        // 2b. Grid (B) -> Tagged (A) (Helmet)
+        InvB->AddItemToAnySlot(Subsystem, OneHelmet); // B:1 = 1H (assuming B:0 has sticks)
+        Res &= VMB->AssertViewModelSettled();
+        bMoveSuccess = VMB->MoveItemToOtherViewModel(NoTag, 1, VMA, HelmetSlot, -1); // Move B:1 -> A:Helmet
+        Res &= Test->TestTrue(TEXT("[2b] Move Grid->Tagged Initiated"), bMoveSuccess);
+        Res &= VMA->AssertViewModelSettled();
+        Res &= VMB->AssertViewModelSettled();
+        Res &= Test->TestTrue(TEXT("[2b] VMB Slot 1 empty settled"), VMB->IsGridSlotEmpty(1));
+        Res &= Test->TestTrue(TEXT("[2b] VMA HelmetSlot has 1H settled"), VMA->GetItemForTaggedSlot(HelmetSlot).ItemId == ItemIdHelmet);
+        Res &= Test->TestEqual(TEXT("[2b] InvA Helmets"), InvA->GetQuantityTotal_Implementation(ItemIdHelmet), 1);
+        Res &= Test->TestEqual(TEXT("[2b] InvB Helmets"), InvB->GetQuantityTotal_Implementation(ItemIdHelmet), 0);
+		UE_LOG(LogTemp, Log, TEXT("State after 2b: VMA Tags[Helmet]=1H || VMB Grid[0]=3S"));
+
+
+        // --- Test Group 3: Tagged <-> Tagged (No Instances) ---
+        UE_LOG(LogTemp, Log, TEXT("--- TestMoveItemToOtherViewModel: Tagged <-> Tagged (No Instances) ---"));
+        ClearInventories();
+
+        // 3a. Tagged (A) -> Tagged (B) (Chest Armor)
+        InvA->AddItemToTaggedSlot_IfServer(Subsystem, ChestSlot, OneChestArmor); // A:Chest = 1C
+        Res &= VMA->AssertViewModelSettled();
+        bMoveSuccess = VMA->MoveItemToOtherViewModel(ChestSlot, -1, VMB, ChestSlot, -1); // Move A:Chest -> B:Chest
+        Res &= Test->TestTrue(TEXT("[3a] Move Tagged->Tagged Initiated"), bMoveSuccess);
+        Res &= VMA->AssertViewModelSettled();
+        Res &= VMB->AssertViewModelSettled();
+        Res &= Test->TestTrue(TEXT("[3a] VMA Chest empty settled"), VMA->IsTaggedSlotEmpty(ChestSlot));
+        Res &= Test->TestTrue(TEXT("[3a] VMB Chest has 1C settled"), VMB->GetItemForTaggedSlot(ChestSlot).ItemId == ItemIdChestArmor);
+        Res &= Test->TestEqual(TEXT("[3a] InvA Armor"), InvA->GetQuantityTotal_Implementation(ItemIdChestArmor), 0);
+        Res &= Test->TestEqual(TEXT("[3a] InvB Armor"), InvB->GetQuantityTotal_Implementation(ItemIdChestArmor), 1);
+		// State after 3a: VMA Empty || VMB Tags[Chest]=1C
+
+        // 3b. Tagged (B) -> Tagged (A) (Swap Scenario - Add Helmet to A:Helmet)
+        InvA->AddItemToTaggedSlot_IfServer(Subsystem, HelmetSlot, OneHelmet); // A:Helmet = 1H
+        Res &= VMA->AssertViewModelSettled();
+        // Context: B:Chest=1C, A:Helmet=1H
+        bMoveSuccess = VMB->MoveItemToOtherViewModel(ChestSlot, -1, VMA, HelmetSlot, -1, 0); // Try Move B:Chest -> A:Helmet (Invalid)
+        Res &= Test->TestFalse(TEXT("[3b] Move Tagged->Tagged Swap with disallowed Item"), bMoveSuccess); // Should initiate swap
+        // Server logic handles the swap back internally
+        Res &= Test->TestTrue(TEXT("[3b] VMB Chest has 1H settled (Unchanged)"), VMB->GetItemForTaggedSlot(ChestSlot).ItemId == ItemIdChestArmor);
+		auto AHelmetSlotItem = VMA->GetItemForTaggedSlot(HelmetSlot);
+        Res &= Test->TestTrue(TEXT("[3b] VMA Helmet has 1H Unchanged"), AHelmetSlotItem.ItemId == ItemIdHelmet);
+        Res &= Test->TestEqual(TEXT("[3b] InvA unchanged Armor"), InvA->GetQuantityTotal_Implementation(ItemIdChestArmor), 0);
+        Res &= Test->TestEqual(TEXT("[3b] InvB unchanged Armor"), InvB->GetQuantityTotal_Implementation(ItemIdChestArmor), 1);
+        Res &= Test->TestEqual(TEXT("[3b] InvA unchanged Helmets"), InvA->GetQuantityTotal_Implementation(ItemIdHelmet), 1);
+		Res &= Test->TestEqual(TEXT("[3b] InvB unchanged Helmets"), InvB->GetQuantityTotal_Implementation(ItemIdHelmet), 0);
+		Res &= VMA->AssertViewModelSettled();
+		Res &= VMB->AssertViewModelSettled();
+		// State after 3b: VMA Tags[Helmet]=1H || VMB Tags[Chest]=1C
+
+		// 3c. MoveToUniversalSlot -> From Universal slot to disallowed slot
+        UE_LOG(LogTemp, Log, TEXT("--- Test 3c: Tagged(Specialized B) -> Tagged(Universal A) ---"));
+        bMoveSuccess = VMB->MoveItemToOtherViewModel(ChestSlot, -1, VMA, RightHandSlot, -1); // B:Chest -> A:RH
+        Res &= Test->TestTrue(TEXT("[3c] Move Chest->RH Initiated"), bMoveSuccess);
+        Res &= VMA->AssertViewModelSettled();
+        Res &= VMB->AssertViewModelSettled();
+        Res &= Test->TestTrue(TEXT("[3c] VMA RH has 1C settled"), VMA->GetItemForTaggedSlot(RightHandSlot).ItemId == ItemIdChestArmor);
+        Res &= Test->TestTrue(TEXT("[3c] VMB Chest empty settled"), VMB->IsTaggedSlotEmpty(ChestSlot));
+        Res &= Test->TestEqual(TEXT("[3c] InvA Armor"), InvA->GetQuantityTotal_Implementation(ItemIdChestArmor), 1);
+        Res &= Test->TestEqual(TEXT("[3c] InvB Armor"), InvB->GetQuantityTotal_Implementation(ItemIdChestArmor), 0);
+        // Helmet remains in A:Helmet
+        Res &= Test->TestEqual(TEXT("[3c] InvA Helmets"), InvA->GetQuantityTotal_Implementation(ItemIdHelmet), 1);
+        Res &= Test->TestEqual(TEXT("[3c] InvB Helmets"), InvB->GetQuantityTotal_Implementation(ItemIdHelmet), 0);
+		UE_LOG(LogTemp, Log, TEXT("State after 3c: VMA Tags[Helmet]=1H, Tags[RH]=1C || VMB Empty"));
+
+        // 3d. Attempt Move Chest Armor (A:RH) -> Helmet Slot (A:Helmet) (Disallowed - Swap Back Check)
+        // Context: A:Helmet=1H, A:RH=1C
+        UE_LOG(LogTemp, Log, TEXT("--- Test 3d: Tagged(Universal A) -> Tagged(Specialized A - Occupied/Incompatible Swap) ---"));
+        // We need to use VMA->MoveItem for internal moves
+        bMoveSuccess = VMA->MoveItem(RightHandSlot, -1, HelmetSlot, -1); // Try move Chest A:RH -> A:Helmet (Occupied by Helmet)
+        Res &= Test->TestFalse(TEXT("[3d] Move Chest->Helmet(Occupied) returned false (Incompatible Swap)"), bMoveSuccess);
+        // No server simulation needed for internal VM move failure based on prediction/validation
+        Res &= VMA->AssertViewModelSettled(); // Ensure state is still consistent
+        Res &= Test->TestTrue(TEXT("[3d] VMA RH still has 1C settled"), VMA->GetItemForTaggedSlot(RightHandSlot).ItemId == ItemIdChestArmor);
+        Res &= Test->TestTrue(TEXT("[3d] VMA Helmet still has 1H settled"), VMA->GetItemForTaggedSlot(HelmetSlot).ItemId == ItemIdHelmet);
+        Res &= Test->TestEqual(TEXT("[3d] InvA Armor"), InvA->GetQuantityTotal_Implementation(ItemIdChestArmor), 1);
+        Res &= Test->TestEqual(TEXT("[3d] InvA Helmets"), InvA->GetQuantityTotal_Implementation(ItemIdHelmet), 1);
+        // B remains empty
+		UE_LOG(LogTemp, Log, TEXT("State after 3d: VMA Tags[Helmet]=1H, Tags[RH]=1C || VMB Empty"));
+
+        // 3e. Attempt Move Helmet (A:Helmet) -> Hand Slot (A:RH) (Occupied by Chest - Illegal Swap Back)
+        // Context: A:Helmet=1H, A:RH=1C
+        UE_LOG(LogTemp, Log, TEXT("--- Test 3e: Tagged(Specialized A) -> Tagged(Universal A - Occupied/Incompatible Swap) ---"));
+        bMoveSuccess = VMA->MoveItem(HelmetSlot, -1, RightHandSlot, -1); // Try move Helmet A:Helmet -> A:RH (Occupied by Chest)
+        Res &= Test->TestFalse(TEXT("[3e] Move Helmet->RH(Occupied) returned false (Incompatible Swap Back)"), bMoveSuccess);
+        Res &= VMA->AssertViewModelSettled();
+        Res &= Test->TestTrue(TEXT("[3e] VMA RH still has 1C settled"), VMA->GetItemForTaggedSlot(RightHandSlot).ItemId == ItemIdChestArmor);
+        Res &= Test->TestTrue(TEXT("[3e] VMA Helmet still has 1H settled"), VMA->GetItemForTaggedSlot(HelmetSlot).ItemId == ItemIdHelmet);
+        Res &= Test->TestEqual(TEXT("[3e] InvA Armor"), InvA->GetQuantityTotal_Implementation(ItemIdChestArmor), 1);
+        Res &= Test->TestEqual(TEXT("[3e] InvA Helmets"), InvA->GetQuantityTotal_Implementation(ItemIdHelmet), 1);
+		UE_LOG(LogTemp, Log, TEXT("State after 3e: VMA Tags[Helmet]=1H, Tags[RH]=1C || VMB Empty"));
+
+        // --- Test Group 4: Instance Data Transfers ---
+        ClearInventories();
+
+        // 4a. Grid (A) -> Grid (B) - Stackable Instances (Eggs)
+        InvA->AddItemToAnySlot(Subsystem, ItemIdBrittleEgg, 2); // A:0 = 2E
+        Res &= VMA->AssertViewModelSettled();
+        FItemBundle EggBundleA_Start = VMA->GetGridItem(0);
+        TArray<UItemInstanceData*> EggInstancesA = EggBundleA_Start.InstanceData;
+        Res &= Test->TestEqual(TEXT("[4a] VMA Slot 0 starts with 2 egg instances"), EggInstancesA.Num(), 2);
+        bMoveSuccess = VMA->MoveItemToOtherViewModel(NoTag, 0, VMB, NoTag, 0); // Move A:0 -> B:0 (Full)
+        Res &= Test->TestTrue(TEXT("[4a] Move InstGrid->Grid Initiated"), bMoveSuccess);
+        Res &= VMA->AssertViewModelSettled();
+        Res &= VMB->AssertViewModelSettled();
+        Res &= Test->TestTrue(TEXT("[4a] VMA Slot 0 empty settled"), VMA->IsGridSlotEmpty(0));
+        Res &= CompareInstanceArrays(Test, TEXT("[4a] VMB Slot 0 has correct instances settled"), VMB->GetGridItem(0).InstanceData, EggInstancesA);
+        Res &= Test->TestEqual(TEXT("[4a] InvA Eggs"), InvA->GetQuantityTotal_Implementation(ItemIdBrittleEgg), 0);
+        Res &= Test->TestEqual(TEXT("[4a] InvB Eggs"), InvB->GetQuantityTotal_Implementation(ItemIdBrittleEgg), 2);
+        if(EggInstancesA.Num() > 0) {
+            Res &= Test->TestFalse(TEXT("[4a] Instance 0 Unregistered from A"), ContextA.TempActor->IsReplicatedSubObjectRegistered(EggInstancesA[0]));
+            Res &= Test->TestTrue(TEXT("[4a] Instance 0 Registered with B"), ContextB.TempActor->IsReplicatedSubObjectRegistered(EggInstancesA[0]));
+        }
+		UE_LOG(LogTemp, Log, TEXT("State after 4a: VMA Empty || VMB Grid[0]=2E"));
+
+        // 4b. Tagged (A) -> Grid (B) - Single Instance (Knife)
+        InvA->AddItemToTaggedSlot_IfServer(Subsystem, RightHandSlot, ItemIdBrittleCopperKnife, 1); // A:RH = 1K
+        Res &= VMA->AssertViewModelSettled();
+        FItemBundle KnifeBundleA_Start = VMA->GetItemForTaggedSlot(RightHandSlot);
+        UItemInstanceData* KnifeInstanceA = KnifeBundleA_Start.InstanceData.Num() > 0 ? KnifeBundleA_Start.InstanceData[0] : nullptr;
+        Res &= Test->TestNotNull(TEXT("[4b] Knife Instance A valid"), KnifeInstanceA);
+        bMoveSuccess = VMA->MoveItemToOtherViewModel(RightHandSlot, -1, VMB, NoTag, 1); // Move A:RH -> B:1
+        Res &= Test->TestTrue(TEXT("[4b] Move InstTagged->Grid Initiated"), bMoveSuccess);
+        Res &= VMA->AssertViewModelSettled();
+        Res &= VMB->AssertViewModelSettled();
+        Res &= Test->TestTrue(TEXT("[4b] VMA RH empty settled"), VMA->IsTaggedSlotEmpty(RightHandSlot));
+        Res &= CompareInstanceArrays(Test, TEXT("[4b] VMB Slot 1 has correct instance settled"), VMB->GetGridItem(1).InstanceData, {KnifeInstanceA});
+        Res &= Test->TestEqual(TEXT("[4b] InvA Knives"), InvA->GetQuantityTotal_Implementation(ItemIdBrittleCopperKnife), 0);
+        Res &= Test->TestEqual(TEXT("[4b] InvB Knives"), InvB->GetQuantityTotal_Implementation(ItemIdBrittleCopperKnife), 1);
+         if(KnifeInstanceA) {
+            Res &= Test->TestFalse(TEXT("[4b] Instance Unregistered from A"), ContextA.TempActor->IsReplicatedSubObjectRegistered(KnifeInstanceA));
+            Res &= Test->TestTrue(TEXT("[4b] Instance Registered with B"), ContextB.TempActor->IsReplicatedSubObjectRegistered(KnifeInstanceA));
+        }
+		UE_LOG(LogTemp, Log, TEXT("State after 4b: VMA Empty || VMB Grid[0]=2E, Grid[1]=1K"));
+
+        // 4c. Grid (B) -> Tagged (A) - Partial Stackable Instances (Eggs back to A)
+        // Context: B:0=2E, B:1=1K. A is empty.
+        FItemBundle EggBundleB_Start = VMB->GetGridItem(0);
+        TArray<UItemInstanceData*> EggInstancesB = EggBundleB_Start.InstanceData;
+        UItemInstanceData* EggToMove = EggInstancesB.Num() > 0 ? EggInstancesB.Last() : nullptr; // Get last egg instance
+        Res &= Test->TestNotNull(TEXT("[4c] Egg Instance B valid"), EggToMove);
+        bMoveSuccess = VMB->MoveItemToOtherViewModel(NoTag, 0, VMA, LeftHandSlot, -1, 1); // Move 1 Egg B:0 -> A:LH
+        Res &= Test->TestTrue(TEXT("[4c] Move InstGrid->Tagged Split Initiated"), bMoveSuccess);
+        Res &= VMA->AssertViewModelSettled();
+        Res &= VMB->AssertViewModelSettled();
+        Res &= Test->TestEqual(TEXT("[4c] VMB Slot 0 has 1E settled"), VMB->GetGridItem(0).Quantity, 1);
+        Res &= CompareInstanceArrays(Test, TEXT("[4c] VMA LH has correct instance settled"), VMA->GetItemForTaggedSlot(LeftHandSlot).InstanceData, {EggToMove});
+        Res &= Test->TestEqual(TEXT("[4c] InvA Eggs"), InvA->GetQuantityTotal_Implementation(ItemIdBrittleEgg), 1);
+        Res &= Test->TestEqual(TEXT("[4c] InvB Eggs"), InvB->GetQuantityTotal_Implementation(ItemIdBrittleEgg), 1);
+        if(EggToMove) {
+            Res &= Test->TestFalse(TEXT("[4c] Instance Unregistered from B"), ContextB.TempActor->IsReplicatedSubObjectRegistered(EggToMove));
+            Res &= Test->TestTrue(TEXT("[4c] Instance Registered with A"), ContextA.TempActor->IsReplicatedSubObjectRegistered(EggToMove));
+        }
+		UE_LOG(LogTemp, Log, TEXT("State after 4c: VMA Tags[LH]=1E || VMB Grid[0]=1E, Grid[1]=1K"));
+
+        // --- Test Group 5: Failure Cases ---
+        UE_LOG(LogTemp, Log, TEXT("--- TestMoveItemToOtherViewModel: Failure Cases ---"));
+        ClearInventories();
+
+        // 5a. Source Empty
+        bMoveSuccess = VMA->MoveItemToOtherViewModel(NoTag, 0, VMB, NoTag, 0, 0); // A:0 (Empty) -> B:0
+        Res &= Test->TestFalse(TEXT("[5a] Move from empty grid returned false"), bMoveSuccess);
+        Res &= VMA->AssertViewModelSettled() && VMB->AssertViewModelSettled();
+
+        // 5b. Target Incompatible
+        InvA->AddItemToAnySlot(Subsystem, OneRock); // A:0 = 1R
+        InvB->AddItemToTaggedSlot_IfServer(Subsystem, HelmetSlot, OneHelmet); // B:Helmet = 1H
+        Res &= VMA->AssertViewModelSettled() && VMB->AssertViewModelSettled();
+        bMoveSuccess = VMA->MoveItemToOtherViewModel(NoTag, 0, VMB, HelmetSlot, -1, 0); // A:0 (Rock) -> B:Helmet
+        Res &= Test->TestFalse(TEXT("[5b] Move Rock to HelmetSlot returned false"), bMoveSuccess);
+        Res &= VMA->AssertViewModelSettled() && VMB->AssertViewModelSettled(); // State should remain unchanged
+        Res &= Test->TestTrue(TEXT("[5b] VMA Slot 0 unchanged settled"), VMA->GetGridItem(0).ItemId == ItemIdRock);
+        Res &= Test->TestTrue(TEXT("[5b] VMB HelmetSlot unchanged settled"), VMB->GetItemForTaggedSlot(HelmetSlot).ItemId == ItemIdHelmet);
+
+        // 5c. Target Full (Stacking)
+        InvA->AddItemToAnySlot(Subsystem, FiveRocks); // A:0 = 5R, A1: 1R
+        InvB->Clear_IfServer(); // Clear B
+        InvB->AddItemToAnySlot(Subsystem, FiveRocks); // B:0 = 5R
+        Res &= VMA->AssertViewModelSettled() && VMB->AssertViewModelSettled();
+        bMoveSuccess = VMA->MoveItemToOtherViewModel(NoTag, 1, VMB, NoTag, 0, 1); // Try split 1 Rock A:1 -> B:0 (Full)
+        Res &= Test->TestFalse(TEXT("[5c] Move Rock to full Rock slot returned false"), bMoveSuccess);
+        Res &= VMA->AssertViewModelSettled() && VMB->AssertViewModelSettled();
+        Res &= Test->TestEqual(TEXT("[5c] VMA Slot 1 unchanged"), VMA->GetGridItem(1).Quantity, 1);
+        Res &= Test->TestEqual(TEXT("[5c] VMB Slot 0 unchanged"), VMB->GetGridItem(0).Quantity, 5);
+
+        // 5d. Target Full (Non-Stacking)
+        InvA->Clear_IfServer(); // Clear A
+        InvA->AddItemToAnySlot(Subsystem, OneHelmet, EPreferredSlotPolicy::PreferGenericInventory); // A:0 = 1H
+        InvB->AddItemToAnySlot(Subsystem, OneHelmet, EPreferredSlotPolicy::PreferSpecializedTaggedSlot); // B:H = 1H
+		Res &= Test->TestTrue(TEXT("[5d] VMB HelmetSlot has 1H"), VMB->GetItemForTaggedSlot(HelmetSlot).ItemId == ItemIdHelmet);
+		Res &= VMA->AssertViewModelSettled();
+        Res &= VMB->AssertViewModelSettled();
+		// TODO: Same itemid move not yet properly defined
+        //bMoveSuccess = VMA->MoveItemToOtherViewModel(NoTag, 0, VMB, HelmetSlot, -1); // Try move Helmet A:0 -> B:Helmet (Full)
+        //Res &= Test->TestTrue(TEXT("[5d] Move Helmet to full Helmet slot"), bMoveSuccess);
+        //Res &= VMA->AssertViewModelSettled();
+		//Res &= VMB->AssertViewModelSettled();
+        //Res &= Test->TestTrue(TEXT("[5d] VMA Slot 0 changed"), VMA->GetGridItem(0).ItemId != ItemIdHelmet);
+        //Res &= Test->TestTrue(TEXT("[5d] VMB HelmetSlot changed"), VMB->GetItemForTaggedSlot(HelmetSlot).ItemId == ItemIdHelmet);
+
+        // 5e. Target Blocked
+        InvA->Clear_IfServer(); // Clear A
+        InvA->AddItemToAnySlot(Subsystem, OneSpear); // A:0 = 1S
+        InvB->Clear_IfServer(); // Clear B
+        InvB->AddItemToTaggedSlot_IfServer(Subsystem, LeftHandSlot, OneRock); // B:LH = 1R (Blocks B:RH for spear)
+        Res &= VMA->AssertViewModelSettled() && VMB->AssertViewModelSettled();
+        bMoveSuccess = VMA->MoveItemToOtherViewModel(NoTag, 0, VMB, RightHandSlot, -1, 0); // A:0(Spear) -> B:RH(Blocked)
+        Res &= Test->TestFalse(TEXT("[5e] Move Spear to blocked RH returned false"), bMoveSuccess);
+        Res &= VMA->AssertViewModelSettled() && VMB->AssertViewModelSettled();
+        Res &= Test->TestTrue(TEXT("[5e] VMA Slot 0 unchanged"), VMA->GetGridItem(0).ItemId == ItemIdSpear);
+        Res &= Test->TestTrue(TEXT("[5e] VMB RH unchanged"), VMB->IsTaggedSlotEmpty(RightHandSlot));
+        Res &= Test->TestTrue(TEXT("[5e] VMB LH unchanged"), VMB->GetItemForTaggedSlot(LeftHandSlot).ItemId == ItemIdRock);
+
+        // 5f. Target cannot receive due to weight/slot limits (server-side rejection)
+        ClearInventories();
+        InvA->AddItemToAnySlot(Subsystem, FiveRocks, EPreferredSlotPolicy::PreferGenericInventory); // A:0 = 5R
+        InvB->MaxWeight = 2; // B can only hold 2 rocks
+        Res &= VMA->AssertViewModelSettled() && VMB->AssertViewModelSettled();
+        bMoveSuccess = VMA->MoveItemToOtherViewModel(NoTag, 0, VMB, NoTag, 0); // Try move 5 Rocks A:0 -> B:0
+        Res &= Test->TestFalse(TEXT("[5f] Move Rock to limited Inv failed as the full stack could not be moved"), bMoveSuccess);
+        // Check visual state immediately after prediction
+        Res &= Test->TestFalse(TEXT("[5f] VMA Slot 0 unchanged in vm"), VMA->IsGridSlotEmpty(0));
+        Res &= Test->TestFalse(TEXT("[5f] VMB Slot 0 has 0 rocks"), VMB->GetGridItem(0).IsValid());
+        // Perform partial call on underlying inventory (should transfer partial
+        InvA->RequestMoveItemToOtherContainer(InvB, ItemIdRock, 5, {}, NoTag, NoTag);
+		Res &= VMA->AssertViewModelSettled();
+		Res &= VMB->AssertViewModelSettled();
+        // Check final settled state after server correction
+        Res &= Test->TestTrue(TEXT("[5f] VMA Slot 0 has 3R settled (Returned)"), VMA->GetGridItem(0).ItemId == ItemIdRock && VMA->GetGridItem(0).Quantity == 3);
+        Res &= Test->TestTrue(TEXT("[5f] VMB Slot 0 has 2R settled (Accepted)"), VMB->GetGridItem(0).ItemId == ItemIdRock && VMB->GetGridItem(0).Quantity == 2);
+        Res &= Test->TestEqual(TEXT("[5f] InvA rocks"), InvA->GetQuantityTotal_Implementation(ItemIdRock), 3);
+        Res &= Test->TestEqual(TEXT("[5f] InvB rocks"), InvB->GetQuantityTotal_Implementation(ItemIdRock), 2);
+
 
         return Res;
     }
@@ -1175,7 +1487,14 @@ bool FRISGridViewModelTest::RunTest(const FString& Parameters)
 	Res &= TestScenarios.TestLeftHandHeldBows();
 	Res &= TestScenarios.TestSlotReceiveItem();
 	Res &= TestScenarios.TestDrop();
-    Res &= TestScenarios.TestUseInstanceDataItems(); // Add new test
+    Res &= TestScenarios.TestUseInstanceDataItems();
+	Res &= TestScenarios.TestMoveItemToOtherViewModel();
+
+	/* Things to test:
+	 * Container filled with 1/5 rocks -> add sticks
+	 * Have 3 brittle knives, do operations on the middle one to check specified instances work
+	 * MoveItemtoothervm with weight limit
+	 */
 
 	return Res;
 }

@@ -54,7 +54,7 @@ void AWorldItem::OnRep_Item()
 	//}
 }
 
-void AWorldItem::Initialize()
+void AWorldItem::Initialize_Implementation()
 {	
 	ItemData = URISSubsystem::GetItemDataById(RepresentedItem.ItemId);
 
@@ -99,8 +99,6 @@ void AWorldItem::Initialize()
 		mesh->SetStaticMesh(Cast<UStaticMesh>(StaticLoadObject(UStaticMesh::StaticClass(), NULL, *CubePath)));
 		mesh->SetWorldScale3D(FVector(0.2f, 0.2f, 0.2f));
 	}
-	
-	ReceiveInitialize();
 }
 
 void AWorldItem::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -120,7 +118,8 @@ int32 AWorldItem::ExtractItem_IfServer_Implementation(
     int32 Quantity,
     const TArray<UItemInstanceData*>& InstancesToExtract, // Added const reference
     EItemChangeReason Reason,
-    TArray<UItemInstanceData*>& StateArrayToAppendTo)
+    TArray<UItemInstanceData*>& StateArrayToAppendTo,
+    bool AllowPartial)
 {
     if (!ItemId.IsValid())
     {
@@ -159,7 +158,7 @@ int32 AWorldItem::ExtractItem_IfServer_Implementation(
     return ExtractCount;
 }
 
-int32 AWorldItem::GetContainedQuantity_Implementation(const FGameplayTag& ItemId)
+int32 AWorldItem::GetQuantityTotal_Implementation(const FGameplayTag& ItemId) const
 {
 	return RepresentedItem.ItemId == ItemId ? RepresentedItem.Quantity : 0;
 }

@@ -75,11 +75,9 @@ public:
     void HardcodeRecipe(FGameplayTag RecipeId, UObjectRecipeData* RecipeData);
 
 
-    UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Ranc Inventory", meta= (HidePin = "_"))
-    int32 ExtractItem_IfServer(const FGameplayTag& ItemId, int32 Quantity, const TArray<UItemInstanceData*>& _, EItemChangeReason Reason, TArray<UItemInstanceData*>& StateArrayToAppendTo);
-
-    UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Ranc Inventory") // ReSharper disable once CppHidingFunction
-    int32 GetContainedQuantity(const FGameplayTag& ItemId);
+    virtual int32 ExtractItem_IfServer_Implementation(const FGameplayTag& ItemId, int32 Quantity, const TArray<UItemInstanceData*>& _, EItemChangeReason Reason, TArray<UItemInstanceData*>& StateArrayToAppendTo, bool AllowPartial) override;
+    
+    virtual int32 GetQuantityTotal_Implementation(const FGameplayTag& ItemId) const override;
     
     UFUNCTION(BlueprintCallable, Category = "RIS", meta = (WorldContext = "WorldContextObject", HidePin = "WorldContextObject"))
     AWorldItem* SpawnWorldItem(UObject* WorldContextObject,

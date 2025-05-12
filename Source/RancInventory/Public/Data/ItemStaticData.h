@@ -112,6 +112,11 @@ public:
 		return nullptr;
 	}
 
+	bool UsesInstances() const
+	{
+		return DefaultInstanceDataTemplate != nullptr;
+	}
+
 	template<typename T>
 	T* GetItemDefinition() const
 		{

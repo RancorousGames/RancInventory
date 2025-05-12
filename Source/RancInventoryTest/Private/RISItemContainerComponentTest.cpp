@@ -12,28 +12,10 @@
 #include "Framework/TestDelegateForwardHelper.h"
 #include "MockClasses/ItemHoldingCharacter.h"
 
-#define TestName "GameTests.RIS.ItemContainerComponent"
+#define TestName "1. GameTests.RIS.ItemContainerComponent"
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRancItemContainerComponentTest, TestName,
                                  EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
-
-URecursiveContainerInstanceData* GetRecursiveInstanceData(const FItemBundle& Bundle)
-{
-	if (Bundle.InstanceData.IsValidIndex(0))
-	{
-		return Cast<URecursiveContainerInstanceData>(Bundle.InstanceData[0]);
-	}
-	return nullptr;
-}
-
-// Helper to safely get the UItemContainerComponent managed by a Recursive Container Instance Data
-UItemContainerComponent* GetRecursiveContainerComponent(const FItemBundle& Bundle)
-{
-	if (URecursiveContainerInstanceData* InstanceData = GetRecursiveInstanceData(Bundle))
-	{
-		return InstanceData->RepresentedContainer;
-	}
-	return nullptr;
-}
 
 // Helper to find a component of a specific class on an actor
 template <typename T>
@@ -85,6 +67,23 @@ public:
 	UItemContainerComponent* ItemContainerComponent;
 };
 
+
+URecursiveContainerInstanceData* GetRecursiveInstanceData(const FItemContainerTestContext& Context, const FGameplayTag& ItemId)
+{
+	return Cast<URecursiveContainerInstanceData>(Context.ItemContainerComponent->GetSingleItemInstanceData(ItemId));
+}
+
+// Helper to safely get the UItemContainerComponent managed by a Recursive Container Instance Data
+UItemContainerComponent* GetRecursiveContainerComponent(const FItemContainerTestContext& Context, const FGameplayTag& ItemId)
+{
+	if (URecursiveContainerInstanceData* InstanceData = GetRecursiveInstanceData(Context, ItemId))
+	{
+		return InstanceData->RepresentedContainer;
+	}
+	return nullptr;
+}
+
+
 class FItemContainerTestScenarios
 {
 public:
@@ -100,7 +99,7 @@ public:
 			Subsystem, FiveRocks, false);
 		Res &= Test->TestEqual(TEXT("Should add 5 rocks"), AddedQuantity, 5);
 		Res &= Test->TestEqual(
-			TEXT("Total weight should be 5 after adding rocks"), Context.ItemContainerComponent->GetCurrentWeight(),
+			TEXT("Total weight should be 5 after adding rocks"), Context.ItemContainerComponent->CurrentWeight,
 			5.0f);
 
 		// Test adding another item that exceeds the weight limit
@@ -109,7 +108,7 @@ public:
 		Res &= Test->TestEqual(TEXT("Should not add Giant Boulder due to weight limit"), AddedQuantity, 0);
 		Res &= Test->TestEqual(
 			TEXT("Total weight should remain 5 after attempting to add Giant Boulder"),
-			Context.ItemContainerComponent->GetCurrentWeight(), 5.0f);
+			Context.ItemContainerComponent->CurrentWeight, 5.0f);
 
 		// Test adding item partially when exceeding the max weight
 		AddedQuantity = Context.ItemContainerComponent->AddItem_IfServer(
@@ -117,7 +116,7 @@ public:
 		Res &= Test->TestEqual(TEXT("Should add only 5 sticks due to weight limit"), AddedQuantity, 5);
 		Res &= Test->TestEqual(
 			TEXT("Total weight should be 10 after partially adding sticks"),
-			Context.ItemContainerComponent->GetCurrentWeight(), 10.0f);
+			Context.ItemContainerComponent->CurrentWeight, 10.0f);
 
 		// Test adding an item when not enough slots are available but under weight limit
 		Context.ItemContainerComponent->Clear_IfServer(); // Clear the inventory
@@ -136,7 +135,7 @@ public:
 		AddedQuantity = Context.ItemContainerComponent->AddItem_IfServer(Subsystem, OneSpear, false);
 		Res &= Test->TestEqual(TEXT("Should add 1 spear"), AddedQuantity, 1);
 		Res &= Test->TestEqual(
-			TEXT("Total weight should be 3 after adding spear"), Context.ItemContainerComponent->GetCurrentWeight(),
+			TEXT("Total weight should be 3 after adding spear"), Context.ItemContainerComponent->CurrentWeight,
 			3.0f);
 		Res &= Test->TestEqual(
 			TEXT("Total used slot count should be 1"), Context.ItemContainerComponent->UsedContainerSlotCount, 1);
@@ -145,7 +144,7 @@ public:
 		AddedQuantity = Context.ItemContainerComponent->AddItem_IfServer(Subsystem, OneHelmet, false);
 		Res &= Test->TestEqual(TEXT("Should add 1 helmet"), AddedQuantity, 1);
 		Res &= Test->TestEqual(
-			TEXT("Total weight should be 5 after adding helmet"), Context.ItemContainerComponent->GetCurrentWeight(),
+			TEXT("Total weight should be 5 after adding helmet"), Context.ItemContainerComponent->CurrentWeight,
 			5.0f);
 		Res &= Test->TestEqual(
 			TEXT("Total used slot count should be 2"), Context.ItemContainerComponent->UsedContainerSlotCount, 2);
@@ -166,7 +165,7 @@ public:
 		Res &= Test->TestEqual(TEXT("Should not add heavy item due to weight limit"), AddedQuantity, 0);
 		Res &= Test->TestEqual(
 			TEXT("Total weight should remain 5 after attempting to add heavy helmet"),
-			Context.ItemContainerComponent->GetCurrentWeight(), 5.0f);
+			Context.ItemContainerComponent->CurrentWeight, 5.0f);
 		Res &= Test->TestEqual(
 			TEXT("Total used slot count should be 2"), Context.ItemContainerComponent->UsedContainerSlotCount, 2);
 
@@ -175,7 +174,7 @@ public:
 		Res &= Test->TestEqual(TEXT("Should add another rock"), AddedQuantity, 1);
 		Res &= Test->TestEqual(
 			TEXT("Total weight should be 6 after adding another rock"),
-			Context.ItemContainerComponent->GetCurrentWeight(), 6.0f);
+			Context.ItemContainerComponent->CurrentWeight, 6.0f);
 		Res &= Test->TestEqual(
 			TEXT("Total used slot count should be 3 after adding another rock"),
 			Context.ItemContainerComponent->UsedContainerSlotCount, 3);
@@ -201,7 +200,7 @@ public:
 		Res &= Test->TestEqual(TEXT("Should remove 2 rocks"), RemovedQuantity, 2);
 		Res &= Test->TestEqual(
 			TEXT("Total rocks should be 3 after removal"),
-			Context.ItemContainerComponent->GetQuantityTotal(ItemIdRock), 3);
+			Context.ItemContainerComponent->GetQuantityTotal_Implementation(ItemIdRock), 3);
 
 		// Test removing a stackable item completely
 		RemovedQuantity = Context.ItemContainerComponent->DestroyItem_IfServer(
@@ -245,43 +244,43 @@ public:
 
 		Res &= Test->TestTrue(
 			TEXT("Container should initially be able to receive rocks"),
-			Context.ItemContainerComponent->CanContainerReceiveItems(FiveRocks));
+			Context.ItemContainerComponent->CanReceiveItem(FiveRocks));
 
 		Context.ItemContainerComponent->AddItem_IfServer(Subsystem, ThreeRocks, false);
 
 		Res &= Test->TestTrue(
 			TEXT("Container should still be able to receive more rocks"),
-			Context.ItemContainerComponent->CanContainerReceiveItems(TwoRocks));
+			Context.ItemContainerComponent->CanReceiveItem(TwoRocks));
 		Res &= Test->TestFalse(
 			TEXT("Container should not be able to receive more rocks than its weight limit"),
-			Context.ItemContainerComponent->CanContainerReceiveItems(ItemIdRock, 13));
+			Context.ItemContainerComponent->CanReceiveItem(ItemIdRock, 13));
 
 		Context.ItemContainerComponent->AddItem_IfServer(Subsystem, ItemIdHelmet, 5, false);
 
 		Res &= Test->TestTrue(
 			TEXT("Container should be able to receive a helmet"),
-			Context.ItemContainerComponent->CanContainerReceiveItems(OneHelmet));
+			Context.ItemContainerComponent->CanReceiveItem(OneHelmet));
 		Res &= Test->TestFalse(
 			TEXT("Container should not be able to receive a spear"),
-			Context.ItemContainerComponent->CanContainerReceiveItems(OneSpear));
+			Context.ItemContainerComponent->CanReceiveItem(OneSpear));
 
 		Context.ItemContainerComponent->AddItem_IfServer(Subsystem, TwoRocks, false);
 
 		Res &= Test->TestFalse(
 			TEXT("Container should not be able to receive any more items due to weight limit"),
-			Context.ItemContainerComponent->CanContainerReceiveItems(ItemIdRock, 1));
+			Context.ItemContainerComponent->CanReceiveItem(ItemIdRock, 1));
 		Res &= Test->TestFalse(
 			TEXT("Container should not be able to receive any more unstackable items due to item count limit"),
-			Context.ItemContainerComponent->CanContainerReceiveItems(OneHelmet));
+			Context.ItemContainerComponent->CanReceiveItem(OneHelmet));
 
 		Context.ItemContainerComponent->MaxWeight = 20;
 		Res &= Test->TestTrue(
 			TEXT("Container should now be able to receive 1 more item"),
-			Context.ItemContainerComponent->CanContainerReceiveItems(OneHelmet));
+			Context.ItemContainerComponent->CanReceiveItem(OneHelmet));
 		Context.ItemContainerComponent->AddItem_IfServer(Subsystem, OneHelmet, false);
 		Res &= Test->TestFalse(
 			TEXT("Container should not be able to receive any more unstackable items due to slot count limit"),
-			Context.ItemContainerComponent->CanContainerReceiveItems(OneHelmet));
+			Context.ItemContainerComponent->CanReceiveItem(OneHelmet));
 		return Res;
 	}
 
@@ -296,11 +295,11 @@ public:
 		Context.ItemContainerComponent->AddItem_IfServer(Subsystem, OneHelmet, false);
 
 		Res &= Test->TestEqual(
-			TEXT("Inventory should report 5 rocks"), Context.ItemContainerComponent->GetQuantityTotal(ItemIdRock),
+			TEXT("Inventory should report 5 rocks"), Context.ItemContainerComponent->GetQuantityTotal_Implementation(ItemIdRock),
 			5);
 		Res &= Test->TestEqual(
 			TEXT("Inventory should report 1 helmet"),
-			Context.ItemContainerComponent->GetQuantityTotal(ItemIdHelmet), 1);
+			Context.ItemContainerComponent->GetQuantityTotal_Implementation(ItemIdHelmet), 1);
 
 		Res &= Test->TestTrue(
 			TEXT("Inventory should contain at least 5 rocks"), Context.ItemContainerComponent->Contains(ItemIdRock, 5));
@@ -331,7 +330,7 @@ public:
 		Context.ItemContainerComponent->DestroyItem_IfServer(ThreeRocks, FItemBundle::NoInstances, EItemChangeReason::Removed, true);
 		Res &= Test->TestEqual(
 			TEXT("After removal, inventory should report 2 rocks"),
-			Context.ItemContainerComponent->GetQuantityTotal(ItemIdRock), 2);
+			Context.ItemContainerComponent->GetQuantityTotal_Implementation(ItemIdRock), 2);
 
 		Res &= Test->TestFalse(TEXT("Inventory should not be empty"), Context.ItemContainerComponent->IsEmpty());
 
@@ -349,15 +348,15 @@ public:
 		
 		FDebugTestResult Res = true;
 
-		FItemBundle RockItemInstance = Context.ItemContainerComponent->FindItemById(ItemIdRock);
+		int32 ContainedQuantity = Context.ItemContainerComponent->GetQuantityTotal_Implementation(ItemIdRock);
 		Res &= Test->TestTrue(
-			TEXT("FindItemById should not find an item before it's added"), RockItemInstance.ItemId != ItemIdRock);
+			TEXT("FindItemById should not find an item before it's added"), ContainedQuantity == 0);
 
 		Context.ItemContainerComponent->AddItem_IfServer(Subsystem, ItemIdRock, 1);
 
-		RockItemInstance = Context.ItemContainerComponent->FindItemById(ItemIdRock);
+		ContainedQuantity = Context.ItemContainerComponent->GetQuantityTotal_Implementation(ItemIdRock);
 		Res &= Test->TestTrue(
-			TEXT("FindItemById should find the item after it's added"), RockItemInstance.ItemId == ItemIdRock);
+			TEXT("FindItemById should find the item after it's added"), ContainedQuantity == 1);
 
 		Res &= Test->TestTrue(
 			TEXT("ContainsItems should return true for items present in the container"),
@@ -369,7 +368,7 @@ public:
 		Context.ItemContainerComponent->Clear_IfServer();
 
 		Context.ItemContainerComponent->AddItem_IfServer(Subsystem, ItemIdRock, 1);
-		Context.ItemContainerComponent->DropItems(ItemIdRock, 1, FItemBundle::NoInstances);
+		Context.ItemContainerComponent->DropItem(ItemIdRock, 1, FItemBundle::NoInstances);
 
 		return Res;
 	}
@@ -384,9 +383,9 @@ public:
 		const auto DelegateHelper = NewObject<UTestDelegateForwardHelper>();
 		UItemContainerComponent::FAddItemValidationDelegate MyDelegateInstance;
 		MyDelegateInstance.BindUFunction(DelegateHelper, FName("DispatchItemToInt"));
-		Context.ItemContainerComponent->SetAddItemValidationCallback_IfServer(MyDelegateInstance);
+		Context.ItemContainerComponent->SetAddItemValidationCallback(MyDelegateInstance);
 
-		DelegateHelper->CallFuncItemToInt = [](const FGameplayTag& ItemId, int32 RequestedQuantity)
+		DelegateHelper->CallFuncItemToInt = [](const FGameplayTag& ItemId, int32 RequestedQuantity, const FGameplayTag& Slot)
 		{
 			return ItemId.MatchesTag(ItemIdRock) ? RequestedQuantity : 0;
 		};
@@ -398,7 +397,7 @@ public:
 		AddedQuantity = Context.ItemContainerComponent->AddItem_IfServer(Subsystem, OneHelmet, false);
 		Res &= Test->TestEqual(TEXT("Should not add the helmet since only rocks are allowed"), AddedQuantity, 0);
 
-		DelegateHelper->CallFuncItemToInt = [&](const FGameplayTag& ItemId, int32 Quantity) { return Quantity; };
+		DelegateHelper->CallFuncItemToInt = [&](const FGameplayTag& ItemId, int32 Quantity, const FGameplayTag& Slot) { return Quantity; };
 
 		AddedQuantity = Context.ItemContainerComponent->AddItem_IfServer(Subsystem, OneHelmet, false);
 		Res &= Test->TestEqual(TEXT("Should add the helmet now that all items are allowed"), AddedQuantity, 1);
@@ -417,9 +416,9 @@ public:
 		int32 Added = Context.ItemContainerComponent->AddItem_IfServer(Subsystem, ItemIdRock, 20, false);
 		Res &= Test->TestEqual(TEXT("Should add 20 rocks"), Added, 20);
 		TArray<UItemInstanceData*> ExtractedDynamicItems = TArray<UItemInstanceData*>();
-		int ExtractedCount = Context.ItemContainerComponent->ExtractItem_IfServer(ItemIdRock, 5, FItemBundle::NoInstances, EItemChangeReason::Removed, ExtractedDynamicItems);
+		int ExtractedCount = Context.ItemContainerComponent->ExtractItem_IfServer_Implementation(ItemIdRock, 5, FItemBundle::NoInstances, EItemChangeReason::Removed, ExtractedDynamicItems, true);
 		Res &= Test->TestEqual(TEXT("Should extract 5 rocks"), ExtractedCount, 5);
-		Res &= Test->TestEqual(TEXT("Should have 15 rocks remaining"), Context.ItemContainerComponent->GetQuantityTotal(ItemIdRock), 15);
+		Res &= Test->TestEqual(TEXT("Should have 15 rocks remaining"), Context.ItemContainerComponent->GetQuantityTotal_Implementation(ItemIdRock), 15);
 		Res &= Test->TestEqual(TEXT("Should have no dynamic data as rocks dont have instance data"), ExtractedDynamicItems.Num(), 0);
 
 		// Now try to add an item with instance data and extract it
@@ -435,9 +434,9 @@ public:
 
 		// Now extract it and verify that the item state is returned
 		ExtractedDynamicItems = TArray<UItemInstanceData*>();
-		ExtractedCount = Context.ItemContainerComponent->ExtractItem_IfServer(ItemIdBrittleCopperKnife, 1, FItemBundle::NoInstances, EItemChangeReason::Removed, ExtractedDynamicItems);
+		ExtractedCount = Context.ItemContainerComponent->ExtractItem_IfServer_Implementation(ItemIdBrittleCopperKnife, 1, FItemBundle::NoInstances, EItemChangeReason::Removed, ExtractedDynamicItems, true);
 		Res &= Test->TestEqual(TEXT("Should extract 1 knife"), ExtractedCount, 1);
-		Res &= Test->TestEqual(TEXT("Should have 0 knives remaining"), Context.ItemContainerComponent->GetQuantityTotal(ItemIdBrittleCopperKnife), 0);
+		Res &= Test->TestEqual(TEXT("Should have 0 knives remaining"), Context.ItemContainerComponent->GetQuantityTotal_Implementation(ItemIdBrittleCopperKnife), 0);
 		Res &= Test->TestEqual(TEXT("Should have 1 extracted knife instance data"), ExtractedDynamicItems.Num(), 1);
 		if (ExtractedDynamicItems.Num() > 0)
 		{
@@ -453,13 +452,13 @@ public:
 
 		Added = Context.ItemContainerComponent->AddItem_IfServer(LimitedSource, ItemIdRock, 10, false);
 		Res &= Test->TestEqual(TEXT("Should add 5 rocks"), Added, 5);
-		Res &= Test->TestEqual(TEXT("Should have 5 rocks"), Context.ItemContainerComponent->GetQuantityTotal(ItemIdRock), 5);
+		Res &= Test->TestEqual(TEXT("Should have 5 rocks"), Context.ItemContainerComponent->GetQuantityTotal_Implementation(ItemIdRock), 5);
 		Res &= Test->TestEqual(TEXT("Should have exhausted the source"), LimitedSource->SourceRemainder, 0);
 		// Try to add one more which should fail
 
 		Added = Context.ItemContainerComponent->AddItem_IfServer(LimitedSource, ItemIdRock, 1, false);
 		Res &= Test->TestEqual(TEXT("Should not add a rock"), Added, 0);
-		Res &= Test->TestEqual(TEXT("Should still have 5 rocks"), Context.ItemContainerComponent->GetQuantityTotal(ItemIdRock), 5);
+		Res &= Test->TestEqual(TEXT("Should still have 5 rocks"), Context.ItemContainerComponent->GetQuantityTotal_Implementation(ItemIdRock), 5);
 		Res &= Test->TestEqual(TEXT("Should still have exhausted the source"), LimitedSource->SourceRemainder, 0);
 		
 		return Res;
@@ -499,14 +498,15 @@ public:
 
 		// 3. Transfer the knife from Container A to Container B
 		UItemInstanceData* InstancePtrBeforeTransfer = ItemStateA.Num() > 0 ? ItemStateA[0] : nullptr; // Keep pointer for later check
-		int32 Transferred = ContextB.ItemContainerComponent->ExtractItemFromOtherContainer_IfServer(
-			ContextA.ItemContainerComponent, ItemIdBrittleCopperKnife, 1, FItemBundle::NoInstances, false);
-			
+		ContextA.ItemContainerComponent->RequestMoveItemToOtherContainer(
+			ContextB.ItemContainerComponent, ItemIdBrittleCopperKnife, 1, FItemBundle::NoInstances, NoTag, NoTag);
+
+		int32 Transferred = ContextB.ItemContainerComponent->GetQuantityTotal_Implementation(ItemIdBrittleCopperKnife);
 		Res &= Test->TestEqual(TEXT("[Transfer] Should transfer 1 knife from A to B"), Transferred, 1);
 
 		// 4. Verify Item state in Container A after transfer
 		Res &= Test->TestEqual(TEXT("[Transfer] Container A should have 0 knives after transfer"),
-		                       ContextA.ItemContainerComponent->GetQuantityTotal(ItemIdBrittleCopperKnife), 0);
+		                       ContextA.ItemContainerComponent->GetQuantityTotal_Implementation(ItemIdBrittleCopperKnife), 0);
 		ItemStateA = ContextA.ItemContainerComponent->GetItemInstanceData(ItemIdBrittleCopperKnife);
 		Res &= Test->TestEqual(TEXT("[Transfer] Container A should have 0 instance data entries after transfer"), ItemStateA.Num(), 0);
 		if (InstancePtrBeforeTransfer)
@@ -517,7 +517,7 @@ public:
 
 		// 5. Verify Item state and Instance Data in Container B after transfer
 		Res &= Test->TestEqual(TEXT("[Transfer] Container B should have 1 knife after transfer"),
-		                       ContextB.ItemContainerComponent->GetQuantityTotal(ItemIdBrittleCopperKnife), 1);
+		                       ContextB.ItemContainerComponent->GetQuantityTotal_Implementation(ItemIdBrittleCopperKnife), 1);
 		TArray<UItemInstanceData*> ItemStateB = ContextB.ItemContainerComponent->GetItemInstanceData(ItemIdBrittleCopperKnife);
 		Res &= Test->TestEqual(TEXT("[Transfer] Container B should have 1 instance data entry after transfer"), ItemStateB.Num(), 1);
 		if (ItemStateB.Num() == 1)
@@ -538,7 +538,10 @@ public:
 		// 6. Add a rock (no instance data) and transfer it - ensure no instance data appears
 		Added = ContextA.ItemContainerComponent->AddItem_IfServer(Subsystem, ItemIdRock, 1, false);
 		Res &= Test->TestEqual(TEXT("[Transfer] Should add 1 rock to Container A"), Added, 1);
-		Transferred = ContextB.ItemContainerComponent->ExtractItemFromOtherContainer_IfServer(ContextA.ItemContainerComponent, ItemIdRock, 1, FItemBundle::NoInstances, false);
+		
+		ContextA.ItemContainerComponent->RequestMoveItemToOtherContainer(
+			ContextB.ItemContainerComponent, ItemIdRock, 1, FItemBundle::NoInstances, NoTag, NoTag);
+		Transferred = ContextB.ItemContainerComponent->GetQuantityTotal_Implementation(ItemIdRock);
 		Res &= Test->TestEqual(TEXT("[Transfer] Should transfer 1 rock from A to B"), Transferred, 1);
 		ItemStateB = ContextB.ItemContainerComponent->GetItemInstanceData(ItemIdRock);
 		Res &= Test->TestEqual(TEXT("[Transfer] Container B should have 0 instance data entries for the rock"), ItemStateB.Num(), 0);
@@ -574,10 +577,10 @@ public:
 		                      ContextA.TempActor->IsReplicatedSubObjectRegistered(InstancePtrBeforeDrop));
 
 		// 2. Drop the knife
-		int32 Dropped = ContextA.ItemContainerComponent->DropItems(ItemIdBrittleCopperKnife, 1, FItemBundle::NoInstances);
+		int32 Dropped = ContextA.ItemContainerComponent->DropItem(ItemIdBrittleCopperKnife, 1, FItemBundle::NoInstances);
 		Res &= Test->TestEqual(TEXT("[DropPickup] DropItems should report 1 item dropped"), Dropped, 1); // Client guess, but check anyway
 		Res &= Test->TestEqual(TEXT("[DropPickup] Container A should have 0 knives after drop"),
-		                       ContextA.ItemContainerComponent->GetQuantityTotal(ItemIdBrittleCopperKnife), 0);
+		                       ContextA.ItemContainerComponent->GetQuantityTotal_Implementation(ItemIdBrittleCopperKnife), 0);
 		Res &= Test->TestFalse(TEXT("[DropPickup] Instance should NOT be registered with Owner A after drop"),
 		                       ContextA.TempActor->IsReplicatedSubObjectRegistered(InstancePtrBeforeDrop));
 
@@ -598,7 +601,7 @@ public:
 		UItemDurabilityTestInstanceData* DurabilityDataWorld = nullptr;
 		if (DroppedWorldItem)
 		{
-			Res &= Test->TestEqual(TEXT("[DropPickup] WorldItem should represent 1 knife"), DroppedWorldItem->GetContainedQuantity(ItemIdBrittleCopperKnife), 1);
+			Res &= Test->TestEqual(TEXT("[DropPickup] WorldItem should represent 1 knife"), DroppedWorldItem->GetQuantityTotal_Implementation(ItemIdBrittleCopperKnife), 1);
 			TArray<UItemInstanceData*>& WorldItemState = DroppedWorldItem->RepresentedItem.InstanceData;
 			Res &= Test->TestEqual(TEXT("[DropPickup] WorldItem should have 1 instance data entry"), WorldItemState.Num(), 1);
 			if (WorldItemState.Num() == 1)
@@ -625,7 +628,7 @@ public:
 		if (DroppedWorldItem)
 		{
 			// WorldItem's ExtractItem should have removed the instance data and quantity
-			Res &= Test->TestEqual(TEXT("[DropPickup] WorldItem should have 0 knives after pickup"), DroppedWorldItem->GetContainedQuantity(ItemIdBrittleCopperKnife), 0);
+			Res &= Test->TestEqual(TEXT("[DropPickup] WorldItem should have 0 knives after pickup"), DroppedWorldItem->GetQuantityTotal_Implementation(ItemIdBrittleCopperKnife), 0);
 			Res &= Test->TestEqual(TEXT("[DropPickup] WorldItem should have 0 instance data entries after pickup"), DroppedWorldItem->RepresentedItem.InstanceData.Num(), 0);
 			if (InstancePtrBeforePickup)
 			{
@@ -638,7 +641,7 @@ public:
 
 		// 7. Verify Container B state after pickup
 		Res &= Test->TestEqual(TEXT("[DropPickup] Container B should have 1 knife after pickup"),
-		                       ContextB.ItemContainerComponent->GetQuantityTotal(ItemIdBrittleCopperKnife), 1);
+		                       ContextB.ItemContainerComponent->GetQuantityTotal_Implementation(ItemIdBrittleCopperKnife), 1);
 		TArray<UItemInstanceData*> ItemStateB = ContextB.ItemContainerComponent->GetItemInstanceData(ItemIdBrittleCopperKnife);
 		Res &= Test->TestEqual(TEXT("[DropPickup] Container B should have 1 instance data entry after pickup"), ItemStateB.Num(), 1);
 		if (ItemStateB.Num() == 1)
@@ -679,7 +682,7 @@ public:
 		// 9. Destroy two knives
 		int32 Destroyed = ContextA.ItemContainerComponent->DestroyItem_IfServer(ItemIdBrittleCopperKnife, 2, FItemBundle::NoInstances, EItemChangeReason::Removed, true);
 		Res &= Test->TestEqual(TEXT("[Destroy] Should destroy 2 knives"), Destroyed, 2);
-		Res &= Test->TestEqual(TEXT("[Destroy] Should have 1 knife remaining"), ContextA.ItemContainerComponent->GetQuantityTotal(ItemIdBrittleCopperKnife), 1);
+		Res &= Test->TestEqual(TEXT("[Destroy] Should have 1 knife remaining"), ContextA.ItemContainerComponent->GetQuantityTotal_Implementation(ItemIdBrittleCopperKnife), 1);
 		ItemStateA = ContextA.ItemContainerComponent->GetItemInstanceData(ItemIdBrittleCopperKnife);
 		Res &= Test->TestEqual(TEXT("[Destroy] Should have 1 instance data entry remaining"), ItemStateA.Num(), 1);
 
@@ -702,7 +705,7 @@ public:
 		UItemInstanceData* LastInstancePtr = ItemStateA.Num() > 0 ? ItemStateA[0] : nullptr;
 		Destroyed = ContextA.ItemContainerComponent->DestroyItem_IfServer(ItemIdBrittleCopperKnife, 1, FItemBundle::NoInstances, EItemChangeReason::Removed, true);
 		Res &= Test->TestEqual(TEXT("[Destroy] Should destroy the last knife"), Destroyed, 1);
-		Res &= Test->TestEqual(TEXT("[Destroy] Should have 0 knives remaining"), ContextA.ItemContainerComponent->GetQuantityTotal(ItemIdBrittleCopperKnife), 0);
+		Res &= Test->TestEqual(TEXT("[Destroy] Should have 0 knives remaining"), ContextA.ItemContainerComponent->GetQuantityTotal_Implementation(ItemIdBrittleCopperKnife), 0);
 		ItemStateA = ContextA.ItemContainerComponent->GetItemInstanceData(ItemIdBrittleCopperKnife);
 		Res &= Test->TestEqual(TEXT("[Destroy] Should have 0 instance data entries remaining"), ItemStateA.Num(), 0);
 		if (LastInstancePtr)
@@ -731,11 +734,10 @@ public:
         // 1. Add Backpack to Container A
         int32 Added = ContextA.ItemContainerComponent->AddItem_IfServer(Subsystem, ItemIdBackpack, 1, false);
         Res &= Test->TestEqual(TEXT("[Recursive] 1. Add Backpack: Added Quantity"), Added, 1);
-        FItemBundle BackpackBundleA = ContextA.ItemContainerComponent->FindItemById(ItemIdBackpack);
-        Res &= Test->TestTrue(TEXT("[Recursive] 1. Add Backpack: Bundle Valid"), BackpackBundleA.IsValid());
+        Res &= Test->TestTrue(TEXT("[Recursive] 1. Add Backpack: Bundle Valid"), ContextA.ItemContainerComponent->GetQuantityTotal_Implementation(ItemIdBackpack) == 1);
 
         // 2. Verify Instance Data and Sub-Component Creation (A)
-        URecursiveContainerInstanceData* BackpackInstanceA = GetRecursiveInstanceData(BackpackBundleA);
+        URecursiveContainerInstanceData* BackpackInstanceA = GetRecursiveInstanceData(ContextA, ItemIdBackpack);
         Res &= Test->TestNotNull(TEXT("[Recursive] 2. Verify Creation (A): Instance Data Exists"), BackpackInstanceA);
         if (!BackpackInstanceA) return false; // Stop test if instance data failed
 		
@@ -764,15 +766,15 @@ public:
         Res &= Test->TestEqual(TEXT("[Recursive] 3. Add Inside (A): Knife Added Quantity"), Added, 1);
 
         // 4. Verify Contents of Sub-Container A
-        Res &= Test->TestEqual(TEXT("[Recursive] 4. Verify Contents (A): Rock Quantity"), SubContainerA->GetQuantityTotal(ItemIdRock), 3);
-        Res &= Test->TestEqual(TEXT("[Recursive] 4. Verify Contents (A): Knife Quantity"), SubContainerA->GetQuantityTotal(ItemIdBrittleCopperKnife), 1);
-        Res &= Test->TestEqual(TEXT("[Recursive] 4. Verify Contents (A): Sub-Container Weight"), SubContainerA->GetCurrentWeight(), 6.0f); // 3*1 + 3*1
+        Res &= Test->TestEqual(TEXT("[Recursive] 4. Verify Contents (A): Rock Quantity"), SubContainerA->GetQuantityTotal_Implementation(ItemIdRock), 3);
+        Res &= Test->TestEqual(TEXT("[Recursive] 4. Verify Contents (A): Knife Quantity"), SubContainerA->GetQuantityTotal_Implementation(ItemIdBrittleCopperKnife), 1);
+        Res &= Test->TestEqual(TEXT("[Recursive] 4. Verify Contents (A): Sub-Container Weight"), SubContainerA->CurrentWeight, 6.0f); // 3*1 + 3*1
         Res &= Test->TestFalse(TEXT("[Recursive] 4. Verify Contents (A): Primary Container has Rocks"), ContextA.ItemContainerComponent->Contains(ItemIdRock));
         Res &= Test->TestFalse(TEXT("[Recursive] 4. Verify Contents (A): Primary Container has Knife"), ContextA.ItemContainerComponent->Contains(ItemIdBrittleCopperKnife));
 
         // Set and Verify Knife Instance Data (Inside Backpack A)
-        FItemBundle KnifeBundleA = SubContainerA->FindItemById(ItemIdBrittleCopperKnife);
-        UItemDurabilityTestInstanceData* KnifeInstanceA = KnifeBundleA.InstanceData.Num() > 0 ? Cast<UItemDurabilityTestInstanceData>(KnifeBundleA.InstanceData[0]) : nullptr;
+        auto KnifeBundleAInstanceData = SubContainerA->GetItemInstanceData(ItemIdBrittleCopperKnife);
+        UItemDurabilityTestInstanceData* KnifeInstanceA = KnifeBundleAInstanceData.Num() > 0 ? Cast<UItemDurabilityTestInstanceData>(KnifeBundleAInstanceData[0]) : nullptr;
         Res &= Test->TestNotNull(TEXT("[Recursive] 4. Verify Contents (A): Knife Instance Exists"), KnifeInstanceA);
         if (KnifeInstanceA)
         {
@@ -785,9 +787,12 @@ public:
         URecursiveContainerInstanceData* PtrInstanceA_BeforeTransfer = BackpackInstanceA;
         UItemDurabilityTestInstanceData* PtrKnifeInstanceA_BeforeTransfer = KnifeInstanceA;
 
-        int32 Transferred = ContextB.ItemContainerComponent->ExtractItemFromOtherContainer_IfServer(
-			ContextA.ItemContainerComponent, ItemIdBackpack, 1, FItemBundle::NoInstances, false);
-        Res &= Test->TestEqual(TEXT("[Recursive] 5. Transfer A->B: Transferred Quantity"), Transferred, 1);
+		
+		ContextA.ItemContainerComponent->RequestMoveItemToOtherContainer(
+			ContextB.ItemContainerComponent, ItemIdBackpack, 1, FItemBundle::NoInstances, NoTag, NoTag);
+		
+        Res &= Test->TestEqual(TEXT("[Recursive] 5. Transfer A->B: Transferred Quantity"), 
+		                       ContextB.ItemContainerComponent->GetQuantityTotal_Implementation(ItemIdBackpack), 1);
 
         // 6. Verify State After Transfer (A->B)
         // Container A Checks
@@ -802,9 +807,8 @@ public:
 
 
         // Container B Checks
-        FItemBundle BackpackBundleB = ContextB.ItemContainerComponent->FindItemById(ItemIdBackpack);
-        Res &= Test->TestTrue(TEXT("[Recursive] 6. Verify Post-Transfer (B): Backpack Exists"), BackpackBundleB.IsValid());
-        URecursiveContainerInstanceData* BackpackInstanceB = GetRecursiveInstanceData(BackpackBundleB);
+        Res &= Test->TestTrue(TEXT("[Recursive] 6. Verify Post-Transfer (B): Backpack Exists"),  ContextB.ItemContainerComponent->Contains(ItemIdBackpack));
+        URecursiveContainerInstanceData* BackpackInstanceB = GetRecursiveInstanceData(ContextB, ItemIdBackpack);
         Res &= Test->TestNotNull(TEXT("[Recursive] 6. Verify Post-Transfer (B): New Backpack Instance Exists"), BackpackInstanceB);
         Res &= Test->TestTrue(TEXT("[Recursive] 6. Verify Post-Transfer (B): New Backpack Instance Registered"), ContextB.TempActor->IsReplicatedSubObjectRegistered(BackpackInstanceB));
         if (!BackpackInstanceB) return false;
@@ -823,13 +827,13 @@ public:
         Res &= Test->TestTrue(TEXT("[Recursive] 6. Verify Post-Transfer (B): Instance points to New Sub-Component"), BackpackInstanceB->RepresentedContainer == SubContainerB);
 
         // Verify Contents Transferred to SubContainerB
-        Res &= Test->TestEqual(TEXT("[Recursive] 6. Verify Post-Transfer (B): Rock Quantity in New Sub"), SubContainerB->GetQuantityTotal(ItemIdRock), 3);
-        Res &= Test->TestEqual(TEXT("[Recursive] 6. Verify Post-Transfer (B): Knife Quantity in New Sub"), SubContainerB->GetQuantityTotal(ItemIdBrittleCopperKnife), 1);
-        Res &= Test->TestEqual(TEXT("[Recursive] 6. Verify Post-Transfer (B): New Sub-Container Weight"), SubContainerB->GetCurrentWeight(), 6.0f);
+        Res &= Test->TestEqual(TEXT("[Recursive] 6. Verify Post-Transfer (B): Rock Quantity in New Sub"), SubContainerB->GetQuantityTotal_Implementation(ItemIdRock), 3);
+        Res &= Test->TestEqual(TEXT("[Recursive] 6. Verify Post-Transfer (B): Knife Quantity in New Sub"), SubContainerB->GetQuantityTotal_Implementation(ItemIdBrittleCopperKnife), 1);
+        Res &= Test->TestEqual(TEXT("[Recursive] 6. Verify Post-Transfer (B): New Sub-Container Weight"), SubContainerB->CurrentWeight, 6.0f);
 
         // Verify Knife Instance Data Transferred
-        FItemBundle KnifeBundleB = SubContainerB->FindItemById(ItemIdBrittleCopperKnife);
-        UItemDurabilityTestInstanceData* KnifeInstanceB = KnifeBundleB.InstanceData.Num() > 0 ? Cast<UItemDurabilityTestInstanceData>(KnifeBundleB.InstanceData[0]) : nullptr;
+        auto KnifeBundleInstanceData = SubContainerB->GetItemInstanceData(ItemIdBrittleCopperKnife);
+        UItemDurabilityTestInstanceData* KnifeInstanceB = KnifeBundleInstanceData.Num() > 0 ? Cast<UItemDurabilityTestInstanceData>(KnifeBundleInstanceData[0]) : nullptr;
         Res &= Test->TestNotNull(TEXT("[Recursive] 6. Verify Post-Transfer (B): Knife Instance Exists in New Sub"), KnifeInstanceB);
         if (KnifeInstanceB)
         {
@@ -843,7 +847,7 @@ public:
         URecursiveContainerInstanceData* PtrInstanceB_BeforeDrop = BackpackInstanceB;
         UItemDurabilityTestInstanceData* PtrKnifeInstanceB_BeforeDrop = KnifeInstanceB;
 
-        int32 Dropped = ContextB.ItemContainerComponent->DropItems(ItemIdBackpack, 1, FItemBundle::NoInstances);
+        int32 Dropped = ContextB.ItemContainerComponent->DropItem(ItemIdBackpack, 1, FItemBundle::NoInstances);
         Res &= Test->TestEqual(TEXT("[Recursive] 7. Drop B->World: Dropped Quantity"), Dropped, 1);
 
         // 8. Verify State After Drop (B->World)
@@ -872,7 +876,7 @@ public:
 
         FItemBundle BackpackBundleWorld = DroppedWorldItem->RepresentedItem;
         Res &= Test->TestTrue(TEXT("[Recursive] 8. Verify Post-Drop (World): Backpack Bundle Valid"), BackpackBundleWorld.IsValid());
-        URecursiveContainerInstanceData* BackpackInstanceWorld = GetRecursiveInstanceData(BackpackBundleWorld);
+        URecursiveContainerInstanceData* BackpackInstanceWorld = Cast<URecursiveContainerInstanceData>(BackpackBundleWorld.InstanceData[0]);
         Res &= Test->TestNotNull(TEXT("[Recursive] 8. Verify Post-Drop (World): Backpack Instance Exists"), BackpackInstanceWorld);
         Res &= Test->TestTrue(TEXT("[Recursive] 8. Verify Post-Drop (World): Backpack Instance Registered on WorldItem"), DroppedWorldItem->IsReplicatedSubObjectRegistered(BackpackInstanceWorld));
         if (!BackpackInstanceWorld) return false;
@@ -888,10 +892,10 @@ public:
         Res &= Test->TestTrue(TEXT("[Recursive] 8. Verify Post-Drop (World): Instance points to Sub-Component"), BackpackInstanceWorld->RepresentedContainer == SubContainerWorld);
 
         // Verify Contents in WorldItem's SubContainer
-        Res &= Test->TestEqual(TEXT("[Recursive] 8. Verify Post-Drop (World): Rock Quantity in Sub"), SubContainerWorld->GetQuantityTotal(ItemIdRock), 3);
-        Res &= Test->TestEqual(TEXT("[Recursive] 8. Verify Post-Drop (World): Knife Quantity in Sub"), SubContainerWorld->GetQuantityTotal(ItemIdBrittleCopperKnife), 1);
-        FItemBundle KnifeBundleWorld = SubContainerWorld->FindItemById(ItemIdBrittleCopperKnife);
-        UItemDurabilityTestInstanceData* KnifeInstanceWorld = KnifeBundleWorld.InstanceData.Num() > 0 ? Cast<UItemDurabilityTestInstanceData>(KnifeBundleWorld.InstanceData[0]) : nullptr;
+        Res &= Test->TestEqual(TEXT("[Recursive] 8. Verify Post-Drop (World): Rock Quantity in Sub"), SubContainerWorld->GetQuantityTotal_Implementation(ItemIdRock), 3);
+        Res &= Test->TestEqual(TEXT("[Recursive] 8. Verify Post-Drop (World): Knife Quantity in Sub"), SubContainerWorld->GetQuantityTotal_Implementation(ItemIdBrittleCopperKnife), 1);
+
+        UItemDurabilityTestInstanceData* KnifeInstanceWorld = Cast<UItemDurabilityTestInstanceData>(SubContainerWorld->GetItemInstanceData(ItemIdBrittleCopperKnife)[0]);
         Res &= Test->TestNotNull(TEXT("[Recursive] 8. Verify Post-Drop (World): Knife Instance Exists in Sub"), KnifeInstanceWorld);
         if (KnifeInstanceWorld)
         {
@@ -912,7 +916,7 @@ public:
         // WorldItem Checks
         if (DroppedWorldItem) // Should still be valid but potentially empty/pending kill
         {
-             Res &= Test->TestEqual(TEXT("[Recursive] 10. Verify Post-Pickup (World): Item Quantity"), DroppedWorldItem->GetContainedQuantity(ItemIdBackpack), 0);
+             Res &= Test->TestEqual(TEXT("[Recursive] 10. Verify Post-Pickup (World): Item Quantity"), DroppedWorldItem->GetQuantityTotal_Implementation(ItemIdBackpack), 0);
              TArray<UItemContainerComponent*> ComponentsOnWorld = FindAllComponents<UItemContainerComponent>(DroppedWorldItem);
              bool OldSubStillOnWorld = ComponentsOnWorld.Contains(PtrSubContainerWorld_BeforePickup);
              Res &= Test->TestFalse(TEXT("[Recursive] 10. Verify Post-Pickup (World): Old Sub-Component Still on WorldItem"), OldSubStillOnWorld);
@@ -923,9 +927,8 @@ public:
         }
 
         // Container C Checks
-        FItemBundle BackpackBundleC = ContextC.ItemContainerComponent->FindItemById(ItemIdBackpack);
-        Res &= Test->TestTrue(TEXT("[Recursive] 10. Verify Post-Pickup (C): Backpack Exists"), BackpackBundleC.IsValid());
-        URecursiveContainerInstanceData* BackpackInstanceC = GetRecursiveInstanceData(BackpackBundleC);
+        Res &= Test->TestTrue(TEXT("[Recursive] 10. Verify Post-Pickup (C): Backpack Exists"), ContextC.ItemContainerComponent->Contains(ItemIdBackpack));
+        URecursiveContainerInstanceData* BackpackInstanceC = GetRecursiveInstanceData(ContextC, ItemIdBackpack);
         Res &= Test->TestNotNull(TEXT("[Recursive] 10. Verify Post-Pickup (C): New Backpack Instance Exists"), BackpackInstanceC);
         Res &= Test->TestTrue(TEXT("[Recursive] 10. Verify Post-Pickup (C): New Backpack Instance Registered"), ContextC.TempActor->IsReplicatedSubObjectRegistered(BackpackInstanceC));
         if(!BackpackInstanceC) return false;
@@ -939,10 +942,10 @@ public:
 
         Res &= Test->TestEqual(TEXT("[Recursive] 10. Verify Post-Pickup (C): New Sub-Component Owner"), SubContainerC->GetOwner(), ContextC.TempActor);
         Res &= Test->TestTrue(TEXT("[Recursive] 10. Verify Post-Pickup (C): New Sub-Component Registered"), SubContainerC->IsRegistered());
-        Res &= Test->TestEqual(TEXT("[Recursive] 10. Verify Post-Pickup (C): Rock Quantity in New Sub"), SubContainerC->GetQuantityTotal(ItemIdRock), 3);
-        Res &= Test->TestEqual(TEXT("[Recursive] 10. Verify Post-Pickup (C): Knife Quantity in New Sub"), SubContainerC->GetQuantityTotal(ItemIdBrittleCopperKnife), 1);
-        FItemBundle KnifeBundleC = SubContainerC->FindItemById(ItemIdBrittleCopperKnife);
-        UItemDurabilityTestInstanceData* KnifeInstanceC = KnifeBundleC.InstanceData.Num() > 0 ? Cast<UItemDurabilityTestInstanceData>(KnifeBundleC.InstanceData[0]) : nullptr;
+        Res &= Test->TestEqual(TEXT("[Recursive] 10. Verify Post-Pickup (C): Rock Quantity in New Sub"), SubContainerC->GetQuantityTotal_Implementation(ItemIdRock), 3);
+        Res &= Test->TestEqual(TEXT("[Recursive] 10. Verify Post-Pickup (C): Knife Quantity in New Sub"), SubContainerC->GetQuantityTotal_Implementation(ItemIdBrittleCopperKnife), 1);
+		KnifeBundleInstanceData = SubContainerC->GetItemInstanceData(ItemIdBrittleCopperKnife);
+        UItemDurabilityTestInstanceData* KnifeInstanceC = KnifeBundleInstanceData.Num() > 0 ? Cast<UItemDurabilityTestInstanceData>(KnifeBundleInstanceData[0]) : nullptr;
         Res &= Test->TestNotNull(TEXT("[Recursive] 10. Verify Post-Pickup (C): Knife Instance Exists in New Sub"), KnifeInstanceC);
         if (KnifeInstanceC)
         {
@@ -957,8 +960,7 @@ public:
 
         // Add backpack to A, initialize
         ContextA.ItemContainerComponent->AddItem_IfServer(Subsystem, ItemIdBackpack, 1, false);
-        BackpackBundleA = ContextA.ItemContainerComponent->FindItemById(ItemIdBackpack);
-        BackpackInstanceA = GetRecursiveInstanceData(BackpackBundleA);
+        BackpackInstanceA = GetRecursiveInstanceData(ContextA, ItemIdBackpack);
         BackpackInstanceA->Initialize(true, nullptr, ContextA.ItemContainerComponent);
         SubContainerA = BackpackInstanceA->RepresentedContainer;
         Res &= Test->TestNotNull(TEXT("[Nested] 11. Setup: SubContainerA valid"), SubContainerA);
@@ -966,9 +968,9 @@ public:
         // Add Coin Purse INSIDE Backpack A
         Added = SubContainerA->AddItem_IfServer(Subsystem, ItemIdCoinPurse, 1, false);
         Res &= Test->TestEqual(TEXT("[Nested] 11. Setup: Added Purse to Backpack"), Added, 1);
-        FItemBundle PurseBundleA = SubContainerA->FindItemById(ItemIdCoinPurse);
-        Res &= Test->TestTrue(TEXT("[Nested] 11. Setup: Purse Bundle valid"), PurseBundleA.IsValid());
-        URecursiveContainerInstanceData* PurseInstanceA = GetRecursiveInstanceData(PurseBundleA);
+        Res &= Test->TestTrue(TEXT("[Nested] 11. Setup: Purse Bundle valid"), SubContainerA->GetQuantityTotal_Implementation(ItemIdCoinPurse) == 1);
+
+		URecursiveContainerInstanceData* PurseInstanceA = Cast<URecursiveContainerInstanceData>(SubContainerA->GetSingleItemInstanceData(ItemIdCoinPurse));
         Res &= Test->TestNotNull(TEXT("[Nested] 11. Setup: Purse Instance valid"), PurseInstanceA);
         if (!PurseInstanceA) return false;
 		Res &= Test->TestEqual(TEXT("[Nested] 11. Setup: Purse Instance Slot Count"), PurseInstanceA->MaxSlotCount, 4);
@@ -983,16 +985,16 @@ public:
         // Add Rocks INSIDE Coin Purse A
         Added = SubContainerPurseA->AddItem_IfServer(Subsystem, ItemIdRock, 1, false); // 1 Rock (Weight 1)
         Res &= Test->TestEqual(TEXT("[Nested] 11. Setup: Added Rocks to Purse"), Added, 1);
-        Res &= Test->TestEqual(TEXT("[Nested] 11. Setup: Purse Content Quantity"), SubContainerPurseA->GetQuantityTotal(ItemIdRock), 1);
-        Res &= Test->TestEqual(TEXT("[Nested] 11. Setup: Purse Weight"), SubContainerPurseA->GetCurrentWeight(), 1.0f);
+        Res &= Test->TestEqual(TEXT("[Nested] 11. Setup: Purse Content Quantity"), SubContainerPurseA->GetQuantityTotal_Implementation(ItemIdRock), 1);
+        Res &= Test->TestEqual(TEXT("[Nested] 11. Setup: Purse Weight"), SubContainerPurseA->CurrentWeight, 1.0f);
         Res &= Test->TestFalse(TEXT("[Nested] 11. Setup: Backpack contains Rocks"), SubContainerA->Contains(ItemIdRock));
 
         // Transfer Backpack (containing purse containing rocks) from A to B
-        ContextB.ItemContainerComponent->ExtractItemFromOtherContainer_IfServer( ContextA.ItemContainerComponent, ItemIdBackpack, 1, FItemBundle::NoInstances, false);
-
+		ContextA.ItemContainerComponent->RequestMoveItemToOtherContainer(
+			ContextB.ItemContainerComponent, ItemIdBackpack, 1, FItemBundle::NoInstances, NoTag, NoTag);
+		
         // Verify Nested Structure on B
-        BackpackBundleB = ContextB.ItemContainerComponent->FindItemById(ItemIdBackpack);
-        BackpackInstanceB = GetRecursiveInstanceData(BackpackBundleB);
+        BackpackInstanceB = GetRecursiveInstanceData(ContextB, ItemIdBackpack);
 		Res &= Test->TestNotNull(TEXT("[Nested] 11. Verify Transfer: Backpack Instance valid"), BackpackInstanceB);
         BackpackInstanceB->Initialize(true, nullptr, ContextB.ItemContainerComponent); // Manually initialize
 		Res &= Test->TestEqual(TEXT("[Nested] 11. Verify: Backpack Slot Count"), BackpackInstanceB->MaxSlotCount, 8);
@@ -1002,10 +1004,10 @@ public:
         if (!SubContainerB) return false;
 
         // Verify Purse exists inside Backpack B
-        FItemBundle PurseBundleB = SubContainerB->FindItemById(ItemIdCoinPurse);
-        Res &= Test->TestTrue(TEXT("[Nested] 11. Verify Transfer: Purse Bundle valid in B"), PurseBundleB.IsValid());
-        URecursiveContainerInstanceData* PurseInstanceB = GetRecursiveInstanceData(PurseBundleB);
-        Res &= Test->TestNotNull(TEXT("[Nested] 11. Verify Transfer: Purse Instance valid in B"), PurseInstanceB);
+        Res &= Test->TestTrue(TEXT("[Nested] 11. Verify Transfer: Purse Bundle valid in B"), SubContainerB->GetQuantityTotal_Implementation(ItemIdCoinPurse) == 1);
+		URecursiveContainerInstanceData* PurseInstanceB = Cast<URecursiveContainerInstanceData>(SubContainerB->GetSingleItemInstanceData(ItemIdCoinPurse));
+        
+		Res &= Test->TestNotNull(TEXT("[Nested] 11. Verify Transfer: Purse Instance valid in B"), PurseInstanceB);
         if (!PurseInstanceB) return false;
 
         // Manually initialize Purse on B
@@ -1016,16 +1018,15 @@ public:
         if (!SubContainerPurseB) return false;
 
         // Verify Rocks exist inside Purse B
-        Res &= Test->TestEqual(TEXT("[Nested] 11. Verify Transfer: Rock Quantity in Purse B"), SubContainerPurseB->GetQuantityTotal(ItemIdRock), 1);
-        Res &= Test->TestEqual(TEXT("[Nested] 11. Verify Transfer: Purse B Weight"), SubContainerPurseB->GetCurrentWeight(), 1.0f);
+        Res &= Test->TestEqual(TEXT("[Nested] 11. Verify Transfer: Rock Quantity in Purse B"), SubContainerPurseB->GetQuantityTotal_Implementation(ItemIdRock), 1);
+        Res &= Test->TestEqual(TEXT("[Nested] 11. Verify Transfer: Purse B Weight"), SubContainerPurseB->CurrentWeight, 1.0f);
         Res &= Test->TestFalse(TEXT("[Nested] 11. Verify Transfer: Backpack B contains Rocks"), SubContainerB->Contains(ItemIdRock));
 
         // 12. Destruction Test
         ContextA.ItemContainerComponent->Clear_IfServer(); // Reset A
         // Add backpack to A, initialize
         ContextA.ItemContainerComponent->AddItem_IfServer(Subsystem, ItemIdBackpack, 1, false);
-        BackpackBundleA = ContextA.ItemContainerComponent->FindItemById(ItemIdBackpack);
-        BackpackInstanceA = GetRecursiveInstanceData(BackpackBundleA);
+        BackpackInstanceA = GetRecursiveInstanceData(ContextA, ItemIdBackpack);
         BackpackInstanceA->Initialize(true, nullptr, ContextA.ItemContainerComponent);
         SubContainerA = BackpackInstanceA->RepresentedContainer;
         Res &= Test->TestNotNull(TEXT("[Destroy] 12. Setup: SubContainerA valid"), SubContainerA);

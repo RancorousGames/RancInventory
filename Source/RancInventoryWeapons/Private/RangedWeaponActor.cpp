@@ -288,7 +288,7 @@ void ARangedWeaponActor::ReloadWeapon()
     if (bIsReloading) return;
 
     if ((!ReserveAmmoContainer && !RangedWeaponData->bInfiniteReserve) ||
-        ReserveAmmoContainer->GetQuantityTotal(RangedWeaponData->AmmoItemId) <= 0)
+        ReserveAmmoContainer->GetQuantityTotal_Implementation(RangedWeaponData->AmmoItemId) <= 0)
         return;
 
     bIsReloading = true;

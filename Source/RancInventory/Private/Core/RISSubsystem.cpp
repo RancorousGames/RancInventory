@@ -198,15 +198,30 @@ TArray<UItemStaticData*> URISSubsystem::GetItemDataArrayById(const TArray<FPrima
 int32 URISSubsystem::ExtractItem_IfServer_Implementation(const FGameplayTag& ItemId, int32 Quantity,
 														 const TArray<UItemInstanceData*>& _,
                                                          EItemChangeReason Reason,
-                                                         TArray<UItemInstanceData*>& StateArrayToAppendTo)
+                                                         TArray<UItemInstanceData*>& StateArrayToAppendTo, bool AllowPartial)
 {
 	ensureMsgf(_.Num() == 0,
 		TEXT("ExtractItem_IfServer_Implementation: InstancesToExtract should be empty."));
+
+	// Add to StateArrayToAppendTo
+	if (UItemStaticData* ItemData = AllLoadedItemsByTag.FindRef(ItemId))
+	{
+		if (ItemData->UsesInstances())
+		{
+			for (int32 i = 0; i < Quantity; ++i)
+			{
+				if (UItemInstanceData* InstanceData = DuplicateObject(ItemData->DefaultInstanceDataTemplate, this))
+				{
+					StateArrayToAppendTo.Add(InstanceData);
+				}
+			}
+		}
+	}
 	
 	return Quantity;
 }
 
-int32 URISSubsystem::GetContainedQuantity_Implementation(const FGameplayTag& ItemId)
+int32 URISSubsystem::GetQuantityTotal_Implementation(const FGameplayTag& ItemId) const
 {
 	return MAX_int32;
 }
@@ -408,7 +423,7 @@ AWorldItem* URISSubsystem::SpawnWorldItem(UObject* WorldContextObject,
 	{
 		for (int32 i = 0; i < Item.Quantity; ++i)
 		{
-			UItemInstanceData* InstanceData = NewObject<UItemInstanceData>(ItemData->DefaultInstanceDataTemplate);
+			UItemInstanceData* InstanceData = DuplicateObject<UItemInstanceData>(ItemData->DefaultInstanceDataTemplate, this);
 			Item.InstanceData.Add(InstanceData);
 		}
 	}
@@ -437,7 +452,7 @@ TArray<UItemInstanceData*> URISSubsystem::GenerateInstanceData(const FGameplayTa
 	{
 		for (int32 i = 0; i < Quantity; ++i)
 		{
-			UItemInstanceData* InstanceData = NewObject<UItemInstanceData>(ItemData->DefaultInstanceDataTemplate);
+			UItemInstanceData* InstanceData = DuplicateObject<UItemInstanceData>(ItemData->DefaultInstanceDataTemplate, this);
 			InstanceDataArray.Add(InstanceData);
 		}
 	}

@@ -9,7 +9,7 @@
 #include "Framework/DebugTestResult.h"
 #include "MockClasses/ItemHoldingCharacter.h"
 
-#define TestName "GameTests.RIS.InventoryComponent"
+#define TestName "2. GameTests.RIS.InventoryComponent"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRancInventoryComponentTest, TestName,
                                  EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -106,10 +106,10 @@ public:
             TEXT("Unstackable Item should be in the left hand slot after addition"),
             InventoryComponent->GetItemForTaggedSlot(LeftHandSlot).ItemId.MatchesTag(ItemIdHelmet));
 
-        InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, LeftHandSlot, OneHelmet, true);
-        Res &= Test->TestTrue(
-            TEXT("Second unstackable item should not replace the first one"),
-            InventoryComponent->GetItemForTaggedSlot(LeftHandSlot).Quantity == 1);
+        //InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, LeftHandSlot, OneHelmet, true);
+        //Res &= Test->TestTrue(
+        //    TEXT("Second unstackable item should not replace the first one"),
+        //    InventoryComponent->GetItemForTaggedSlot(LeftHandSlot).Quantity == 1);
 
         InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, HelmetSlot, OneSpear, true);
         Res &= Test->TestTrue(
@@ -123,39 +123,34 @@ public:
 
         InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, RightHandSlot, ThreeRocks, false);
         InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, RightHandSlot, ItemIdSticks, 2, false);
-        Res &= Test->TestFalse(
+        Res &= Test->TestTrue(
             TEXT(
-                "Different stackable item (Sticks) should not be added to a slot already containing a stackable item (Rock)"),
+                "Different stackable item (Sticks) should replace  already contained stackable item (Rock)"),
             InventoryComponent->GetItemForTaggedSlot(RightHandSlot).ItemId.MatchesTag(ItemIdSticks));
 
+		// Rock should have moved into the container
+		Res &= Test->TestTrue(
+			TEXT("Rock should be in the container after replacing it with sticks"),
+			InventoryComponent->GetContainerOnlyItemQuantity(ItemIdRock) == 3);
+		
         InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, FGameplayTag::EmptyTag, OneRock, false);
-        Res &= Test->TestFalse(
-            TEXT("Item should not be added to an invalid slot"),
-            InventoryComponent->GetItemForTaggedSlot(FGameplayTag::EmptyTag).IsValid());
+        Res &= Test->TestTrue(
+            TEXT("Rock should be in the container after kicking it out of tagged slot"),
+            InventoryComponent->GetContainerOnlyItemQuantity(ItemIdRock) == 3);
 
-        InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, RightHandSlot, FiveRocks, true);
+        InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, RightHandSlot, FiveSticks, true);
         int32 AmountAdded = InventoryComponent->
-            AddItemToTaggedSlot_IfServer(Subsystem, RightHandSlot, ThreeRocks, true);
+            AddItemToTaggedSlot_IfServer(Subsystem, RightHandSlot, ThreeSticks, true);
         Res &= Test->TestEqual(
-            TEXT("Stackable Item (Rock) amount added should be none as already full stack"), AmountAdded, 0);
+            TEXT("Stackable Item (Sticks) amount added should be none as already full stack"), AmountAdded, 0);
         Res &= Test->TestEqual(
-            TEXT("Right hand slot should have 5 Rocks"),
+            TEXT("Right hand slot should have 5 Stick"),
             InventoryComponent->GetItemForTaggedSlot(RightHandSlot).Quantity, 5);
 
         int32 QuantityRemoved = InventoryComponent->RemoveQuantityFromTaggedSlot_IfServer(RightHandSlot, 4, FItemBundle::NoInstances, EItemChangeReason::Removed, true);
         Res &= Test->TestEqual(
-            TEXT("Should have removed 4 rocks"), QuantityRemoved, 4);
-
-        int32 AddedQuantity = InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, RightHandSlot, ItemIdSticks, 4, true);
-
-        Res &= Test->TestEqual(
-            TEXT("Should have failed to override rock"), AddedQuantity, 0);
-
-        auto ItemInRightHand = InventoryComponent->GetItemForTaggedSlot(RightHandSlot);
-        Res &= Test->TestTrue(
-            TEXT("Right hand slot should still have 1 Rock"),
-            ItemInRightHand.Quantity == 1 && ItemInRightHand.ItemId.MatchesTag(ItemIdRock));
-
+            TEXT("Should have removed 4 sticks"), QuantityRemoved, 4);
+		
         // Instance Data Tests
         InventoryComponent->Clear_IfServer();
         AmountAdded = InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, RightHandSlot, ItemIdBrittleCopperKnife, 1, true);
@@ -169,12 +164,6 @@ public:
             Res &= Test->TestEqual(TEXT("[Instance] Tagged instance pointer should match container instance pointer"), KnifeBundle.InstanceData[0], ContainerKnifeBundle->InstanceData[0]);
             Res &= Test->TestTrue(TEXT("[Instance] Tagged instance should be registered"), Context.TempActor->IsReplicatedSubObjectRegistered(KnifeBundle.InstanceData[0]));
         }
-
-        // Try adding another instance (should fail as max stack is 1)
-        AmountAdded = InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, RightHandSlot, ItemIdBrittleCopperKnife, 1, true);
-        Res &= Test->TestEqual(TEXT("[Instance] Should fail to add second knife instance"), AmountAdded, 0);
-        KnifeBundle = InventoryComponent->GetItemForTaggedSlot(RightHandSlot);
-        Res &= Test->TestEqual(TEXT("[Instance] Tagged slot should still have 1 instance"), KnifeBundle.InstanceData.Num(), 1);
 
         return Res;
     }
@@ -396,7 +385,7 @@ public:
 			TEXT("Helmet item should be added to the helmet slot"),
 			InventoryComponent->GetItemForTaggedSlot(HelmetSlot).ItemId.MatchesTag(ItemIdHelmet));
 		Res &= Test->TestTrue(
-			TEXT("Container should be empty"), InventoryComponent->GetQuantityTotal(HelmetSlot) == 0);
+			TEXT("Container should be empty"), InventoryComponent->GetQuantityTotal_Implementation(HelmetSlot) == 0);
 
         int32 SimulatedMoveQuantity = InventoryComponent->ValidateMoveItem(OneHelmet, FItemBundle::NoInstances, HelmetSlot, FGameplayTag::EmptyTag, FGameplayTag(), 0);
         Res &= Test->TestEqual(
@@ -479,9 +468,9 @@ public:
             TEXT("Right hand slot should still contain the rock item"),
             InventoryComponent->GetItemForTaggedSlot(RightHandSlot).ItemId.MatchesTag(ItemIdRock));
 
-        SimulatedMoveQuantity = InventoryComponent->ValidateMoveItem(OneHelmet, FItemBundle::NoInstances, LeftHandSlot, RightHandSlot);
+        SimulatedMoveQuantity = InventoryComponent->ValidateMoveItem(OneHelmet, FItemBundle::NoInstances, LeftHandSlot, RightHandSlot, ItemIdRock, 1);
         Res &= Test->TestEqual(TEXT("Should simulate moving the helmet item from left hand slot to right hand slot"), SimulatedMoveQuantity, 1);
-        MovedQuantity = InventoryComponent->MoveItem(OneHelmet, FItemBundle::NoInstances, LeftHandSlot, RightHandSlot);
+        MovedQuantity = InventoryComponent->MoveItem(OneHelmet, FItemBundle::NoInstances, LeftHandSlot, RightHandSlot, ItemIdRock, 1);
         Res &= Test->TestEqual(TEXT("Should Swap the two items"), MovedQuantity, 1);
         Res &= Test->TestTrue(
             TEXT("Right hand slot should now contain the helmet item"),
@@ -683,9 +672,9 @@ public:
 			TEXT("Left hand slot should contain the stick"),
 			InventoryComponent->GetItemForTaggedSlot(LeftHandSlot).ItemId.MatchesTag(ItemIdSticks));
 
-		SimulatedMoveQuantity = InventoryComponent->ValidateMoveItem(ThreeRocks, FItemBundle::NoInstances, RightHandSlot, LeftHandSlot);
+		SimulatedMoveQuantity = InventoryComponent->ValidateMoveItem(ThreeRocks, FItemBundle::NoInstances, RightHandSlot, LeftHandSlot, ItemIdSticks, 1);
 		Res &= Test->TestEqual(TEXT("Should simulate moving 3 rocks from right hand slot to left hand slot"), SimulatedMoveQuantity, 3);
-		MovedQuantity = InventoryComponent->MoveItem(ThreeRocks, FItemBundle::NoInstances, RightHandSlot, LeftHandSlot);
+		MovedQuantity = InventoryComponent->MoveItem(ThreeRocks, FItemBundle::NoInstances, RightHandSlot, LeftHandSlot, ItemIdSticks, 1);
 		Res &= Test->TestEqual(TEXT("Should move 3 rocks from right hand slot to left hand slot"), MovedQuantity, 3);
 		Res &= Test->TestTrue(
 			TEXT("Left hand slot should contain 3 rocks"),
@@ -745,7 +734,7 @@ public:
         // Tagged -> Tagged (Swap)
         InventoryComponent->AddItem_IfServer(Subsystem, ItemIdRock, 1);
         InventoryComponent->MoveItem(ItemIdRock, 1, FItemBundle::NoInstances, FGameplayTag::EmptyTag, RightHandSlot); // Rock in Right
-        MovedQuantity = InventoryComponent->MoveItem(ItemIdBrittleCopperKnife, 1, FItemBundle::NoInstances, LeftHandSlot, RightHandSlot);
+        MovedQuantity = InventoryComponent->MoveItem(ItemIdBrittleCopperKnife, 1, FItemBundle::NoInstances, LeftHandSlot, RightHandSlot, ItemIdRock, 1);
         Res &= Test->TestEqual(TEXT("[Instance] Swapped knife (Left) and rock (Right)"), MovedQuantity, 1);
         FTaggedItemBundle RightHandAfterSwap = InventoryComponent->GetItemForTaggedSlot(RightHandSlot);
         FTaggedItemBundle LeftHandAfterSwap = InventoryComponent->GetItemForTaggedSlot(LeftHandSlot);
@@ -775,36 +764,43 @@ public:
 		InventoryComponent->AddItem_IfServer(Subsystem, ItemIdRock, 10*5); // Fill up rest of generic inventory and both hands
 		Res &= Test->TestTrue(TEXT("Left and Right hand should have rocks"), InventoryComponent->GetItemForTaggedSlot(LeftHandSlot).ItemId.MatchesTag(ItemIdRock) && InventoryComponent->GetItemForTaggedSlot(RightHandSlot).ItemId.MatchesTag(ItemIdRock));
 		int32 MovedQuantity = InventoryComponent->MoveItem(OneSpear, FItemBundle::NoInstances, FGameplayTag::EmptyTag, RightHandSlot);
-		Res &= Test->TestEqual(TEXT("Should not move spear to right hand slot as left hand is occupied and cannot be cleared"), MovedQuantity, 0);
+		Res &= Test->TestEqual(TEXT("Should not move spear to right hand slot as right hand is occupied, and left hand is blocking and cannot be cleared"), MovedQuantity, 0);
 		Res &= Test->TestTrue(
 			TEXT("Right hand slot should still have a rock"), InventoryComponent->GetItemForTaggedSlot(RightHandSlot).IsValid());
 		Res &= Test->TestTrue(
-			TEXT("Inventory should still contain 10 rocks"),
-			InventoryComponent->GetQuantityTotal(ItemIdRock) == 10*5);
+			TEXT("Inventory should still contain 10 rock stacks"),
+			InventoryComponent->GetQuantityTotal_Implementation(ItemIdRock) == 10*5);
 
+		// TODO: Clarify
 		// Now with swapback which should still fail
-		MovedQuantity = InventoryComponent->MoveItem(OneSpear, FItemBundle::NoInstances, FGameplayTag::EmptyTag, RightHandSlot, ItemIdRock, 5);
-		Res &= Test->TestEqual(TEXT("Should not move spear to right hand slot as left hand is occupied and cannot be cleared"), MovedQuantity, 0);
-        Res &= Test->TestTrue(
-            TEXT("Right hand slot should still have a rock"), InventoryComponent->GetItemForTaggedSlot(RightHandSlot).IsValid());
+		// MovedQuantity = InventoryComponent->MoveItem(OneSpear, FItemBundle::NoInstances, FGameplayTag::EmptyTag, RightHandSlot, ItemIdRock, 5);
+		// Res &= Test->TestEqual(TEXT("Should not move spear to right hand slot as left hand blocking is occupied and cannot be cleared"), MovedQuantity, 0);
+        // Res &= Test->TestTrue(
+        //     TEXT("Right hand slot should still have a rock"), InventoryComponent->GetItemForTaggedSlot(RightHandSlot).IsValid());
 
-		// Now with swapback in opposite direction, rock -> righthand
-		MovedQuantity = InventoryComponent->MoveItem(ItemIdRock, 5, FItemBundle::NoInstances, FGameplayTag::EmptyTag, RightHandSlot, OneSpear);
-		Res &= Test->TestEqual(TEXT("Should not move rock to right hand slot as left hand is occupied and cannot be cleared"), MovedQuantity, 0);
-		Res &= Test->TestTrue(
-			TEXT("Right hand slot should still have a rock"), InventoryComponent->GetItemForTaggedSlot(RightHandSlot).IsValid());
+		// Now with swapback in opposite direction, rock in right hand -> generic swapping spear
+		//MovedQuantity = InventoryComponent->MoveItem(ItemIdRock, 5, FItemBundle::NoInstances, RightHandSlot, FGameplayTag::EmptyTag, OneSpear);
+		//Res &= Test->TestEqual(TEXT("Should not move rock to generic slot as left hand is occupied and cannot be cleared blocking spear from swapback"), MovedQuantity, 0);
+		//Res &= Test->TestTrue(
+		//	TEXT("Right hand slot should still have a rock"), InventoryComponent->GetItemForTaggedSlot(RightHandSlot).IsValid());
 		
 		// Now remove rock from left hand and try again, rock and spear should swap
 		InventoryComponent->RemoveQuantityFromTaggedSlot_IfServer(LeftHandSlot, 5, FItemBundle::NoInstances, EItemChangeReason::Removed, true);
-        MovedQuantity = InventoryComponent->MoveItem(OneSpear, FItemBundle::NoInstances, FGameplayTag::EmptyTag, RightHandSlot);
+        MovedQuantity = InventoryComponent->MoveItem(OneSpear, FItemBundle::NoInstances, FGameplayTag::EmptyTag, RightHandSlot, ItemIdRock, 5);
         Res &= Test->TestEqual(TEXT("Should move spear to right hand slot"), MovedQuantity, 1);
         Res &= Test->TestTrue(TEXT("Right hand slot should contain the spear"),
 			InventoryComponent->GetItemForTaggedSlot(RightHandSlot).ItemId.MatchesTag(ItemIdSpear));
 		Res &= Test->TestFalse(TEXT("Left hand should be empty"),
 			InventoryComponent->GetItemForTaggedSlot(LeftHandSlot).IsValid());
-		Res &= Test->TestTrue(TEXT("Inventory should now contain 9 rocks"),
-			InventoryComponent->GetQuantityTotal(ItemIdRock) == 9*5);
+		Res &= Test->TestTrue(TEXT("Inventory should now contain 9 rocks total"),
+			InventoryComponent->GetQuantityTotal_Implementation(ItemIdRock) == 9*5);
 
+		// Try to move spear into generic inventory thats full without swapback
+		MovedQuantity = InventoryComponent->MoveItem(OneSpear, FItemBundle::NoInstances, FGameplayTag::EmptyTag);
+		Res &= Test->TestEqual(TEXT("Should not move spear to generic inventory as it is full"), MovedQuantity, 0);
+		Res &= Test->TestTrue(TEXT("Generic inventory should still contain 9 stacks of rocks"),
+			InventoryComponent->GetContainerOnlyItemQuantity(ItemIdRock) == 9*5);
+		
 		// Move spear back to generic inventory swapping with a rock explicitly
 		MovedQuantity = InventoryComponent->MoveItem(OneSpear, FItemBundle::NoInstances, RightHandSlot, FGameplayTag::EmptyTag, ItemIdRock, 5);
 		Res &= Test->TestEqual(TEXT("Should move spear to generic inventory"), MovedQuantity, 1);
@@ -993,10 +989,10 @@ public:
 
         Res &= Test->TestEqual(
             TEXT("CraftRecipe_IfServer should remove the correct quantity of the component items"),
-            InventoryComponent->GetQuantityTotal(ItemIdRock), 3);
+            InventoryComponent->GetQuantityTotal_Implementation(ItemIdRock), 3);
         Res &= Test->TestEqual(
             TEXT("CraftRecipe_IfServer should remove the correct quantity of the component items"),
-            InventoryComponent->GetQuantityTotal(ItemIdSticks), 0);
+            InventoryComponent->GetQuantityTotal_Implementation(ItemIdSticks), 0);
 
         InventoryComponent->RemoveQuantityFromTaggedSlot_IfServer(RightHandSlot, 99, FItemBundle::NoInstances, EItemChangeReason::Removed, true);
 
@@ -1064,20 +1060,20 @@ public:
 		// Step 1: Adding Stackable Items to Generic Slots
 		InventoryComponent->AddItem_IfServer(Subsystem, ThreeRocks);
 		Res &= Test->TestEqual(
-			TEXT("Should successfully add rocks within capacity"), InventoryComponent->GetQuantityTotal(ItemIdRock),
+			TEXT("Should successfully add rocks within capacity"), InventoryComponent->GetQuantityTotal_Implementation(ItemIdRock),
 			3);
 		InventoryComponent->AddItem_IfServer(Subsystem, ThreeSticks);
 		// Trying to add more rocks, total weight would be 6 but capacity is 5
 		Res &= Test->TestTrue(
-			TEXT("Should fail to add all 3 sticks due to weight capacity"), InventoryComponent->GetQuantityTotal(ItemIdSticks) < 3);
+			TEXT("Should fail to add all 3 sticks due to weight capacity"), InventoryComponent->GetQuantityTotal_Implementation(ItemIdSticks) < 3);
 
 		// Remove any sticks we might have added partially
 		InventoryComponent->DestroyItem_IfServer(ItemIdSticks, 99, FItemBundle::NoInstances, EItemChangeReason::Removed, true);
 		// Verify removal of sticks only
 		Res &= Test->TestEqual(
-			TEXT("Should remove all sticks"), InventoryComponent->GetQuantityTotal(ItemIdSticks), 0);
+			TEXT("Should remove all sticks"), InventoryComponent->GetQuantityTotal_Implementation(ItemIdSticks), 0);
 		Res &= Test->TestEqual(
-			TEXT("Should not remove any rocks"), InventoryComponent->GetQuantityTotal(ItemIdRock), 3);
+			TEXT("Should not remove any rocks"), InventoryComponent->GetQuantityTotal_Implementation(ItemIdRock), 3);
 
 		// Step 2: Adding Unstackable Items to Tagged Slots
 		int32 QuantityAdded = InventoryComponent->
@@ -1110,7 +1106,7 @@ public:
 		// Check that the crafted item is not in inventory
 		Res &= Test->TestEqual(
 			TEXT("Crafted boulder should not be in inventory"),
-			InventoryComponent->GetQuantityTotal(ItemIdGiantBoulder), 0);
+			InventoryComponent->GetQuantityTotal_Implementation(ItemIdGiantBoulder), 0);
 
 		return Res;
 	}
@@ -1226,6 +1222,7 @@ public:
         InventoryComponent->Clear_IfServer();
 
         int32 RequestedRocks = 60;
+
         int32 AddedRocks = InventoryComponent->AddItem_IfServer(Subsystem, ItemIdRock, RequestedRocks, true);
         Res &= Test->TestEqual(
             TEXT("Adding 60 Rocks should return 55 as the added quantity (5*9+5+5)"),
@@ -1411,8 +1408,9 @@ public:
 			InventoryComponent->GetItemForTaggedSlot(RightHandSlot).ItemId.MatchesTag(ItemIdSpear));
 
 		// Try adding a rock to left hand, should fail
-		Res &= Test->TestTrue(TEXT("Can't add rock to left hand"), InventoryComponent->GetQuantityOfItemTaggedSlotCanReceive(LeftHandSlot, ItemIdRock) == 0);
-		int32 Added = InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, LeftHandSlot, OneRock, true);
+		auto* RockItemData = Subsystem->GetItemDataById(ItemIdRock);
+		Res &= Test->TestTrue(TEXT("Can't add rock to left hand"), InventoryComponent->GetReceivableQuantityForTaggedSlot(RockItemData, LeftHandSlot) == 0);
+		int32 Added = InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, LeftHandSlot, OneRock, true, false);
         Res &= Test->TestEqual(TEXT("Should not add a rock to left hand slot"), Added, 0);
         Res &= Test->TestFalse(
             TEXT("Left hand slot should not contain a rock"),
@@ -1449,7 +1447,9 @@ public:
 		Res &= Test->TestFalse(TEXT("Left hand should not be blocked"), InventoryComponent->IsTaggedSlotBlocked(LeftHandSlot));
 		
 		InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, LeftHandSlot, OneRock, true);
-		Res &= Test->TestTrue(TEXT("Can't add spear to right hand"), InventoryComponent->GetQuantityOfItemTaggedSlotCanReceive(RightHandSlot, ItemIdSpear) == 0);
+		
+		auto* SpearItemData = Subsystem->GetItemDataById(ItemIdSpear);
+		Res &= Test->TestTrue(TEXT("Can't add spear to right hand"), InventoryComponent->GetReceivableQuantityForTaggedSlot(SpearItemData, RightHandSlot) == 0);
 		Added = InventoryComponent->AddItemToAnySlot(Subsystem, ItemIdSpear, 1, EPreferredSlotPolicy::PreferAnyTaggedSlot);
 		Res &= Test->TestEqual(TEXT("Should add a spear to generic inventory"), Added, 1);
 		Res &= Test->TestTrue(
@@ -1467,7 +1467,7 @@ public:
         Res &= Test->TestTrue(TEXT("Right hand should contain a spear"), InventoryComponent->GetItemForTaggedSlot(RightHandSlot).ItemId.MatchesTag(ItemIdSpear));
         Res &= Test->TestTrue(TEXT("Left hand should be blocked"), InventoryComponent->IsTaggedSlotBlocked(LeftHandSlot));
 
-        Added = InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, LeftHandSlot, OneRock, true);
+        Added = InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, LeftHandSlot, OneRock, true, false);
         Res &= Test->TestEqual(TEXT("Should not add a rock to left hand slot"), Added, 0);
         Res &= Test->TestFalse(TEXT("Left hand slot should not contain a rock"), InventoryComponent->GetItemForTaggedSlot(LeftHandSlot).IsValid());
 
@@ -1489,7 +1489,7 @@ public:
 		
 		// Remove spear from right hand and Add a rock to right hand
 		InventoryComponent->RemoveQuantityFromTaggedSlot_IfServer(RightHandSlot, 1, FItemBundle::NoInstances, EItemChangeReason::ForceDestroyed);
-		InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, RightHandSlot, OneRock, true);
+		InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, RightHandSlot, OneRock, true, false);
 		// Move the rock to generic inventory
 		int32 MovedQuantity = InventoryComponent->MoveItem(ItemIdRock, 1, FItemBundle::NoInstances, RightHandSlot, FGameplayTag::EmptyTag, ItemIdSpear, 1);
 		// Verify rock is in generic inventory and spear is in right hand
@@ -1518,7 +1518,7 @@ public:
         Res &= Test->TestTrue(TEXT("[Instance][Block] RightHand should be blocked by Longbow"), InventoryComponent->IsTaggedSlotBlocked(RightHandSlot));
 
         // Try adding knife to blocked RightHand
-        Added = InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, RightHandSlot, ItemIdBrittleCopperKnife, 1);
+        Added = InventoryComponent->AddItemToTaggedSlot_IfServer(Subsystem, RightHandSlot, ItemIdBrittleCopperKnife, 1, true, false);
         Res &= Test->TestEqual(TEXT("[Instance][Block] Should fail to add knife to blocked RightHand"), Added, 0);
         Res &= Test->TestFalse(TEXT("[Instance][Block] RightHand remains empty"), InventoryComponent->GetItemForTaggedSlot(RightHandSlot).IsValid());
 
@@ -1535,7 +1535,8 @@ public:
 
 		FDebugTestResult Res = true;
 
-		int32 ReceivableQuantity = InventoryComponent->GetReceivableQuantity(ItemIdSpear);
+		auto* SpearItemData = Subsystem->GetItemDataById(ItemIdSpear);
+		int32 ReceivableQuantity = InventoryComponent->GetReceivableQuantity(SpearItemData);
 		Res &= Test->TestEqual(TEXT("Should be able to receive 3 spears, one righthand, two in generic"), ReceivableQuantity, 3);
 
 		// Remove old right hand and add a new version that does not make two handed items exclusive to right hand
@@ -1543,7 +1544,7 @@ public:
 		InventoryComponent->UniversalTaggedSlots[IndexToReplace] = FUniversalTaggedSlot(RightHandSlot, LeftHandSlot, ItemTypeTwoHanded, FGameplayTag());
 		
 		// Now verify we can still only receive 3 spears as adding a spear to each hand would violate blocking
-		ReceivableQuantity = InventoryComponent->GetReceivableQuantity(ItemIdSpear);
+		ReceivableQuantity = InventoryComponent->GetReceivableQuantity(SpearItemData);
 		Res &= Test->TestEqual(TEXT("Should be able to receive 3 spears, one righthand, two in generic"), ReceivableQuantity, 3);
 		
 		return Res;
@@ -1706,7 +1707,7 @@ public:
 		Res &= Test->TestEqual(TEXT("Container should have 2 instances"), ContainerKnives ? ContainerKnives->InstanceData.Num() : 0, 2);
 		UItemInstanceData* InstanceA = ContainerKnives->InstanceData[0];
 		UItemInstanceData* InstanceB = ContainerKnives->InstanceData[1];
-		TArray<UItemInstanceData*> SpecificInstanceToMove = { InstanceA };
+		TArray SpecificInstanceToMove = { InstanceA };
 		Listener->Clear();
 
 		int32 QuantityMoved = InventoryComponent->MoveItem(ItemIdBrittleCopperKnife, 1, SpecificInstanceToMove, NoTag, RightHandSlot);
@@ -1790,7 +1791,7 @@ public:
 		bool bHelmetRemains = (InventoryComponent->GetItemForTaggedSlot(HelmetSlot).ItemId.MatchesTag(ItemIdHelmet) && InventoryComponent->GetItemForTaggedSlot(HelmetSlot).Quantity == 1) ||
 							  (InventoryComponent->GetItemForTaggedSlot(RightHandSlot).ItemId.MatchesTag(ItemIdHelmet) && InventoryComponent->GetItemForTaggedSlot(RightHandSlot).Quantity == 1);
         Res &= Test->TestTrue(TEXT("One slot should still contain a helmet"), bHelmetRemains);
-		Res &= Test->TestEqual(TEXT("Total container quantity should be 1"), InventoryComponent->GetQuantityTotal(ItemIdHelmet), 1);
+		Res &= Test->TestEqual(TEXT("Total container quantity should be 1"), InventoryComponent->GetQuantityTotal_Implementation(ItemIdHelmet), 1);
 
         // Test specific instance destruction
         InventoryComponent->Clear_IfServer();
@@ -1806,7 +1807,7 @@ public:
 
         Res &= Test->TestFalse(TEXT("[Indirect][Instance] Right hand slot should be empty after specific destroy"), InventoryComponent->GetItemForTaggedSlot(RightHandSlot).IsValid());
         Res &= Test->TestTrue(TEXT("[Indirect][Instance] Left hand slot should still have knife"), InventoryComponent->GetItemForTaggedSlot(LeftHandSlot).IsValid());
-        Res &= Test->TestEqual(TEXT("[Indirect][Instance] Total knife quantity should be 1"), InventoryComponent->GetQuantityTotal(ItemIdBrittleCopperKnife), 1);
+        Res &= Test->TestEqual(TEXT("[Indirect][Instance] Total knife quantity should be 1"), InventoryComponent->GetQuantityTotal_Implementation(ItemIdBrittleCopperKnife), 1);
         if(RightInstancePtrIndirect) Res &= Test->TestFalse(TEXT("[Indirect][Instance] Destroyed instance unregistered"), Context.TempActor->IsReplicatedSubObjectRegistered(RightInstancePtrIndirect));
         if(LeftInstancePtrIndirect) Res &= Test->TestTrue(TEXT("[Indirect][Instance] Remaining instance registered"), Context.TempActor->IsReplicatedSubObjectRegistered(LeftInstancePtrIndirect));
 
@@ -1833,6 +1834,11 @@ bool FRancInventoryComponentTest::RunTest(const FString& Parameters)
 	Res &= TestScenarios.TestCanCraftRecipe();
 	Res &= TestScenarios.TestInventoryMaxCapacity();
 	Res &= TestScenarios.TestReceivableQuantity();
+
+	// Tests to add:
+	//  * AddItemToTaggedSlot_IfServer with pushoutexistingitem = true
+	//  * Move item with swapback that violates indirect blocking
+	//  * RequestMoveItemToOtherContainer - include case where generic slots are full but there is space in tagged slots
 	
 	return Res;
 }

@@ -12,11 +12,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ranc Inventory")
 	int32 SourceRemainder;
 	
-	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Ranc Inventory") // ReSharper disable once CppHidingFunction
-	int32 ExtractItem_IfServer(const FGameplayTag& ItemId, int32 Quantity, const TArray<UItemInstanceData*>& _, EItemChangeReason Reason, TArray<UItemInstanceData*>& StateArrayToAppendTo);
+	virtual int32 ExtractItem_IfServer_Implementation(const FGameplayTag& ItemId, int32 Quantity, const TArray<UItemInstanceData*>& _, EItemChangeReason Reason, TArray<UItemInstanceData*>& StateArrayToAppendTo, bool AllowPartial) override;
 	
-    UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Ranc Inventory") // ReSharper disable once CppHidingFunction
-    int32 GetContainedQuantity(const FGameplayTag& ItemId);
+    virtual int32 GetQuantityTotal_Implementation(const FGameplayTag& ItemId) const override;
 	
     
 };

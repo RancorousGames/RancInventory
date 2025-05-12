@@ -283,6 +283,18 @@ struct RANCINVENTORY_API FGenericItemBundle
 		}, Data);
 	}
 
+	TArray<UItemInstanceData*> FromInstanceIds(TArray<int32> Ids) const 
+    {
+    	if (std::holds_alternative<std::monostate>(Data)) return TArray<UItemInstanceData*>();
+    	return std::visit([Ids]<typename T0>(T0&& arg) -> TArray<UItemInstanceData*> {
+			using T = std::decay_t<T0>;
+			if constexpr (std::is_same_v<T, std::monostate>)
+				return TArray<UItemInstanceData*>();
+			else
+				return arg ? arg->FromInstanceIds(Ids) : TArray<UItemInstanceData*>();
+		}, Data);
+    }
+
     void SetQuantity(int32 NewQuantity) 
     {
         if (std::holds_alternative<std::monostate>(Data)) return;

@@ -27,20 +27,13 @@ public:
 	virtual void BeginPlay() override;
 	void OnRep_Item();
 	
-	virtual void Initialize();
+	UFUNCTION(BlueprintNativeEvent, meta=(DisplayName = "Initialize"))
+	void Initialize();
 	
-	UFUNCTION(BlueprintImplementableEvent, meta=(DisplayName = "Initialize"))
-	void ReceiveInitialize();
-
-
-	//TODO: TEST IF THIS WORKS FROM BP, this is how chatgpt says to do it, then look for all // ReSharper disable once CppHidingFunction
-	//UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Ranc Inventory")
-	virtual int32 ExtractItem_IfServer_Implementation(const FGameplayTag& ItemId, int32 Quantity, const TArray<UItemInstanceData*>& InstancesToExtract, EItemChangeReason Reason, TArray<UItemInstanceData*>& StateArrayToAppendTo) override;
+	virtual int32 ExtractItem_IfServer_Implementation(const FGameplayTag& ItemId, int32 Quantity, const TArray<UItemInstanceData*>& InstancesToExtract, EItemChangeReason Reason, TArray<UItemInstanceData*>& StateArrayToAppendTo, bool AllowPartial) override;
 	
-	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Ranc Inventory") // ReSharper disable once CppHidingFunction
-	int32 GetContainedQuantity(const FGameplayTag& ItemId);
+	virtual int32 GetQuantityTotal_Implementation(const FGameplayTag& ItemId) const override;
 	
-
-virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	virtual void PreReplication( IRepChangedPropertyTracker & ChangedPropertyTracker ) override;
 };
