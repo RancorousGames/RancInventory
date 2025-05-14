@@ -9,7 +9,7 @@
 #include "Framework/DebugTestResult.h"
 #include "MockClasses/ItemHoldingCharacter.h"
 
-#define TestName "2. GameTests.RIS.InventoryComponent"
+#define TestName "GameTests.RIS.2_InventoryComponent"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRancInventoryComponentTest, TestName,
                                  EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)

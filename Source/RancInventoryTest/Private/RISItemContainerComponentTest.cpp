@@ -12,7 +12,7 @@
 #include "Framework/TestDelegateForwardHelper.h"
 #include "MockClasses/ItemHoldingCharacter.h"
 
-#define TestName "1. GameTests.RIS.ItemContainerComponent"
+#define TestName "GameTests.RIS.1_ItemContainerComponent"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRancItemContainerComponentTest, TestName,
                                  EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)

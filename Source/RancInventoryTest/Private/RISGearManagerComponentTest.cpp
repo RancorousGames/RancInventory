@@ -10,7 +10,7 @@
 #include "GameFramework/Character.h"
 #include "MockClasses/ItemHoldingCharacter.h"
 
-#define TestName "4. GameTests.RIS.GearManager"
+#define TestName "GameTests.RIS.4_GearManager"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRancGearManagerComponentTest, TestName,
                                  EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)

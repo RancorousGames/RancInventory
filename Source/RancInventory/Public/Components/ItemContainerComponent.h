@@ -48,12 +48,12 @@ public:
 	 * @return True if the condition is met, false otherwise.
 	 */
 	DECLARE_DYNAMIC_DELEGATE_RetVal_OneParam(bool, FBPItemInstancePredicate, const UItemInstanceData*, InstanceData);
-	UFUNCTION(BlueprintPure, Category="RIS", meta = (DisplayName = "Contains By Predicate (Blueprint)"))
+	UFUNCTION(BlueprintPure, Category="RIS")
 	bool ContainsByPredicate(const FGameplayTag& ItemId, const FBPItemInstancePredicate& Predicate, int32 Quantity = 1) const;
 	
 	UFUNCTION(BlueprintPure, Category=RIS)
 	bool IsEmpty() const;
-	
+
 	/**
 	 * Validates if the specified item/quantity can be received by the target (either a tagged slot or the generic container).
 	 * Checks compatibility, blocking, stacking, weight, and slot limits of the *target*.
@@ -220,7 +220,7 @@ protected:
 	
 	UFUNCTION(Server, Reliable)
 	void DropItemFromContainer_Server(const FGameplayTag& ItemId, int32 Quantity, const TArray<int32>& InstanceIdsToDrop, FVector RelativeDropLocation = FVector(1e+300, 0,0));
-	void DropItemFromContainer_ServerImpl(const FItemBundle* Item, int32 Quantity, const TArray<UItemInstanceData*>& InstancesToDrop, FVector RelativeDropLocation = FVector(1e+300, 0,0));
+	void DropItemFromContainer_ServerImpl(FGameplayTag ItemId, int32 Quantity, const TArray<UItemInstanceData*>& InstancesToDrop, FVector RelativeDropLocation = FVector(1e+300, 0,0));
 
 	// Drops all items, respecting stack sizes. Returns number of worlditems created			
 	virtual int32 DropAllItems_ServerImpl();
@@ -234,7 +234,7 @@ protected:
 	virtual int32 DestroyItemImpl(const FGameplayTag& ItemId, int32 Quantity, TArray<UItemInstanceData*> InstancesToDestroy, EItemChangeReason Reason, bool AllowPartial = false, bool SuppressEvents = false, bool SuppressUpdate = false);
 
 	// Interface version of ExtractItem_IfServer_Implementation
-	virtual int32 ExtractItemImpl_IfServer(const FGameplayTag& ItemId, int32 Quantity, const TArray<UItemInstanceData*>& InstancesToExtract, EItemChangeReason Reason, TArray<UItemInstanceData*>& StateArrayToAppendTo, bool AllowPartial, bool SuppressEvents = false, bool SuppressUpdate = false);
+	virtual int32 ExtractItem_ServerImpl(const FGameplayTag& ItemId, int32 Quantity, const TArray<UItemInstanceData*>& InstancesToExtract, EItemChangeReason Reason, TArray<UItemInstanceData*>& StateArrayToAppendTo, bool AllowPartial, bool SuppressEvents = false, bool SuppressUpdate = false);
 
 	// == OTHER ==
 	

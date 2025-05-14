@@ -502,7 +502,7 @@ int32 UItemContainerComponent::ExtractItem_IfServer_Implementation(const FGamepl
                                                                    TArray<UItemInstanceData*>& StateArrayToAppendTo,
                                                                    bool AllowPartial)
 {
-	return ExtractItemImpl_IfServer(ItemId, Quantity, InstancesToExtract, Reason, StateArrayToAppendTo, AllowPartial,
+	return ExtractItem_ServerImpl(ItemId, Quantity, InstancesToExtract, Reason, StateArrayToAppendTo, AllowPartial,
 	                                false, false);
 }
 
@@ -538,10 +538,10 @@ void UItemContainerComponent::DropItemFromContainer_Server_Implementation(
 	const FGameplayTag& ItemId, int32 Quantity, const TArray<int32>& InstanceIdsToDrop, FVector RelativeDropLocation)
 {
 	FItemBundle* Item = FindItemInstanceMutable(ItemId);
-	DropItemFromContainer_ServerImpl(Item, Quantity, Item->FromInstanceIds(InstanceIdsToDrop), RelativeDropLocation);
+	DropItemFromContainer_ServerImpl(Item->ItemId, Quantity, Item->FromInstanceIds(InstanceIdsToDrop), RelativeDropLocation);
 }
 
-void UItemContainerComponent::DropItemFromContainer_ServerImpl(const FItemBundle* Item, int32 Quantity,
+void UItemContainerComponent::DropItemFromContainer_ServerImpl(FGameplayTag ItemId, int32 Quantity,
                                                                const TArray<UItemInstanceData*>& InstancesToDrop,
                                                                FVector RelativeDropLocation)
 {
@@ -550,7 +550,7 @@ void UItemContainerComponent::DropItemFromContainer_ServerImpl(const FItemBundle
 	
 	TArray<UItemInstanceData*> DroppedItemInstancesArray = TArray<UItemInstanceData*>();
 
-	int32 Extracted = ExtractItem_IfServer_Implementation(Item->ItemId, Quantity, InstancesToDrop,
+	int32 Extracted = ExtractItem_IfServer_Implementation(ItemId, Quantity, InstancesToDrop,
 	                                                      EItemChangeReason::Dropped, DroppedItemInstancesArray, false);
 
 	if (Extracted <= 0)
@@ -559,7 +559,7 @@ void UItemContainerComponent::DropItemFromContainer_ServerImpl(const FItemBundle
 		return;
 	}
 
-	SpawnItemIntoWorldFromContainer_ServerImpl(Item->ItemId, Extracted, RelativeDropLocation,
+	SpawnItemIntoWorldFromContainer_ServerImpl(ItemId, Extracted, RelativeDropLocation,
 	                                           DroppedItemInstancesArray);
 }
 
@@ -619,7 +619,7 @@ int32 UItemContainerComponent::DropAllItems_ServerImpl()
 				if (UItemInstanceData* InstanceData = ItemToProcess.InstanceData[i])
 					ItemInstancesToDrop.Add(InstanceData);
 
-		DropItemFromContainer_ServerImpl(&ItemToProcess, QuantityForThisStack, ItemInstancesToDrop, DropLocation);
+		DropItemFromContainer_ServerImpl(ItemToProcess.ItemId, QuantityForThisStack, ItemInstancesToDrop, DropLocation);
 
 		DroppedStacksCount++;
 		CurrentAngle += AngleStep;
@@ -781,13 +781,13 @@ int32 UItemContainerComponent::DestroyItemImpl(const FGameplayTag& ItemId, int32
 	return QuantityRemoved;
 }
 
-int32 UItemContainerComponent::ExtractItemImpl_IfServer(const FGameplayTag& ItemId, int32 Quantity,
+int32 UItemContainerComponent::ExtractItem_ServerImpl(const FGameplayTag& ItemId, int32 Quantity,
                                                         const TArray<UItemInstanceData*>& InstancesToExtract,
                                                         EItemChangeReason Reason,
                                                         TArray<UItemInstanceData*>& StateArrayToAppendTo,
                                                         bool AllowPartial, bool SuppressEvents, bool SuppressUpdate)
 {
-	if (IsClient("ExtractItemImpl_IfServer")) return 0;
+	if (IsClient("ExtractItem_ServerImpl")) return 0;
 
 	const UItemStaticData* ItemData = URISSubsystem::GetItemDataById(ItemId);
 	if (BadItemData(ItemData, ItemId))

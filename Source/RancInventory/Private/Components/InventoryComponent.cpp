@@ -187,7 +187,7 @@ int32 UInventoryComponent::GetReceivableQuantityContainerOnly(const UItemStaticD
 	return FMath::Min(FinalViableQuantity, RequestedQuantity);
 }
 
-int32 UInventoryComponent::ExtractItemImpl_IfServer(const FGameplayTag& ItemId, int32 Quantity,
+int32 UInventoryComponent::ExtractItem_ServerImpl(const FGameplayTag& ItemId, int32 Quantity,
                                                     const TArray<UItemInstanceData*>& InstancesToExtract,
                                                     EItemChangeReason Reason,
                                                     TArray<UItemInstanceData*>& InstanceArrayToAppendTo,
@@ -198,12 +198,12 @@ int32 UInventoryComponent::ExtractItemImpl_IfServer(const FGameplayTag& ItemId, 
 
 	if (AllowPartial && !InstancesToExtract.IsEmpty())
 	{
-		UE_LOG(LogRISInventory, Error, TEXT("ExtractItemImpl_IfServer: AllowPartial with InstancesToDestroy is not currently supported."));
+		UE_LOG(LogRISInventory, Error, TEXT("ExtractItem_ServerImpl: AllowPartial with InstancesToDestroy is not currently supported."));
 		return 0;
 	}
 
 	
-	const int32 ExtractedFromContainer = Super::ExtractItemImpl_IfServer(
+	const int32 ExtractedFromContainer = Super::ExtractItem_ServerImpl(
 		ItemId, Quantity, InstancesToExtract, Reason, InstanceArrayToAppendTo, AllowPartial, true);
 
 	if (ExtractedFromContainer <= 0) return 0;
@@ -262,7 +262,7 @@ int32 UInventoryComponent::ExtractItemFromTaggedSlot_IfServer(const FGameplayTag
 		return 0;
 	}
 	
-	const int32 ExtractedFromContainer = Super::ExtractItemImpl_IfServer(
+	const int32 ExtractedFromContainer = Super::ExtractItem_ServerImpl(
 		ItemId, Quantity, InstancesToExtract, Reason, InstanceArrayToAppendTo, false, true, true);
 
 
@@ -1206,7 +1206,7 @@ void UInventoryComponent::MoveBetweenContainers_ServerImpl(UItemContainerCompone
     }
     else
     {
-        ExtractedQuantity = SourceComponent->ExtractItemImpl_IfServer(
+        ExtractedQuantity = SourceComponent->ExtractItem_ServerImpl(
             ItemId, QuantityToExtract, InstancesToMovePtrs, ExtractReason, ExtractedInstances, false, false, false);
     }
 
@@ -2151,7 +2151,7 @@ int32 UInventoryComponent::DestroyItemImpl(const FGameplayTag& ItemId, int32 Qua
                                            bool AllowPartial, bool SuppressEvents, bool SuppressUpdate)
 {
 	TArray<UItemInstanceData*> ThrowAwayInstances;
-	return ExtractItemImpl_IfServer(ItemId, Quantity, InstancesToDestroy, Reason,ThrowAwayInstances,
+	return ExtractItem_ServerImpl(ItemId, Quantity, InstancesToDestroy, Reason,ThrowAwayInstances,
 	                                AllowPartial, SuppressEvents, SuppressUpdate);
 }
 

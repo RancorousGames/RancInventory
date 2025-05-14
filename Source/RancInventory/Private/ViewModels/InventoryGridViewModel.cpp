@@ -16,10 +16,24 @@ FItemBundle UInventoryGridViewModel::DummyEmptyBundle = FItemBundle();
 
 void UInventoryGridViewModel::Initialize_Implementation(UItemContainerComponent* ContainerComponent)
 {
-    if (bIsInitialized || !ContainerComponent)
+    if (!IsValid(ContainerComponent))
     {
         if (!ContainerComponent) UE_LOG(LogRISInventory, Warning, TEXT("RisInventoryViewModel::Initialize failed: ContainerComponent is null."));
         return;
+    }
+
+    if (bIsInitialized) // If we are reinitializing
+    {
+        if (LinkedContainerComponent)
+        {
+            LinkedContainerComponent->OnItemAddedToContainer.RemoveDynamic(this, &UInventoryGridViewModel::HandleItemAdded);
+            LinkedContainerComponent->OnItemRemovedFromContainer.RemoveDynamic(this, &UInventoryGridViewModel::HandleItemRemoved);
+        }
+        if (LinkedInventoryComponent)
+        {
+            LinkedInventoryComponent->OnItemAddedToTaggedSlot.RemoveDynamic(this, &UInventoryGridViewModel::HandleTaggedItemAdded);
+            LinkedInventoryComponent->OnItemRemovedFromTaggedSlot.RemoveDynamic(this, &UInventoryGridViewModel::HandleTaggedItemRemoved);
+        }
     }
 
     LinkedContainerComponent = ContainerComponent;
@@ -156,8 +170,8 @@ int32 UInventoryGridViewModel::DropItem(FGameplayTag SourceTaggedSlot, int32 Sou
             SourceItem = FItemBundle::EmptyItemInstance;
         }
 
-        if (bSourceIsGrid) OnGridSlotUpdated.Broadcast(SourceSlotIndex);
-        else OnTaggedSlotUpdated.Broadcast(SourceTaggedSlot);
+        if (bSourceIsGrid) OnGridSlotUpdated.Broadcast(SourceSlotIndex, InstancesToDrop);
+        else OnTaggedSlotUpdated.Broadcast(SourceTaggedSlot, InstancesToDrop);
     }
     else
     {
@@ -290,12 +304,21 @@ int32 UInventoryGridViewModel::UseItem(FGameplayTag SourceTaggedSlot, int32 Sour
     }
 
     int32 UniqueInstanceIdToUse = -1;
+    UItemInstanceData* InstanceDataToUse = nullptr;
     FItemBundle OriginalSourceItemForOpConfirm = SourceItem; // Copy for op confirm before modification
-
+    
+    if (SourceItem.InstanceData.Num() > 0)
+    {
+        InstanceDataToUse = SourceItem.InstanceData.Last();
+        UniqueInstanceIdToUse = InstanceDataToUse->UniqueInstanceId;
+    }
+        
     if (QuantityToConsume > 0) { // Only modify state if items are actually consumed
         if (SourceItem.InstanceData.Num() > 0) {
-            UniqueInstanceIdToUse = SourceItem.InstanceData.Last()->UniqueInstanceId; // Get ID before pop
-            SourceItem.InstanceData.Pop(EAllowShrinking::No);
+            for (int32 i = 0; i < QuantityToConsume && SourceItem.InstanceData.Num() > 0; ++i) {
+                SourceItem.InstanceData.Last()->OnDestroy();
+                SourceItem.InstanceData.Pop(EAllowShrinking::No);
+            }
             SourceItem.InstanceData.Shrink();
         }
         SourceItem.Quantity -= QuantityToConsume;
@@ -337,8 +360,12 @@ int32 UInventoryGridViewModel::UseItem(FGameplayTag SourceTaggedSlot, int32 Sour
         }
 
         // Broadcast UI update if consumption was predicted and (at least partially) confirmed
-        if (bSourceIsGrid) OnGridSlotUpdated.Broadcast(SourceSlotIndex);
-        else OnTaggedSlotUpdated.Broadcast(SourceTaggedSlot);
+        TArray<UItemInstanceData*> InstancesToUpdate;
+        if (InstanceDataToUse)
+            InstancesToUpdate.Add(InstanceDataToUse);
+        
+        if (bSourceIsGrid) OnGridSlotUpdated.Broadcast(SourceSlotIndex, InstancesToUpdate);
+        else OnTaggedSlotUpdated.Broadcast(SourceTaggedSlot, InstancesToUpdate);
     }
     // If QuantityToConsume was 0, ActualConsumed should also likely be 0 unless UseItem can return other codes.
     // In this case, no ViewModel state change due to consumption, so no specific broadcast here.
@@ -466,7 +493,7 @@ bool UInventoryGridViewModel::MoveItemToOtherViewModel(
     if (QuantityToMove <= 0) return false;
 
     auto* ItemData = URISSubsystem::GetItemDataById(ItemIdToMove);
-
+    // TODO: Validate swapback
     if (bTargetIsTag)
     {
         if (!TargetViewModel->LinkedInventoryComponent)
@@ -499,7 +526,7 @@ bool UInventoryGridViewModel::MoveItemToOtherViewModel(
          } else if (!InstancesToMove.IsEmpty()) {
              ActualSourceItem.InstanceData.RemoveAll([&InstancesToMove](UItemInstanceData* Inst){ return InstancesToMove.Contains(Inst); });
          }
-         this->OnTaggedSlotUpdated.Broadcast(SourceTaggedSlot);
+         this->OnTaggedSlotUpdated.Broadcast(SourceTaggedSlot, InstancesToMove);
     }
     else // Source is Grid
     {
@@ -510,28 +537,30 @@ bool UInventoryGridViewModel::MoveItemToOtherViewModel(
         } else if (!InstancesToMove.IsEmpty()) {
              this->ViewableGridSlots[SourceSlotIndex].InstanceData.RemoveAll([&InstancesToMove](UItemInstanceData* Inst){ return InstancesToMove.Contains(Inst); });
         }
-        this->OnGridSlotUpdated.Broadcast(SourceSlotIndex);
+        this->OnGridSlotUpdated.Broadcast(SourceSlotIndex, InstancesToMove);
     }
 
     if (bTargetIsTag)
     {
         if (!TargetViewModel->LinkedInventoryComponent) return false; // Target Tag requires target to be Inventory
         FItemBundle& ActualTargetItem = TargetViewModel->GetMutableItemForTaggedSlotInternal(TargetTaggedSlot); // Use internal helper
+        TArray<UItemInstanceData*> OldTargetInstances = ActualTargetItem.InstanceData;
         ActualTargetItem.Quantity += QuantityToMove;
         if (ActualTargetItem.ItemId != ItemIdToMove)
         {
             ActualTargetItem = FItemBundle(ItemIdToMove, QuantityToMove, InstancesToMove);
         }
-        TargetViewModel->OnTaggedSlotUpdated.Broadcast(TargetTaggedSlot);
+        TargetViewModel->OnTaggedSlotUpdated.Broadcast(TargetTaggedSlot, OldTargetInstances);
     }
     else // Target is Grid
     {
+        TArray<UItemInstanceData*> OldTargetInstances = TargetViewModel->ViewableGridSlots[TargetGridSlotIndex].InstanceData;
         TargetViewModel->ViewableGridSlots[TargetGridSlotIndex].Quantity += QuantityToMove;
         if (TargetViewModel->ViewableGridSlots[TargetGridSlotIndex].ItemId != ItemIdToMove)
         {
             TargetViewModel->ViewableGridSlots[TargetGridSlotIndex] = FItemBundle(ItemIdToMove, QuantityToMove, InstancesToMove);
         }
-        TargetViewModel->OnGridSlotUpdated.Broadcast(TargetGridSlotIndex);
+        TargetViewModel->OnGridSlotUpdated.Broadcast(TargetGridSlotIndex, OldTargetInstances);
     }
 
     ERISSlotOperation RemoveOp = bSourceIsTag ? RemoveTagged : Remove;
@@ -591,7 +620,7 @@ void UInventoryGridViewModel::PickupItem(AWorldItem* WorldItem, EPreferredSlotPo
                      Slot.InstanceData = TArray<UItemInstanceData*>(); // Assume instances are handled by HandleItemAdded later
                  }
                  Slot.Quantity += AddedQty;
-                 OnGridSlotUpdated.Broadcast(TargetSlot);
+                 OnGridSlotUpdated.Broadcast(TargetSlot, FItemBundle::NoInstances);
              }
              // If server interaction succeeded, and DestroyAfterPickup is true, destroy the world item.
              if (DestroyAfterPickup && WorldItem && WorldItem->GetQuantityTotal_Implementation(ItemToPickup.ItemId) <= 0) // Check if source is empty
@@ -943,7 +972,7 @@ void UInventoryGridViewModel::HandleItemAdded_Implementation(const UItemStaticDa
         }
 
         RemainingItems -= ActuallyAddedToSlot;
-        OnGridSlotUpdated.Broadcast(SlotIndex);
+        OnGridSlotUpdated.Broadcast(SlotIndex, FItemBundle::NoInstances);
     }
 }
 
@@ -983,7 +1012,7 @@ void UInventoryGridViewModel::HandleItemRemoved_Implementation(const UItemStatic
                 if (RemovedCount > 0) {
                     RemainingToRemove -= RemovedCount;
                     if (CurrentSlot.Quantity <= 0) CurrentSlot = FItemBundle::EmptyItemInstance;
-                    OnGridSlotUpdated.Broadcast(SlotIndex);
+                    OnGridSlotUpdated.Broadcast(SlotIndex, InstancesRemoved);
                 }
             }
             else // Remove by quantity
@@ -1003,7 +1032,7 @@ void UInventoryGridViewModel::HandleItemRemoved_Implementation(const UItemStatic
                     if (CurrentSlot.Quantity <= 0)
                         CurrentSlot = FItemBundle::EmptyItemInstance;
 
-                    OnGridSlotUpdated.Broadcast(SlotIndex);
+                    OnGridSlotUpdated.Broadcast(SlotIndex, InstancesRemoved);
                 }
             }
         }
@@ -1042,8 +1071,9 @@ void UInventoryGridViewModel::HandleTaggedItemAdded_Implementation(const FGamepl
                      }
                  } else if (ViewableItem.IsValid()) { // Server says empty, VM has item?
                       UE_LOG(LogRISInventory, Warning, TEXT("Mismatch after confirming AddTagged for tag %s (server empty). Forcing slot update."), *SlotTag.ToString());
+                      TArray<UItemInstanceData*> OldInstances = ViewableItem.InstanceData;
                        ViewableItem = FItemBundle::EmptyItemInstance;
-                       OnTaggedSlotUpdated.Broadcast(SlotTag);
+                       OnTaggedSlotUpdated.Broadcast(SlotTag, OldInstances);
                  }
              }
             return;
@@ -1054,18 +1084,19 @@ void UInventoryGridViewModel::HandleTaggedItemAdded_Implementation(const FGamepl
     if (ViewableTaggedSlots.Contains(SlotTag))
     {
         FItemBundle& TargetSlot = GetMutableItemForTaggedSlotInternal(SlotTag);
+        TArray<UItemInstanceData*> OldInstances = TargetSlot.InstanceData;
         FTaggedItemBundle ActualItem = LinkedInventoryComponent->GetItemForTaggedSlot(SlotTag); // Get source of truth
         if (ActualItem.IsValid()) {
             TargetSlot.ItemId = ActualItem.ItemId;
             TargetSlot.Quantity = ActualItem.Quantity;
             TargetSlot.InstanceData = ActualItem.InstanceData;
-            OnTaggedSlotUpdated.Broadcast(SlotTag);
+            OnTaggedSlotUpdated.Broadcast(SlotTag, OldInstances);
         } else {
              UE_LOG(LogRISInventory, Warning, TEXT("HandleTaggedItemAdded: Component reported add but tag %s is empty in component state?"), *SlotTag.ToString());
              // Maybe clear the visual slot if it wasn't already?
              if(TargetSlot.IsValid()) {
                  TargetSlot = FItemBundle::EmptyItemInstance;
-                 OnTaggedSlotUpdated.Broadcast(SlotTag);
+                 OnTaggedSlotUpdated.Broadcast(SlotTag, OldInstances);
              }
         }
     }
@@ -1122,7 +1153,7 @@ void UInventoryGridViewModel::HandleTaggedItemRemoved_Implementation(const FGame
             } else {
                 TargetSlot = FItemBundle::EmptyItemInstance; // Reset
             }
-            OnTaggedSlotUpdated.Broadcast(SlotTag);
+            OnTaggedSlotUpdated.Broadcast(SlotTag, InstancesRemoved);
         }
         else if (TargetSlot.IsValid() && TargetSlot.ItemId != ItemData->ItemId)
         {
@@ -1245,6 +1276,12 @@ bool UInventoryGridViewModel::MoveItem_Internal(FGameplayTag SourceTaggedSlot, i
     int32 QuantityToActuallyMove = QuantityValidatedByServer;
     InstancesToMove = SourceItem->GetInstancesFromEnd(QuantityToActuallyMove); // Re-get instances for the validated quantity
     TArray<int32> InstanceIdsToMove = FItemBundle::ToInstanceIds(InstancesToMove);
+    TArray<UItemInstanceData*> InstancesToSwapBack;
+    if (SwapItemId.IsValid() && SwapQuantity > 0)
+    {
+        // Get instances from the target item to swap back
+        InstancesToSwapBack = TargetItem->GetInstancesFromEnd(SwapQuantity);
+    }
     
     // --- Perform Visual Move ---
     FGenericItemBundle SourceItemGB(SourceItem);
@@ -1256,8 +1293,8 @@ bool UInventoryGridViewModel::MoveItem_Internal(FGameplayTag SourceTaggedSlot, i
     if (MoveResult.QuantityMoved > 0 || MoveResult.WereItemsSwapped)
     {
         // --- Broadcast Updates ---
-        if(bSourceIsTag) OnTaggedSlotUpdated.Broadcast(SourceTaggedSlot); else OnGridSlotUpdated.Broadcast(SourceSlotIndex);
-        if(bTargetIsTag) OnTaggedSlotUpdated.Broadcast(TargetTaggedSlot); else OnGridSlotUpdated.Broadcast(TargetSlotIndex);
+        if(bSourceIsTag) OnTaggedSlotUpdated.Broadcast(SourceTaggedSlot, InstancesToMove); else OnGridSlotUpdated.Broadcast(SourceSlotIndex, InstancesToMove);
+        if(bTargetIsTag) OnTaggedSlotUpdated.Broadcast(TargetTaggedSlot, InstancesToSwapBack); else OnGridSlotUpdated.Broadcast(TargetSlotIndex, InstancesToSwapBack);
 
         if (bSourceIsTag || bTargetIsTag)
         {
@@ -1306,10 +1343,8 @@ void UInventoryGridViewModel::ForceFullUpdate_Implementation()
     OperationsToConfirm.Empty();
 
     // --- Update Grid Slots ---
-    TSet<int32> ChangedGridSlots;
-    for(int32 i=0; i<NumberOfGridSlots; ++i) {
-        if(ViewableGridSlots[i].IsValid()) ChangedGridSlots.Add(i); // Mark previously occupied slots
-    }
+    TArray<FItemBundle> PrevViewableGridSlots = ViewableGridSlots;
+    
     ViewableGridSlots.Init(FItemBundle::EmptyItemInstance, NumberOfGridSlots);
 
     TArray<FItemBundle> ActualItems = LinkedContainerComponent->GetAllItems();
@@ -1362,20 +1397,17 @@ void UInventoryGridViewModel::ForceFullUpdate_Implementation()
             }
 
             RemainingQuantity -= AddedAmount;
-            ChangedGridSlots.Add(SlotToAddTo); // Mark this slot as changed (or newly occupied)
         }
     }
     // Broadcast grid updates
-    for(int32 Index : ChangedGridSlots) { OnGridSlotUpdated.Broadcast(Index); }
+    for(int32 PrevGridSlotIndex = 0; PrevGridSlotIndex < PrevViewableGridSlots.Num(); ++PrevGridSlotIndex)
+        OnGridSlotUpdated.Broadcast(PrevGridSlotIndex, PrevViewableGridSlots[PrevGridSlotIndex].InstanceData);
 
 
     // --- Update Tagged Slots (if inventory) ---
     if (LinkedInventoryComponent)
     {
-        TSet<FGameplayTag> ChangedTaggedSlots;
-        for (const auto& Pair : ViewableTaggedSlots) {
-            if(Pair.Value.IsValid()) ChangedTaggedSlots.Add(Pair.Key); // Mark previously occupied
-        }
+        TMap<FGameplayTag, FItemBundle> PrevViewableTaggedSlots = ViewableTaggedSlots;
 
         // Clear visual tagged slots first (or update in place)
          for (auto& Pair : ViewableTaggedSlots) { Pair.Value = FItemBundle::EmptyItemInstance; }
@@ -1386,16 +1418,16 @@ void UInventoryGridViewModel::ForceFullUpdate_Implementation()
             if (ViewableTaggedSlots.Contains(TaggedItem.Tag))
             {
                 ViewableTaggedSlots[TaggedItem.Tag] = FItemBundle(TaggedItem.ItemId, TaggedItem.Quantity, TaggedItem.InstanceData);
-                ChangedTaggedSlots.Add(TaggedItem.Tag); // Mark as changed/occupied
             }
             else if (TaggedItem.Tag.IsValid())
             {
                  UE_LOG(LogRISInventory, Warning, TEXT("ForceFullUpdate: Tagged item %s found in component but tag %s is not registered visually. Adding."), *TaggedItem.ItemId.ToString(), *TaggedItem.Tag.ToString());
                  ViewableTaggedSlots.Add(TaggedItem.Tag, FItemBundle(TaggedItem.ItemId, TaggedItem.Quantity, TaggedItem.InstanceData));
-                 ChangedTaggedSlots.Add(TaggedItem.Tag);
+                 OnTaggedSlotUpdated.Broadcast(TaggedItem.Tag, TaggedItem.InstanceData);
             }
         }
         // Broadcast tagged updates
-         for(const FGameplayTag& Tag : ChangedTaggedSlots) { OnTaggedSlotUpdated.Broadcast(Tag); }
+        for(const auto& Pair : PrevViewableTaggedSlots)
+            OnTaggedSlotUpdated.Broadcast(Pair.Key, Pair.Value.InstanceData);
     }
 }

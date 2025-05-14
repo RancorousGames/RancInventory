@@ -27,14 +27,7 @@ void AWorldItem::BeginPlay()
 }
 
 void AWorldItem::SetItem(const FItemBundle& NewItem)
-{
-	if (IsValid(ItemData))
-	{
-		UE_LOG(LogTemp, Error, TEXT("AWorldItem::SetItem: WorldItem attempted changed after initialization from %s to %s"),
-			*ItemData->ItemId.ToString(), *NewItem.ItemId.ToString());
-		return;
-	}
-	
+{	
 	RepresentedItem = NewItem;
 	Initialize();
 }
@@ -144,8 +137,6 @@ int32 AWorldItem::ExtractItem_IfServer_Implementation(
     {
         if (HasAuthority())
         {
-            OnRep_Item(); // Trigger replication update if quantity/instances changed
-
             // Optional: Destroy the world item if it becomes empty
             if (RepresentedItem.Quantity <= 0)
             {

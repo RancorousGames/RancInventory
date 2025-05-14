@@ -47,6 +47,10 @@ public:
     UFUNCTION(BlueprintCallable, BlueprintPure, Category="ViewModel|Grid")
     FItemBundle GetGridItem(int32 SlotIndex) const;
 	
+	/** Retrieves the item bundle for a given tagged slot. Returns Empty if not an inventory or slot invalid. */
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category="ViewModel|Tagged")
+	const FItemBundle& GetItemForTaggedSlot(const FGameplayTag& SlotTag) const;
+
     /** Checks if a specific grid slot can visually accept the given item and quantity. */
     UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category="ViewModel|Grid")
     bool CanGridSlotReceiveItem(const FGameplayTag& ItemId, int32 Quantity, int32 SlotIndex) const;
@@ -60,10 +64,6 @@ public:
     /** Checks if a given tagged slot is empty. Returns true if not an inventory or slot invalid. */
     UFUNCTION(BlueprintCallable, BlueprintPure, Category="ViewModel|Tagged")
     bool IsTaggedSlotEmpty(const FGameplayTag& SlotTag) const;
-
-    /** Retrieves the item bundle for a given tagged slot. Returns Empty if not an inventory or slot invalid. */
-    UFUNCTION(BlueprintCallable, BlueprintPure, Category="ViewModel|Tagged")
-    const FItemBundle& GetItemForTaggedSlot(const FGameplayTag& SlotTag) const;
 
     /** Retrieves a modifiable reference to the item bundle for a given tagged slot. Use with caution. Returns ref to dummy if invalid. */
     UFUNCTION(BlueprintCallable, Category="ViewModel|Tagged")
@@ -139,19 +139,19 @@ public:
     // --- Delegates ---
 
     /** Delegate broadcast when a grid slot's visual representation is updated. */
-    DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnGridSlotUpdated, int32, SlotIndex);
+    DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnGridSlotUpdated, int32, SlotIndex, const TArray<UItemInstanceData*>&, OldInstances);
     UPROPERTY(BlueprintAssignable, Category="ViewModel|Grid")
     FOnGridSlotUpdated OnGridSlotUpdated;
 
     /** Delegate broadcast when a tagged slot's visual representation is updated (Inventory only). */
-    DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnTaggedSlotUpdated, const FGameplayTag&, SlotTag);
+    DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnTaggedSlotUpdated, const FGameplayTag&, SlotTag, const TArray<UItemInstanceData*>&, OldInstances);
     UPROPERTY(BlueprintAssignable, Category="ViewModel|Tagged")
     FOnTaggedSlotUpdated OnTaggedSlotUpdated;
 
 protected:
     // --- Internal Logic ---
 
-    /** Finds the best grid slot index to place an incoming item or stack. */
+    /** Finds the best grid slot index to place an incoming item or stack. Does not allow any kind of overriding */
     UFUNCTION(BlueprintNativeEvent, Category = "ViewModel")
     int32 FindGridSlotIndexForItem(const FGameplayTag& ItemId, int32 Quantity);
 

@@ -2,6 +2,7 @@
 
 #include "RISGridViewModelTest.h" // header empty
 
+#include "EngineUtils.h"
 #include "NativeGameplayTags.h"
 #include "Components\InventoryComponent.h"
 #include "Misc/AutomationTest.h"
@@ -11,7 +12,7 @@
 #include "Framework/DebugTestResult.h"
 #include "MockClasses/ItemHoldingCharacter.h"
 
-#define TestNameGVM "3. GameTests.RIS.GridViewModel"
+#define TestNameGVM "GameTests.RIS.3_GridViewModel"
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRISGridViewModelTest, TestNameGVM, EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 class GridViewModelTestContext
@@ -1468,6 +1469,852 @@ public:
 
         return Res;
     }
+
+	bool TestRecursiveContainers()
+    {
+        GridViewModelTestContext ContextA(200.0f, 10, false); ContextA.TempActor->Rename(TEXT("ActorA_Rec"));
+        auto* InvA = ContextA.InventoryComponent;
+        auto* VMA = ContextA.ViewModel;
+        auto* Subsystem = ContextA.TestFixture.GetSubsystem();
+
+        FDebugTestResult Res = true;
+        const float KnifeDurability = 88.f;
+
+        // --- Phase 1: Basic Backpack Operations (VMA) ---
+        // VMA: Empty
+        InvA->AddItemToAnySlot(Subsystem, ItemIdBackpack, 1, EPreferredSlotPolicy::PreferGenericInventory);
+        Res &= VMA->AssertViewModelSettled();
+        // VMA: Grid[0]=Backpack(1)
+        FItemBundle BackpackBundleA_VMA_Grid0 = VMA->GetGridItem(0);
+        bool BackpackInGrid0_VMA = BackpackBundleA_VMA_Grid0.ItemId == ItemIdBackpack && BackpackBundleA_VMA_Grid0.Quantity == 1;
+        Res &= Test->TestTrue(TEXT("[Rec P1] VMA Grid[0] has Backpack"), BackpackInGrid0_VMA);
+        int32 BackpackInstanceCount_VMA = BackpackBundleA_VMA_Grid0.InstanceData.Num();
+        Res &= Test->TestTrue(TEXT("[Rec P1] VMA Backpack instance count is 1"), BackpackInstanceCount_VMA == 1);
+
+        URecursiveContainerInstanceData* RCI_A_Backpack = nullptr;
+        if (BackpackBundleA_VMA_Grid0.InstanceData.Num() > 0) {
+            RCI_A_Backpack = Cast<URecursiveContainerInstanceData>(BackpackBundleA_VMA_Grid0.InstanceData[0]);
+        }
+        Res &= Test->TestTrue(TEXT("[Rec P1] Backpack instance data is URecursiveContainerInstanceData"), RCI_A_Backpack != nullptr);
+        if (!RCI_A_Backpack) return false; 
+
+        UItemContainerComponent* SubInv_A_Backpack = RCI_A_Backpack->RepresentedContainer;
+        Res &= Test->TestTrue(TEXT("[Rec P1] Backpack (A) has a valid sub-container"), SubInv_A_Backpack != nullptr);
+        if (!SubInv_A_Backpack) return false;
+        AActor* SubInv_A_BackpackOwner = SubInv_A_Backpack->GetOwner();
+        Res &= Test->TestTrue(TEXT("[Rec P1] Backpack (A) sub-container owner is ActorA"), SubInv_A_BackpackOwner == ContextA.TempActor);
+
+        // VMA: Grid[0]=Backpack(1) [SubInv_A_Backpack: Empty]
+        int32 AddedToSubA_Rocks = SubInv_A_Backpack->AddItem_IfServer(Subsystem, ItemIdRock, 2, false);
+        Res &= Test->TestTrue(TEXT("[Rec P1] Added 2 Rocks to SubInv_A_Backpack"), AddedToSubA_Rocks == 2);
+        // VMA: Grid[0]=Backpack(1) [SubInv_A_Backpack: Contains Rock(2)]
+        int32 RocksInSubInvA = SubInv_A_Backpack->GetQuantityTotal_Implementation(ItemIdRock);
+        Res &= Test->TestTrue(TEXT("[Rec P1] SubInv_A_Backpack contains 2 Rocks"), RocksInSubInvA == 2);
+
+        int32 AddedToSubA_Sticks = SubInv_A_Backpack->AddItem_IfServer(Subsystem, ItemIdSticks, 3, false);
+        Res &= Test->TestTrue(TEXT("[Rec P1] Added 3 Sticks to SubInv_A_Backpack"), AddedToSubA_Sticks == 3);
+        int32 SticksInSubInvA = SubInv_A_Backpack->GetQuantityTotal_Implementation(ItemIdSticks);
+        Res &= Test->TestTrue(TEXT("[Rec P1] SubInv_A_Backpack contains 3 Sticks"), SticksInSubInvA == 3);
+        
+        // VMA: Grid[0]=Backpack(1) [SubInv_A_Backpack: Contains Rock(2), Sticks(3)]
+        int32 AddedToSubA_Purse = SubInv_A_Backpack->AddItem_IfServer(Subsystem, ItemIdCoinPurse, 1, false);
+        Res &= Test->TestTrue(TEXT("[Rec P1] Added 1 CoinPurse to SubInv_A_Backpack"), AddedToSubA_Purse == 1);
+        // VMA: Grid[0]=Backpack(1) [SubInv_A_Backpack: Contains Rock(2), Sticks(3), CoinPurse(1)]
+        int32 PurseInSubInvA = SubInv_A_Backpack->GetQuantityTotal_Implementation(ItemIdCoinPurse);
+        Res &= Test->TestTrue(TEXT("[Rec P1] SubInv_A_Backpack contains CoinPurse"), PurseInSubInvA == 1);
+        
+        URecursiveContainerInstanceData* RCI_A_Purse = nullptr;
+        TArray<UItemInstanceData*> PurseInstanceDatasInSubA = SubInv_A_Backpack->GetItemInstanceData(ItemIdCoinPurse);
+        if(PurseInstanceDatasInSubA.Num() > 0) {
+            RCI_A_Purse = Cast<URecursiveContainerInstanceData>(PurseInstanceDatasInSubA[0]);
+        }
+        Res &= Test->TestTrue(TEXT("[Rec P1] CoinPurse instance data in SubInv_A_Backpack is URecursiveContainerInstanceData"), RCI_A_Purse != nullptr);
+        if (!RCI_A_Purse) return false;
+
+        UItemContainerComponent* SubInv_A_Purse = RCI_A_Purse->RepresentedContainer; 
+        Res &= Test->TestTrue(TEXT("[Rec P1] CoinPurse (A) has a valid sub-sub-container"), SubInv_A_Purse != nullptr);
+        if (!SubInv_A_Purse) return false;
+        AActor* SubInv_A_PurseOwner = SubInv_A_Purse->GetOwner();
+        Res &= Test->TestTrue(TEXT("[Rec P1] CoinPurse (A) sub-sub-container owner is ActorA"), SubInv_A_PurseOwner == ContextA.TempActor);
+
+        // VMA: Grid[0]=Backpack(1) [SubInv_A_Backpack: Rock(2),Sticks(3),CoinPurse(1)[SubInv_A_Purse:Empty]]
+        int32 AddedToSubSubA_Knife = SubInv_A_Purse->AddItem_IfServer(Subsystem, ItemIdBrittleCopperKnife, 1, false);
+        Res &= Test->TestTrue(TEXT("[Rec P1] Added 1 Knife to SubInv_A_Purse"), AddedToSubSubA_Knife == 1);
+        TArray<UItemInstanceData*> KnifeInstanceDatasInPurseA = SubInv_A_Purse->GetItemInstanceData(ItemIdBrittleCopperKnife);
+        UItemDurabilityTestInstanceData* KnifeDurabilityInstanceA = nullptr;
+        if (KnifeInstanceDatasInPurseA.Num() > 0) KnifeDurabilityInstanceA = Cast<UItemDurabilityTestInstanceData>(KnifeInstanceDatasInPurseA[0]);
+        Res &= Test->TestTrue(TEXT("[Rec P1] Knife instance data in purse is valid"), KnifeDurabilityInstanceA != nullptr);
+        if(KnifeDurabilityInstanceA) KnifeDurabilityInstanceA->Durability = KnifeDurability;
+
+        int32 AddedToSubSubA_Eggs = SubInv_A_Purse->AddItem_IfServer(Subsystem, ItemIdBrittleEgg, 2, false);
+        Res &= Test->TestTrue(TEXT("[Rec P1] Added 2 Eggs to SubInv_A_Purse"), AddedToSubSubA_Eggs == 2);
+        // VMA: Grid[0]=Backpack(1) [SubInv_A_Backpack: Rock(2),Sticks(3),CoinPurse(1)[SubInv_A_Purse:Knife(1),Eggs(2)]]
+        int32 KnivesInPurseA = SubInv_A_Purse->GetQuantityTotal_Implementation(ItemIdBrittleCopperKnife);
+        Res &= Test->TestTrue(TEXT("[Rec P1] SubInv_A_Purse contains 1 Knife"), KnivesInPurseA == 1);
+        int32 EggsInPurseA = SubInv_A_Purse->GetQuantityTotal_Implementation(ItemIdBrittleEgg);
+        Res &= Test->TestTrue(TEXT("[Rec P1] SubInv_A_Purse contains 2 Eggs"), EggsInPurseA == 2);
+
+        // --- Phase 2: Drop and Pickup (VMA -> World -> VMB) ---
+        UItemInstanceData* BackpackInstancePtrBeforeDrop = RCI_A_Backpack;
+        int32 DroppedQtyFromVMA = VMA->DropItem(NoTag, 0, 1); 
+        Res &= Test->TestTrue(TEXT("[Rec P2] DropItem from VMA returned 1"), DroppedQtyFromVMA == 1);
+        Res &= VMA->AssertViewModelSettled();
+        // VMA: Empty
+        bool VMA_Grid0_EmptyAfterDrop = VMA->IsGridSlotEmpty(0);
+        Res &= Test->TestTrue(TEXT("[Rec P2] VMA Grid[0] empty after dropping Backpack"), VMA_Grid0_EmptyAfterDrop);
+        bool InvA_NoBackpack = !InvA->Contains(ItemIdBackpack);
+        Res &= Test->TestTrue(TEXT("[Rec P2] InvA no longer contains Backpack"), InvA_NoBackpack);
+        bool BackpackInstanceUnregisteredFromA = !ContextA.TempActor->IsReplicatedSubObjectRegistered(BackpackInstancePtrBeforeDrop);
+        Res &= Test->TestTrue(TEXT("[Rec P2] Backpack instance unregistered from ActorA"), BackpackInstanceUnregisteredFromA);
+
+        AWorldItem* DroppedBackpackWorldItem = nullptr;
+        for (TActorIterator<AWorldItem> It(ContextA.World); It; ++It) {
+            if (It->RepresentedItem.ItemId == ItemIdBackpack) { DroppedBackpackWorldItem = *It; break; }
+        }
+        Res &= Test->TestTrue(TEXT("[Rec P2] Dropped Backpack WorldItem found"), DroppedBackpackWorldItem != nullptr);
+        if (!DroppedBackpackWorldItem) return false;
+
+        FItemBundle BackpackBundle_World = DroppedBackpackWorldItem->RepresentedItem;
+        bool WorldBackpackValid = BackpackBundle_World.IsValid();
+        Res &= Test->TestTrue(TEXT("[Rec P2] WorldItem Backpack bundle is valid"), WorldBackpackValid);
+        int32 WorldBackpackInstanceCount = BackpackBundle_World.InstanceData.Num();
+        Res &= Test->TestTrue(TEXT("[Rec P2] WorldItem Backpack instance count is 1"), WorldBackpackInstanceCount == 1);
+
+        URecursiveContainerInstanceData* RCI_World_Backpack = nullptr;
+        if(BackpackBundle_World.InstanceData.Num() > 0) { RCI_World_Backpack = Cast<URecursiveContainerInstanceData>(BackpackBundle_World.InstanceData[0]); }
+        Res &= Test->TestTrue(TEXT("[Rec P2] WorldItem Backpack instance is URecursiveContainerInstanceData"), RCI_World_Backpack != nullptr);
+        if (!RCI_World_Backpack) return false;
+        Res &= Test->TestTrue(TEXT("[Rec P2] WorldItem Backpack instance is the same object as original"), RCI_World_Backpack == BackpackInstancePtrBeforeDrop);
+        
+        UItemContainerComponent* SubInv_World_Backpack = RCI_World_Backpack->RepresentedContainer;
+        Res &= Test->TestTrue(TEXT("[Rec P2] WorldItem Backpack has valid sub-container"), SubInv_World_Backpack != nullptr);
+        if (!SubInv_World_Backpack) return false;
+        AActor* SubInv_World_BackpackOwner = SubInv_World_Backpack->GetOwner();
+        Res &= Test->TestTrue(TEXT("[Rec P2] WorldItem Backpack sub-container owner is WorldItem"), SubInv_World_BackpackOwner == DroppedBackpackWorldItem);
+        
+        int32 RocksInSubInvWorld = SubInv_World_Backpack->GetQuantityTotal_Implementation(ItemIdRock);
+        Res &= Test->TestTrue(TEXT("[Rec P2] WorldItem Backpack's sub-container contains 2 Rocks"), RocksInSubInvWorld == 2);
+        int32 SticksInSubInvWorld = SubInv_World_Backpack->GetQuantityTotal_Implementation(ItemIdSticks);
+        Res &= Test->TestTrue(TEXT("[Rec P2] WorldItem Backpack's sub-container contains 3 Sticks"), SticksInSubInvWorld == 3);
+
+        TArray<UItemInstanceData*> PurseInstanceDatasInWorldSub = SubInv_World_Backpack->GetItemInstanceData(ItemIdCoinPurse);
+        int32 PurseInSubInvWorld = SubInv_World_Backpack->GetQuantityTotal_Implementation(ItemIdCoinPurse);
+        Res &= Test->TestTrue(TEXT("[Rec P2] WorldItem Backpack's sub-container contains CoinPurse"), PurseInSubInvWorld == 1);
+        URecursiveContainerInstanceData* RCI_World_Purse = nullptr;
+        if(PurseInstanceDatasInWorldSub.Num() > 0) { RCI_World_Purse = Cast<URecursiveContainerInstanceData>(PurseInstanceDatasInWorldSub[0]); }
+        Res &= Test->TestTrue(TEXT("[Rec P2] WorldItem CoinPurse instance is URecursiveContainerInstanceData"), RCI_World_Purse != nullptr);
+        if (!RCI_World_Purse) return false;
+
+        UItemContainerComponent* SubInv_World_Purse = RCI_World_Purse->RepresentedContainer;
+        Res &= Test->TestTrue(TEXT("[Rec P2] WorldItem CoinPurse has valid sub-sub-container"), SubInv_World_Purse != nullptr);
+        if (!SubInv_World_Purse) return false;
+        AActor* SubInv_World_PurseOwner = SubInv_World_Purse->GetOwner();
+        Res &= Test->TestTrue(TEXT("[Rec P2] WorldItem CoinPurse sub-sub-container owner is WorldItem"), SubInv_World_PurseOwner == DroppedBackpackWorldItem);
+        
+        int32 KnivesInWorldPurse = SubInv_World_Purse->GetQuantityTotal_Implementation(ItemIdBrittleCopperKnife);
+        Res &= Test->TestTrue(TEXT("[Rec P2] WorldItem CoinPurse's sub-sub-container contains 1 Knife"), KnivesInWorldPurse == 1);
+        TArray<UItemInstanceData*> KnifeInstanceDatasInWorldPurse = SubInv_World_Purse->GetItemInstanceData(ItemIdBrittleCopperKnife);
+        UItemDurabilityTestInstanceData* KnifeDurabilityInstanceWorld = nullptr;
+        if(KnifeInstanceDatasInWorldPurse.Num() > 0) KnifeDurabilityInstanceWorld = Cast<UItemDurabilityTestInstanceData>(KnifeInstanceDatasInWorldPurse[0]);
+        Res &= Test->TestTrue(TEXT("[Rec P2] Knife instance in world purse is valid"), KnifeDurabilityInstanceWorld != nullptr);
+        if(KnifeDurabilityInstanceWorld) {
+            float DurabilityInWorld = KnifeDurabilityInstanceWorld->Durability;
+            Res &= Test->TestTrue(TEXT("[Rec P2] Knife durability preserved in WorldItem"), DurabilityInWorld == KnifeDurability);
+        }
+        int32 EggsInWorldPurse = SubInv_World_Purse->GetQuantityTotal_Implementation(ItemIdBrittleEgg);
+        Res &= Test->TestTrue(TEXT("[Rec P2] WorldItem CoinPurse's sub-sub-container contains 2 Eggs"), EggsInWorldPurse == 2);
+
+        GridViewModelTestContext ContextB(200.0f, 10, false); ContextB.TempActor->Rename(TEXT("ActorB_Rec"));
+        auto* InvB = ContextB.InventoryComponent;
+        auto* VMB = ContextB.ViewModel;
+        // VMB: Empty
+
+        VMB->PickupItem(DroppedBackpackWorldItem, EPreferredSlotPolicy::PreferGenericInventory, true); 
+        Res &= VMB->AssertViewModelSettled();
+        // VMB: Grid[0]=Backpack(1)
+        FItemBundle BackpackBundleB_VMB_Grid0 = VMB->GetGridItem(0);
+        bool BackpackInGrid0_VMB = BackpackBundleB_VMB_Grid0.ItemId == ItemIdBackpack;
+        Res &= Test->TestTrue(TEXT("[Rec P2] VMB Grid[0] has Backpack after pickup"), BackpackInGrid0_VMB);
+        
+        URecursiveContainerInstanceData* RCI_B_Backpack = nullptr;
+        if (BackpackBundleB_VMB_Grid0.InstanceData.Num() > 0) { RCI_B_Backpack = Cast<URecursiveContainerInstanceData>(BackpackBundleB_VMB_Grid0.InstanceData[0]); }
+        Res &= Test->TestTrue(TEXT("[Rec P2] Picked-up Backpack instance data is valid"), RCI_B_Backpack != nullptr);
+        if (!RCI_B_Backpack) return false;
+        Res &= Test->TestTrue(TEXT("[Rec P2] Picked-up Backpack instance is same object as original"), RCI_B_Backpack == BackpackInstancePtrBeforeDrop);
+        bool BackpackInstanceRegisteredToB = ContextB.TempActor->IsReplicatedSubObjectRegistered(RCI_B_Backpack);
+        Res &= Test->TestTrue(TEXT("[Rec P2] Picked-up Backpack instance re-registered to ActorB"), BackpackInstanceRegisteredToB);
+
+        UItemContainerComponent* SubInv_B_Backpack = RCI_B_Backpack->RepresentedContainer;
+        Res &= Test->TestTrue(TEXT("[Rec P2] Picked-up Backpack (B) has valid sub-container"), SubInv_B_Backpack != nullptr);
+        if (!SubInv_B_Backpack) return false;
+        AActor* SubInv_B_BackpackOwner = SubInv_B_Backpack->GetOwner();
+        Res &= Test->TestTrue(TEXT("[Rec P2] Picked-up Backpack (B) sub-container owner is ActorB"), SubInv_B_BackpackOwner == ContextB.TempActor);
+
+        int32 RocksInSubInvB = SubInv_B_Backpack->GetQuantityTotal_Implementation(ItemIdRock);
+        Res &= Test->TestTrue(TEXT("[Rec P2] Picked-up Backpack's sub-container (B) contains 2 Rocks"), RocksInSubInvB == 2);
+        int32 SticksInSubInvB = SubInv_B_Backpack->GetQuantityTotal_Implementation(ItemIdSticks);
+        Res &= Test->TestTrue(TEXT("[Rec P2] Picked-up Backpack's sub-container (B) contains 3 Sticks"), SticksInSubInvB == 3);
+        
+        TArray<UItemInstanceData*> PurseInstanceDatasInSubB = SubInv_B_Backpack->GetItemInstanceData(ItemIdCoinPurse);
+        int32 PurseInSubInvB = SubInv_B_Backpack->GetQuantityTotal_Implementation(ItemIdCoinPurse);
+        Res &= Test->TestTrue(TEXT("[Rec P2] Picked-up Backpack's sub-container (B) contains CoinPurse"), PurseInSubInvB == 1);
+        URecursiveContainerInstanceData* RCI_B_Purse = nullptr;
+        if(PurseInstanceDatasInSubB.Num() > 0) { RCI_B_Purse = Cast<URecursiveContainerInstanceData>(PurseInstanceDatasInSubB[0]); }
+        Res &= Test->TestTrue(TEXT("[Rec P2] Picked-up CoinPurse instance data in SubInv_B_Backpack is valid"), RCI_B_Purse != nullptr);
+        if(!RCI_B_Purse) return false;
+        
+        UItemContainerComponent* SubInv_B_Purse = RCI_B_Purse->RepresentedContainer;
+        Res &= Test->TestTrue(TEXT("[Rec P2] Picked-up CoinPurse (B) has valid sub-sub-container"), SubInv_B_Purse != nullptr);
+        if(!SubInv_B_Purse) return false;
+        AActor* SubInv_B_PurseOwner = SubInv_B_Purse->GetOwner();
+        Res &= Test->TestTrue(TEXT("[Rec P2] Picked-up CoinPurse (B) sub-sub-container owner is ActorB"), SubInv_B_PurseOwner == ContextB.TempActor);
+        
+        int32 KnivesInPurseB = SubInv_B_Purse->GetQuantityTotal_Implementation(ItemIdBrittleCopperKnife);
+        Res &= Test->TestTrue(TEXT("[Rec P2] Picked-up CoinPurse's sub-sub-container (B) contains 1 Knife"), KnivesInPurseB == 1);
+        TArray<UItemInstanceData*> KnifeInstanceDatasInPurseB = SubInv_B_Purse->GetItemInstanceData(ItemIdBrittleCopperKnife);
+        UItemDurabilityTestInstanceData* KnifeDurabilityInstanceB = nullptr;
+        if(KnifeInstanceDatasInPurseB.Num() > 0) KnifeDurabilityInstanceB = Cast<UItemDurabilityTestInstanceData>(KnifeInstanceDatasInPurseB[0]);
+        Res &= Test->TestTrue(TEXT("[Rec P2] Picked-up Knife instance in purse B is valid"), KnifeDurabilityInstanceB != nullptr);
+        if(KnifeDurabilityInstanceB) {
+            float DurabilityInB = KnifeDurabilityInstanceB->Durability;
+            Res &= Test->TestTrue(TEXT("[Rec P2] Picked-up Knife durability preserved in Container B"), DurabilityInB == KnifeDurability);
+        }
+        int32 EggsInPurseB = SubInv_B_Purse->GetQuantityTotal_Implementation(ItemIdBrittleEgg);
+        Res &= Test->TestTrue(TEXT("[Rec P2] Picked-up CoinPurse's sub-sub-container (B) contains 2 Eggs"), EggsInPurseB == 2);
+
+        // --- Phase 3: Operations within VMB ---
+        // VMB: Grid[0]=Backpack(1) [Rock(2),Sticks(3),Purse(1)[Knife(1),Eggs(2)]]
+        bool MovedToTagged_VMB = VMB->MoveItem(NoTag, 0, RightHandSlot, -1); 
+        Res &= Test->TestTrue(TEXT("[Rec P3] Moved Backpack from Grid to RightHandSlot in VMB"), MovedToTagged_VMB);
+        Res &= VMB->AssertViewModelSettled();
+        // VMB: RH=Backpack(1) [Rock(2),Sticks(3),Purse(1)[Knife(1),Eggs(2)]]
+        bool VMB_Grid0_EmptyAfterInternalMove = VMB->IsGridSlotEmpty(0);
+        Res &= Test->TestTrue(TEXT("[Rec P3] VMB Grid[0] empty after internal move"), VMB_Grid0_EmptyAfterInternalMove);
+        FItemBundle BackpackBundleB_VMB_RH = VMB->GetItemForTaggedSlot(RightHandSlot);
+        bool BackpackInRH_VMB = BackpackBundleB_VMB_RH.ItemId == ItemIdBackpack;
+        Res &= Test->TestTrue(TEXT("[Rec P3] VMB RightHandSlot has Backpack after internal move"), BackpackInRH_VMB);
+        
+        int32 RocksInSubB_AfterInternalMove_Qty = SubInv_B_Backpack->GetQuantityTotal_Implementation(ItemIdRock);
+        Res &= Test->TestTrue(TEXT("[Rec P3] Rocks still in Backpack's sub-container after internal move in VMB"), RocksInSubB_AfterInternalMove_Qty == 2);
+
+        InvB->AddItemToAnySlot(Subsystem, OneHelmet, EPreferredSlotPolicy::PreferSpecializedTaggedSlot);
+        // VMB: RH=Backpack(1)[...], HelmetSlot=Helmet(1)
+        bool MovedToHelmet_VMB = VMB->MoveItem(RightHandSlot, -1, HelmetSlot, -1); // Try move Backpack (RH) to HelmetSlot (occupied by Helmet)
+        Res &= Test->TestFalse(TEXT("[Rec P3] Attempt to move Backpack to occupied, incompatible HelmetSlot should fail"), MovedToHelmet_VMB);
+        Res &= VMB->AssertViewModelSettled();
+        // VMB: RH=Backpack(1)[...], HelmetSlot=Helmet(1) (State should be unchanged)
+        FItemBundle BackpackBundleB_VMB_RH_AfterFail = VMB->GetItemForTaggedSlot(RightHandSlot);
+        bool BackpackStillInRH_VMB = BackpackBundleB_VMB_RH_AfterFail.ItemId == ItemIdBackpack;
+        Res &= Test->TestTrue(TEXT("[Rec P3] Backpack still in VMB RH after failed incompatible move"), BackpackStillInRH_VMB);
+        FItemBundle HelmetBundleB_VMB_Helmet_AfterFail = VMB->GetItemForTaggedSlot(HelmetSlot);
+        bool HelmetStillInHelmet_VMB = HelmetBundleB_VMB_Helmet_AfterFail.ItemId == ItemIdHelmet;
+        Res &= Test->TestTrue(TEXT("[Rec P3] Helmet still in VMB HelmetSlot after failed incompatible move"), HelmetStillInHelmet_VMB);
+
+        // --- Phase 4: Transfer Backpack VMB -> VMA ---
+        InvA->Clear_IfServer(); // VMA: Empty
+        Res &= VMA->AssertViewModelSettled();
+        // VMB: RH=Backpack(1)[...], HelmetSlot=Helmet(1) || VMA: Empty
+        bool MovedToVMA = VMB->MoveItemToOtherViewModel(RightHandSlot, -1, VMA, NoTag, 0);
+        Res &= Test->TestTrue(TEXT("[Rec P4] Moved Backpack from VMB (RH) to VMA (Grid[0])"), MovedToVMA);
+        Res &= VMA->AssertViewModelSettled();
+        Res &= VMB->AssertViewModelSettled();
+        // VMB: HelmetSlot=Helmet(1) || VMA: Grid[0]=Backpack(1)[...]
+        bool VMB_RH_EmptyAfterExternalMove = VMB->IsTaggedSlotEmpty(RightHandSlot);
+        Res &= Test->TestTrue(TEXT("[Rec P4] VMB RightHandSlot empty after external move to VMA"), VMB_RH_EmptyAfterExternalMove);
+        FItemBundle BackpackBundleA_VMA_AfterExternalMove = VMA->GetGridItem(0);
+        bool BackpackInGrid0_VMA_AfterExternalMove = BackpackBundleA_VMA_AfterExternalMove.ItemId == ItemIdBackpack;
+        Res &= Test->TestTrue(TEXT("[Rec P4] VMA Grid[0] has Backpack after external move"), BackpackInGrid0_VMA_AfterExternalMove);
+
+        URecursiveContainerInstanceData* RCI_A_Backpack_AfterExternalMove = nullptr;
+        if (BackpackBundleA_VMA_AfterExternalMove.InstanceData.Num() > 0) {
+            RCI_A_Backpack_AfterExternalMove = Cast<URecursiveContainerInstanceData>(BackpackBundleA_VMA_AfterExternalMove.InstanceData[0]);
+        }
+        Res &= Test->TestTrue(TEXT("[Rec P4] Backpack instance in VMA after external move is valid"), RCI_A_Backpack_AfterExternalMove != nullptr);
+        if (!RCI_A_Backpack_AfterExternalMove) return false;
+        bool BackpackInstanceA_ReRegToA = ContextA.TempActor->IsReplicatedSubObjectRegistered(RCI_A_Backpack_AfterExternalMove);
+        Res &= Test->TestTrue(TEXT("[Rec P4] Backpack instance re-registered to ActorA after external move"), BackpackInstanceA_ReRegToA);
+        
+        UItemContainerComponent* SubInv_A_Backpack_AfterExternalMove = RCI_A_Backpack_AfterExternalMove->RepresentedContainer;
+        Res &= Test->TestTrue(TEXT("[Rec P4] Backpack sub-container in VMA after external move is valid"), SubInv_A_Backpack_AfterExternalMove != nullptr);
+        if (!SubInv_A_Backpack_AfterExternalMove) return false;
+        AActor* SubInv_A_Backpack_AfterExternalMove_Owner = SubInv_A_Backpack_AfterExternalMove->GetOwner();
+        Res &= Test->TestTrue(TEXT("[Rec P4] Backpack sub-container owner is ActorA after external move"), SubInv_A_Backpack_AfterExternalMove_Owner == ContextA.TempActor);
+        
+        int32 RocksInSubA_AfterExternalMove_Qty = SubInv_A_Backpack_AfterExternalMove->GetQuantityTotal_Implementation(ItemIdRock);
+        Res &= Test->TestTrue(TEXT("[Rec P4] Rocks still in Backpack's sub-container after move to VMA"), RocksInSubA_AfterExternalMove_Qty == 2);
+        
+        TArray<UItemInstanceData*> PurseInstanceDatasInSubA_AfterExternal = SubInv_A_Backpack_AfterExternalMove->GetItemInstanceData(ItemIdCoinPurse);
+        URecursiveContainerInstanceData* RCI_A_Purse_AfterExternalMove = nullptr;
+        if(PurseInstanceDatasInSubA_AfterExternal.Num() > 0) {RCI_A_Purse_AfterExternalMove = Cast<URecursiveContainerInstanceData>(PurseInstanceDatasInSubA_AfterExternal[0]); }
+        Res &= Test->TestTrue(TEXT("[Rec P4] Purse instance in Backpack (A) after external move is valid"), RCI_A_Purse_AfterExternalMove != nullptr);
+        if(!RCI_A_Purse_AfterExternalMove) return false;
+
+        UItemContainerComponent* SubInv_A_Purse_AfterExternalMove = RCI_A_Purse_AfterExternalMove->RepresentedContainer;
+        Res &= Test->TestTrue(TEXT("[Rec P4] Purse sub-sub-container in VMA after external move is valid"), SubInv_A_Purse_AfterExternalMove != nullptr);
+        if(!SubInv_A_Purse_AfterExternalMove) return false;
+
+        int32 EggsInPurse_AfterExternalMove_Qty = SubInv_A_Purse_AfterExternalMove->GetQuantityTotal_Implementation(ItemIdBrittleEgg);
+        Res &= Test->TestTrue(TEXT("[Rec P4] 2 Eggs still in CoinPurse's sub-sub-container after move to VMA"), EggsInPurse_AfterExternalMove_Qty == 2);
+        int32 KnivesInPurse_AfterExternalMove_Qty = SubInv_A_Purse_AfterExternalMove->GetQuantityTotal_Implementation(ItemIdBrittleCopperKnife);
+        Res &= Test->TestTrue(TEXT("[Rec P4] Knife still in CoinPurse after move to VMA"), KnivesInPurse_AfterExternalMove_Qty == 1);
+
+
+        // --- Phase 5: Complex Drop Scenario (Drop Backpack containing another Backpack) ---
+        InvA->Clear_IfServer(); Res &= VMA->AssertViewModelSettled();
+        // VMA: Empty
+        InvA->AddItemToAnySlot(Subsystem, ItemIdBackpack, 1, EPreferredSlotPolicy::PreferGenericInventory); // Backpack1
+        Res &= VMA->AssertViewModelSettled();
+        // VMA: Grid[0]=Backpack1(1)
+        FItemBundle B1_VMA_Grid0 = VMA->GetGridItem(0);
+        URecursiveContainerInstanceData* RCI_A_B1 = Cast<URecursiveContainerInstanceData>(B1_VMA_Grid0.InstanceData[0]);
+        UItemContainerComponent* SubInv_A_B1 = RCI_A_B1->RepresentedContainer;
+        Res &= Test->TestTrue(TEXT("[Rec P5] SubInv_A_B1 valid"), SubInv_A_B1 != nullptr);
+        if(!SubInv_A_B1) return false;
+        
+        SubInv_A_B1->AddItem_IfServer(Subsystem, ItemIdBackpack, 1, false); // Backpack2 inside Backpack1
+        // VMA: Grid[0]=Backpack1(1) [SubInv_A_B1: Grid[0]=Backpack2(1)]
+        TArray<UItemInstanceData*> B2_InstanceDatas_In_SubInv_A_B1 = SubInv_A_B1->GetItemInstanceData(ItemIdBackpack);
+        URecursiveContainerInstanceData* RCI_A_B2 = Cast<URecursiveContainerInstanceData>(B2_InstanceDatas_In_SubInv_A_B1[0]);
+        UItemContainerComponent* SubInv_A_B2 = RCI_A_B2->RepresentedContainer;
+        Res &= Test->TestTrue(TEXT("[Rec P5] SubInv_A_B2 valid"), SubInv_A_B2 != nullptr);
+        if(!SubInv_A_B2) return false;
+
+        SubInv_A_B2->AddItem_IfServer(Subsystem, ItemIdRock, 5, false); // Rocks inside Backpack2
+        // VMA: Grid[0]=Backpack1(1) [SubInv_A_B1: Grid[0]=Backpack2(1) [SubInv_A_B2: Grid[0]=Rock(5)]]
+        int32 RocksInB2_A = SubInv_A_B2->GetQuantityTotal_Implementation(ItemIdRock);
+        Res &= Test->TestTrue(TEXT("[Rec P5] Rocks in Backpack2 (A) correct"), RocksInB2_A == 5);
+        
+        VMA->DropItem(NoTag, 0, 1); // Drop Backpack1
+        Res &= VMA->AssertViewModelSettled();
+        // VMA: Empty
+
+		AWorldItem* DroppedB1_WorldItem = nullptr;
+		UWorld* World = ContextA.TestFixture.GetWorld();
+		for (TActorIterator<AWorldItem> It(World); It; ++It)
+		{
+			if (It->RepresentedItem.ItemId == ItemIdBackpack && It->RepresentedItem.InstanceData[0] == RCI_A_B1)
+			{
+				DroppedB1_WorldItem = *It;
+				break;
+			}
+		}
+        Res &= Test->TestTrue(TEXT("[Rec P5] Dropped Backpack1 WorldItem found"), DroppedB1_WorldItem != nullptr);
+        if (!DroppedB1_WorldItem) return false;
+
+        FItemBundle B1_Bundle_World = DroppedB1_WorldItem->RepresentedItem;
+        URecursiveContainerInstanceData* RCI_W_B1 = Cast<URecursiveContainerInstanceData>(B1_Bundle_World.InstanceData[0]);
+        UItemContainerComponent* SubInv_W_B1 = RCI_W_B1->RepresentedContainer;
+        Res &= Test->TestTrue(TEXT("[Rec P5] SubInv_W_B1 valid"), SubInv_W_B1 != nullptr);
+        if(!SubInv_W_B1) return false;
+        Res &= Test->TestTrue(TEXT("[Rec P5] SubInv_W_B1 owner is WorldItem"), SubInv_W_B1->GetOwner() == DroppedB1_WorldItem);
+
+        TArray<UItemInstanceData*> B2_InstanceDatas_In_SubInv_W_B1 = SubInv_W_B1->GetItemInstanceData(ItemIdBackpack);
+        int32 B2_Qty_In_SubInv_W_B1 = SubInv_W_B1->GetQuantityTotal_Implementation(ItemIdBackpack);
+        Res &= Test->TestTrue(TEXT("[Rec P5] SubInv_W_B1 contains Backpack2"), B2_Qty_In_SubInv_W_B1 == 1);
+        URecursiveContainerInstanceData* RCI_W_B2 = Cast<URecursiveContainerInstanceData>(B2_InstanceDatas_In_SubInv_W_B1[0]);
+        UItemContainerComponent* SubInv_W_B2 = RCI_W_B2->RepresentedContainer;
+        Res &= Test->TestTrue(TEXT("[Rec P5] SubInv_W_B2 valid"), SubInv_W_B2 != nullptr);
+        if(!SubInv_W_B2) return false;
+        Res &= Test->TestTrue(TEXT("[Rec P5] SubInv_W_B2 owner is WorldItem"), SubInv_W_B2->GetOwner() == DroppedB1_WorldItem);
+        
+        int32 RocksInB2_W = SubInv_W_B2->GetQuantityTotal_Implementation(ItemIdRock);
+        Res &= Test->TestTrue(TEXT("[Rec P5] Rocks in Backpack2 (World) correct"), RocksInB2_W == 5);
+
+        InvB->Clear_IfServer(); Res &= VMB->AssertViewModelSettled();
+        // VMB: Empty
+        VMB->PickupItem(DroppedB1_WorldItem, EPreferredSlotPolicy::PreferGenericInventory, true);
+        Res &= VMB->AssertViewModelSettled();
+        // VMB: Grid[0]=Backpack1(1) [SubInv_B_B1: Grid[0]=Backpack2(1) [SubInv_B_B2: Grid[0]=Rock(5)]]
+        FItemBundle B1_VMB_Grid0 = VMB->GetGridItem(0);
+        URecursiveContainerInstanceData* RCI_B_B1 = Cast<URecursiveContainerInstanceData>(B1_VMB_Grid0.InstanceData[0]);
+        UItemContainerComponent* SubInv_B_B1 = RCI_B_B1->RepresentedContainer;
+        Res &= Test->TestTrue(TEXT("[Rec P5] Picked up SubInv_B_B1 valid"), SubInv_B_B1 != nullptr);
+        if(!SubInv_B_B1) return false;
+        Res &= Test->TestTrue(TEXT("[Rec P5] Picked up SubInv_B_B1 owner is ActorB"), SubInv_B_B1->GetOwner() == ContextB.TempActor);
+        
+        TArray<UItemInstanceData*> B2_InstanceDatas_In_SubInv_B_B1 = SubInv_B_B1->GetItemInstanceData(ItemIdBackpack);
+        URecursiveContainerInstanceData* RCI_B_B2 = Cast<URecursiveContainerInstanceData>(B2_InstanceDatas_In_SubInv_B_B1[0]);
+        UItemContainerComponent* SubInv_B_B2 = RCI_B_B2->RepresentedContainer;
+        Res &= Test->TestTrue(TEXT("[Rec P5] Picked up SubInv_B_B2 valid"), SubInv_B_B2 != nullptr);
+        if(!SubInv_B_B2) return false;
+        Res &= Test->TestTrue(TEXT("[Rec P5] Picked up SubInv_B_B2 owner is ActorB"), SubInv_B_B2->GetOwner() == ContextB.TempActor);
+        int32 RocksInB2_B = SubInv_B_B2->GetQuantityTotal_Implementation(ItemIdRock);
+        Res &= Test->TestTrue(TEXT("[Rec P5] Rocks in picked up Backpack2 (B) correct"), RocksInB2_B == 5);
+        
+        // --- Phase 6: Use/Destroy items within a recursive container ---
+        // VMA: Empty. VMB: Grid[0]=Backpack1 [SubInv_B_B1: Grid[0]=Backpack2 [SubInv_B_B2: Grid[0]=Rock(5)]]
+        int32 DestroyedFromSubInvB2 = SubInv_B_B2->DestroyItem_IfServer(ItemIdRock, 2, {}, EItemChangeReason::Consumed);
+        Res &= Test->TestTrue(TEXT("[Rec P6] Destroyed 2 Rocks from SubInv_B_B2"), DestroyedFromSubInvB2 == 2);
+        FItemBundle Backpack1_VMB_AfterDestroy = VMB->GetGridItem(0); // ViewModel should still show Backpack1
+        bool Backpack1_StillInVMB = Backpack1_VMB_AfterDestroy.ItemId == ItemIdBackpack;
+        Res &= Test->TestTrue(TEXT("[Rec P6] Backpack1 still in VMB Grid[0]"), Backpack1_StillInVMB);
+        int32 RocksInSubInvB2_AfterDestroy = SubInv_B_B2->GetQuantityTotal_Implementation(ItemIdRock);
+        Res &= Test->TestTrue(TEXT("[Rec P6] SubInv_B_B2 now contains 3 Rocks"), RocksInSubInvB2_AfterDestroy == 3);
+
+        // --- Phase 8: Full inventory scenarios ---
+        InvA->Clear_IfServer(); Res &= VMA->AssertViewModelSettled();
+        InvA->MaxSlotCount = 1; // InvA generic can only hold 1 item type (stack)
+        // VMA: Empty, MaxSlotCount=1
+        InvA->AddItemToAnySlot(Subsystem, ItemIdRock, 5, EPreferredSlotPolicy::PreferGenericInventory); // Fills InvA generic
+        Res &= VMA->AssertViewModelSettled();
+        // VMA: Grid[0]=Rock(5)
+        
+        int32 AddedBackpackToFullInvA = InvA->AddItemToAnySlot(Subsystem, ItemIdBackpack, 1, EPreferredSlotPolicy::PreferAnyTaggedSlot);
+        Res &= Test->TestTrue(TEXT("[Rec P8] Added Backpack to VMA (should go to Tagged)"), AddedBackpackToFullInvA == 1);
+        Res &= VMA->AssertViewModelSettled();
+        // VMA: Grid[0]=Rock(5), RH=Backpack(1) (assuming RH is first available universal)
+        FItemBundle Backpack_VMA_RH = VMA->GetItemForTaggedSlot(RightHandSlot);
+        bool BackpackInVMA_RH = Backpack_VMA_RH.ItemId == ItemIdBackpack;
+        Res &= Test->TestTrue(TEXT("[Rec P8] Backpack in VMA RightHandSlot"), BackpackInVMA_RH);
+
+        bool MovedBackpackToLH_VMA = VMA->MoveItem(RightHandSlot, -1, LeftHandSlot, -1);
+        Res &= Test->TestTrue(TEXT("[Rec P8] Moved Backpack from RH to LH in VMA"), MovedBackpackToLH_VMA);
+        Res &= VMA->AssertViewModelSettled();
+        // VMA: Grid[0]=Rock(5), LH=Backpack(1)
+        FItemBundle Backpack_VMA_LH = VMA->GetItemForTaggedSlot(LeftHandSlot);
+        bool BackpackInVMA_LH = Backpack_VMA_LH.ItemId == ItemIdBackpack;
+        Res &= Test->TestTrue(TEXT("[Rec P8] Backpack in VMA LeftHandSlot after move"), BackpackInVMA_LH);
+		
+        // VMA: Grid[0]=Rock(5), LH=Backpack(1)
+        Backpack_VMA_LH = VMA->GetItemForTaggedSlot(LeftHandSlot);
+        BackpackInVMA_LH = Backpack_VMA_LH.ItemId == ItemIdBackpack;
+        Res &= Test->TestTrue(TEXT("[Rec P8] Backpack in VMA LeftHandSlot after move"), BackpackInVMA_LH);
+
+        // --- Phase 9: Dropping Items FROM within a Recursive Container (held in a Tagged Slot) ---
+        // VMA: Grid[0]=Rock(5), LH=Backpack(1)[SubInv_A_B1: B2[SubInv_A_B2: Rock(5)]] (Conceptual state from P5, re-using logic)
+        // Get the sub-container of the Backpack in VMA's LeftHandSlot
+        URecursiveContainerInstanceData* RCI_A_LH_Backpack = nullptr;
+        if (Backpack_VMA_LH.InstanceData.Num() > 0) {
+            RCI_A_LH_Backpack = Cast<URecursiveContainerInstanceData>(Backpack_VMA_LH.InstanceData[0]);
+        }
+        Res &= Test->TestTrue(TEXT("[Rec P9] RCI for Backpack in VMA LH is valid"), RCI_A_LH_Backpack != nullptr);
+        if (!RCI_A_LH_Backpack) return false;
+
+        UItemContainerComponent* SubInv_A_LH_Backpack = RCI_A_LH_Backpack->RepresentedContainer;
+        Res &= Test->TestTrue(TEXT("[Rec P9] Sub-container for Backpack in VMA LH is valid"), SubInv_A_LH_Backpack != nullptr);
+        if (!SubInv_A_LH_Backpack) return false;
+        
+        // Let's assume Backpack1 still contains Backpack2 which contains Rock(5) from phase 5 logic re-application.
+        // For clarity, we'll add a distinct item directly to SubInv_A_LH_Backpack first.
+        SubInv_A_LH_Backpack->Clear_IfServer(); // Clear its contents first
+        int32 AddedSticksToLHBackpack = SubInv_A_LH_Backpack->AddItem_IfServer(Subsystem, ItemIdSticks, 3, false);
+        Res &= Test->TestTrue(TEXT("[Rec P9] Added 3 Sticks to Backpack in VMA LH"), AddedSticksToLHBackpack == 3);
+        // VMA: Grid[0]=Rock(5), LH=Backpack(1)[SubInv_A_LH_Backpack: Sticks(3)]
+
+        // Now, "drop" an item *from* SubInv_A_LH_Backpack.
+        // This operation isn't directly exposed via ViewModel for sub-containers.
+        // We test the underlying component logic and expect VMA to remain unchanged for the Backpack itself.
+        int32 DroppedSticksFromSubInv = SubInv_A_LH_Backpack->DropItem(ItemIdSticks, 1, FItemBundle::NoInstances);
+        Res &= Test->TestTrue(TEXT("[Rec P9] DropItem call on SubInv_A_LH_Backpack for 1 Stick returned 1"), DroppedSticksFromSubInv == 1);
+        // The WorldItem for the Stick should be created. VMA's view of the Backpack in LH should not change.
+        Res &= VMA->AssertViewModelSettled(); // Ensure VMA is settled if any indirect events occurred.
+        // VMA: Grid[0]=Rock(5), LH=Backpack(1)[SubInv_A_LH_Backpack: Sticks(2)]
+        
+        Backpack_VMA_LH = VMA->GetItemForTaggedSlot(LeftHandSlot); // Re-fetch VMA's view
+        BackpackInVMA_LH = Backpack_VMA_LH.ItemId == ItemIdBackpack;
+        Res &= Test->TestTrue(TEXT("[Rec P9] Backpack still in VMA LeftHandSlot after dropping item from its sub-inventory"), BackpackInVMA_LH);
+        int32 SticksInLHBackpack_AfterDrop = SubInv_A_LH_Backpack->GetQuantityTotal_Implementation(ItemIdSticks);
+        Res &= Test->TestTrue(TEXT("[Rec P9] Backpack in VMA LH now contains 2 Sticks"), SticksInLHBackpack_AfterDrop == 2);
+
+        AWorldItem* DroppedStickWorldItem = nullptr;
+        for (TActorIterator<AWorldItem> It(ContextA.World); It; ++It) {
+            if (It->RepresentedItem.ItemId == ItemIdSticks) { DroppedStickWorldItem = *It; break; }
+        }
+        Res &= Test->TestTrue(TEXT("[Rec P9] Dropped Stick WorldItem found"), DroppedStickWorldItem != nullptr);
+        if (DroppedStickWorldItem) {
+            DroppedStickWorldItem->Destroy(); // Clean up this dropped item
+        }
+
+        // --- Phase 10: Dropping a Recursive Container that contains another Recursive Container (WorldItem check) ---
+        InvA->Clear_IfServer(); Res &= VMA->AssertViewModelSettled();
+        // VMA: Empty
+        InvA->AddItemToAnySlot(Subsystem, ItemIdBackpack, 1, EPreferredSlotPolicy::PreferGenericInventory); // Backpack1 (B1)
+        Res &= VMA->AssertViewModelSettled();
+        // VMA: Grid[0]=B1(1)
+        FItemBundle B1_VMA_Grid0_P10 = VMA->GetGridItem(0);
+        URecursiveContainerInstanceData* RCI_A_B1_P10 = Cast<URecursiveContainerInstanceData>(B1_VMA_Grid0_P10.InstanceData[0]);
+        UItemContainerComponent* SubInv_A_B1_P10 = RCI_A_B1_P10->RepresentedContainer;
+        
+        SubInv_A_B1_P10->AddItem_IfServer(Subsystem, ItemIdCoinPurse, 1, false); // CoinPurse (CP1) inside B1
+        Res &= VMA->AssertViewModelSettled(); // VMA only sees B1, no direct update from sub-inv add.
+        // VMA: Grid[0]=B1(1)[SubInv_A_B1_P10: CP1(1)]
+        TArray<UItemInstanceData*> CP1_Datas_In_SubInv_A_B1_P10 = SubInv_A_B1_P10->GetItemInstanceData(ItemIdCoinPurse);
+        URecursiveContainerInstanceData* RCI_A_CP1_P10 = Cast<URecursiveContainerInstanceData>(CP1_Datas_In_SubInv_A_B1_P10[0]);
+        UItemContainerComponent* SubInv_A_CP1_P10 = RCI_A_CP1_P10->RepresentedContainer;
+
+        SubInv_A_CP1_P10->AddItem_IfServer(Subsystem, ItemIdRock, 2, false); // Rock(2) inside CP1
+        // VMA: Grid[0]=B1(1)[SubInv_A_B1_P10: CP1(1)[SubInv_A_CP1_P10: Rock(2)]]
+
+        UItemInstanceData* B1_InstancePtr_P10 = RCI_A_B1_P10;
+        int32 DroppedB1_P10 = VMA->DropItem(NoTag, 0, 1); // Drop B1 (which contains CP1, which contains Rocks)
+        Res &= Test->TestTrue(TEXT("[Rec P10] DropItem for B1 (P10) returned 1"), DroppedB1_P10 == 1);
+        Res &= VMA->AssertViewModelSettled();
+        // VMA: Empty
+        
+        AWorldItem* WorldB1_P10 = nullptr;
+        for (TActorIterator<AWorldItem> It(ContextA.World); It; ++It) {
+            if (It->RepresentedItem.ItemId == ItemIdBackpack && It->RepresentedItem.InstanceData[0] == B1_InstancePtr_P10) {
+                WorldB1_P10 = *It; break;
+            }
+        }
+        Res &= Test->TestTrue(TEXT("[Rec P10] WorldItem for B1 (P10) found"), WorldB1_P10 != nullptr);
+        if (!WorldB1_P10) return false;
+        
+        FItemBundle B1_Bundle_World_P10 = WorldB1_P10->RepresentedItem;
+        URecursiveContainerInstanceData* RCI_W_B1_P10 = Cast<URecursiveContainerInstanceData>(B1_Bundle_World_P10.InstanceData[0]);
+        UItemContainerComponent* SubInv_W_B1_P10 = RCI_W_B1_P10->RepresentedContainer;
+        Res &= Test->TestTrue(TEXT("[Rec P10] SubInv_W_B1_P10 valid"), SubInv_W_B1_P10 != nullptr);
+        if (!SubInv_W_B1_P10) return false;
+        AActor* Owner_SubInv_W_B1_P10 = SubInv_W_B1_P10->GetOwner();
+        Res &= Test->TestTrue(TEXT("[Rec P10] SubInv_W_B1_P10 owner is WorldB1_P10"), Owner_SubInv_W_B1_P10 == WorldB1_P10);
+
+        TArray<UItemInstanceData*> CP1_Datas_In_SubInv_W_B1_P10 = SubInv_W_B1_P10->GetItemInstanceData(ItemIdCoinPurse);
+        int32 CP1_Qty_In_SubInv_W_B1_P10 = SubInv_W_B1_P10->GetQuantityTotal_Implementation(ItemIdCoinPurse);
+        Res &= Test->TestTrue(TEXT("[Rec P10] SubInv_W_B1_P10 contains CP1"), CP1_Qty_In_SubInv_W_B1_P10 == 1);
+        URecursiveContainerInstanceData* RCI_W_CP1_P10 = Cast<URecursiveContainerInstanceData>(CP1_Datas_In_SubInv_W_B1_P10[0]);
+        UItemContainerComponent* SubInv_W_CP1_P10 = RCI_W_CP1_P10->RepresentedContainer;
+        Res &= Test->TestTrue(TEXT("[Rec P10] SubInv_W_CP1_P10 valid"), SubInv_W_CP1_P10 != nullptr);
+        if(!SubInv_W_CP1_P10) return false;
+        AActor* Owner_SubInv_W_CP1_P10 = SubInv_W_CP1_P10->GetOwner();
+        Res &= Test->TestTrue(TEXT("[Rec P10] SubInv_W_CP1_P10 owner is WorldB1_P10"), Owner_SubInv_W_CP1_P10 == WorldB1_P10);
+        
+        int32 RocksInCP1_W_P10 = SubInv_W_CP1_P10->GetQuantityTotal_Implementation(ItemIdRock);
+        Res &= Test->TestTrue(TEXT("[Rec P10] Rocks in CP1 (World) correct"), RocksInCP1_W_P10 == 2);
+
+        if (WorldB1_P10) WorldB1_P10->Destroy();
+
+
+        // --- Phase 11: Pickup a Recursive Container that had items dropped from its sub-inventory ---
+        InvA->Clear_IfServer(); Res &= VMA->AssertViewModelSettled();
+        InvB->Clear_IfServer(); Res &= VMB->AssertViewModelSettled();
+        // VMA: Empty, VMB: Empty
+        
+        InvA->AddItemToAnySlot(Subsystem, ItemIdBackpack, 1, EPreferredSlotPolicy::PreferGenericInventory); // B1 in InvA
+        Res &= VMA->AssertViewModelSettled();
+        // VMA: Grid[0]=B1(1)
+        FItemBundle B1_VMA_Grid0_P11 = VMA->GetGridItem(0);
+        URecursiveContainerInstanceData* RCI_A_B1_P11 = Cast<URecursiveContainerInstanceData>(B1_VMA_Grid0_P11.InstanceData[0]);
+        UItemContainerComponent* SubInv_A_B1_P11 = RCI_A_B1_P11->RepresentedContainer;
+
+        SubInv_A_B1_P11->AddItem_IfServer(Subsystem, ItemIdRock, 3, false); // 3 Rocks in B1
+        SubInv_A_B1_P11->AddItem_IfServer(Subsystem, ItemIdSticks, 2, false); // 2 Sticks in B1
+        // VMA: Grid[0]=B1(1) [SubInv_A_B1_P11: Rock(3), Sticks(2)]
+
+        int32 DroppedRocksFromSubB1_P11 = SubInv_A_B1_P11->DropItem(ItemIdRock, 1, FItemBundle::NoInstances); // Drop 1 Rock from B1
+        Res &= Test->TestTrue(TEXT("[Rec P11] Dropped 1 Rock from B1's sub-inventory"), DroppedRocksFromSubB1_P11 == 1);
+        // VMA: Grid[0]=B1(1) [SubInv_A_B1_P11: Rock(2), Sticks(2)] (Conceptual, VMA itself isn't directly updated by sub-inv drop)
+        Res &= VMA->AssertViewModelSettled(); 
+        int32 RocksInSubB1_P11_AfterDrop = SubInv_A_B1_P11->GetQuantityTotal_Implementation(ItemIdRock);
+        Res &= Test->TestTrue(TEXT("[Rec P11] B1's sub-inventory now has 2 Rocks"), RocksInSubB1_P11_AfterDrop == 2);
+
+        AWorldItem* DroppedRockWorldItem_P11 = nullptr;
+        for (TActorIterator<AWorldItem> It(ContextA.World); It; ++It) {
+            if (It->RepresentedItem.ItemId == ItemIdRock) { DroppedRockWorldItem_P11 = *It; break; }
+        }
+        Res &= Test->TestTrue(TEXT("[Rec P11] Dropped Rock WorldItem (P11) found"), DroppedRockWorldItem_P11 != nullptr);
+
+        // Now drop the Backpack (B1) itself
+        UItemInstanceData* B1_InstancePtr_P11 = RCI_A_B1_P11;
+        VMA->DropItem(NoTag, 0, 1);
+        Res &= VMA->AssertViewModelSettled();
+        // VMA: Empty
+        AWorldItem* DroppedB1_WorldItem_P11 = nullptr;
+        for (TActorIterator<AWorldItem> It(ContextA.World); It; ++It) {
+            if (It->RepresentedItem.ItemId == ItemIdBackpack && It->RepresentedItem.InstanceData[0] == B1_InstancePtr_P11) {
+                DroppedB1_WorldItem_P11 = *It; break;
+            }
+        }
+        Res &= Test->TestTrue(TEXT("[Rec P11] Dropped B1 WorldItem (P11) found"), DroppedB1_WorldItem_P11 != nullptr);
+        if (!DroppedB1_WorldItem_P11) return false;
+
+        // Pickup B1 into InvB
+        VMB->PickupItem(DroppedB1_WorldItem_P11, EPreferredSlotPolicy::PreferGenericInventory, true);
+        Res &= VMB->AssertViewModelSettled();
+        // VMB: Grid[0]=B1(1) [SubInv_B_B1_P11: Rock(2), Sticks(2)]
+        FItemBundle B1_VMB_Grid0_P11 = VMB->GetGridItem(0);
+        bool B1_In_VMB_Grid0_P11 = B1_VMB_Grid0_P11.ItemId == ItemIdBackpack;
+        Res &= Test->TestTrue(TEXT("[Rec P11] Picked up B1 into VMB Grid[0]"), B1_In_VMB_Grid0_P11);
+        URecursiveContainerInstanceData* RCI_B_B1_P11 = Cast<URecursiveContainerInstanceData>(B1_VMB_Grid0_P11.InstanceData[0]);
+        UItemContainerComponent* SubInv_B_B1_P11 = RCI_B_B1_P11->RepresentedContainer;
+        Res &= Test->TestTrue(TEXT("[Rec P11] SubInv_B_B1_P11 valid after pickup"), SubInv_B_B1_P11 != nullptr);
+        if (!SubInv_B_B1_P11) return false;
+
+        int32 RocksInPickedUpB1 = SubInv_B_B1_P11->GetQuantityTotal_Implementation(ItemIdRock);
+        Res &= Test->TestTrue(TEXT("[Rec P11] Picked up B1 contains 2 Rocks"), RocksInPickedUpB1 == 2);
+        int32 SticksInPickedUpB1 = SubInv_B_B1_P11->GetQuantityTotal_Implementation(ItemIdSticks);
+        Res &= Test->TestTrue(TEXT("[Rec P11] Picked up B1 contains 2 Sticks"), SticksInPickedUpB1 == 2);
+        
+        if(DroppedRockWorldItem_P11) DroppedRockWorldItem_P11->Destroy(); // Clean up the individual rock
+
+        // --- Phase 12: Dropping from a Tagged Recursive Container, check WorldItem's sub-container owner ---
+        InvA->Clear_IfServer(); Res &= VMA->AssertViewModelSettled();
+        // VMA: Empty
+        InvA->AddItemToAnySlot(Subsystem, ItemIdBackpack, 1, EPreferredSlotPolicy::PreferAnyTaggedSlot);
+        Res &= VMA->AssertViewModelSettled();
+        // VMA: RH=Backpack(1) (assuming RH is available)
+        FItemBundle Backpack_VMA_RH_P12 = VMA->GetItemForTaggedSlot(RightHandSlot);
+        bool BackpackInVMA_RH_P12 = Backpack_VMA_RH_P12.ItemId == ItemIdBackpack;
+        Res &= Test->TestTrue(TEXT("[Rec P12] Backpack in VMA RH"), BackpackInVMA_RH_P12);
+        URecursiveContainerInstanceData* RCI_A_RH_Backpack_P12 = Cast<URecursiveContainerInstanceData>(Backpack_VMA_RH_P12.InstanceData[0]);
+        UItemContainerComponent* SubInv_A_RH_Backpack_P12 = RCI_A_RH_Backpack_P12->RepresentedContainer;
+
+        SubInv_A_RH_Backpack_P12->AddItem_IfServer(Subsystem, ItemIdRock, 1, false);
+        // VMA: RH=Backpack(1)[SubInv_A_RH_Backpack_P12: Rock(1)]
+        
+        UItemInstanceData* B_RH_InstancePtr_P12 = RCI_A_RH_Backpack_P12;
+        VMA->DropItem(RightHandSlot, -1, 1); // Drop Backpack from RH
+        Res &= VMA->AssertViewModelSettled();
+        // VMA: RH is Empty
+        bool VMA_RH_Empty_P12 = VMA->IsTaggedSlotEmpty(RightHandSlot);
+        Res &= Test->TestTrue(TEXT("[Rec P12] VMA RH is empty after drop"), VMA_RH_Empty_P12);
+
+        AWorldItem* DroppedB_RH_WorldItem_P12 = nullptr;
+        for (TActorIterator<AWorldItem> It(ContextA.World); It; ++It) {
+            if (It->RepresentedItem.ItemId == ItemIdBackpack && It->RepresentedItem.InstanceData[0] == B_RH_InstancePtr_P12) {
+                DroppedB_RH_WorldItem_P12 = *It; break;
+            }
+        }
+        Res &= Test->TestTrue(TEXT("[Rec P12] WorldItem for Backpack from RH found"), DroppedB_RH_WorldItem_P12 != nullptr);
+        if(!DroppedB_RH_WorldItem_P12) return false;
+
+        FItemBundle B_RH_Bundle_World_P12 = DroppedB_RH_WorldItem_P12->RepresentedItem;
+        URecursiveContainerInstanceData* RCI_W_B_RH_P12 = Cast<URecursiveContainerInstanceData>(B_RH_Bundle_World_P12.InstanceData[0]);
+        UItemContainerComponent* SubInv_W_B_RH_P12 = RCI_W_B_RH_P12->RepresentedContainer;
+        Res &= Test->TestTrue(TEXT("[Rec P12] SubInv for WorldItem (from RH) valid"), SubInv_W_B_RH_P12 != nullptr);
+        if(!SubInv_W_B_RH_P12) return false;
+        AActor* Owner_SubInv_W_B_RH_P12 = SubInv_W_B_RH_P12->GetOwner();
+        Res &= Test->TestTrue(TEXT("[Rec P12] SubInv for WorldItem (from RH) owner is WorldItem"), Owner_SubInv_W_B_RH_P12 == DroppedB_RH_WorldItem_P12);
+        int32 RocksInSub_World_P12 = SubInv_W_B_RH_P12->GetQuantityTotal_Implementation(ItemIdRock);
+        Res &= Test->TestTrue(TEXT("[Rec P12] Rocks in SubInv of WorldItem (from RH) correct"), RocksInSub_World_P12 == 1);
+        Res &= VMA->AssertViewModelSettled(); // Final ensure after all ops
+
+		// --- Phase 13: Complex Interactions with Pouch, Drops, and Swaps ---
+        InvA->Clear_IfServer(); Res &= VMA->AssertViewModelSettled();
+        InvB->Clear_IfServer(); Res &= VMB->AssertViewModelSettled();
+        // VMA: Empty, VMB: Empty
+        InvA->MaxSlotCount = 5; // Set specific slot count for InvA
+
+        // Add initial items to InvA (generic slots)
+        InvA->AddItemToAnySlot(Subsystem, ItemIdSticks, 3, EPreferredSlotPolicy::PreferGenericInventory);
+        InvA->AddItemToAnySlot(Subsystem, ItemIdRock, 2, EPreferredSlotPolicy::PreferGenericInventory);
+        InvA->AddItemToAnySlot(Subsystem, ItemIdBrittleEgg, 2, EPreferredSlotPolicy::PreferGenericInventory); // 2 Eggs
+        Res &= VMA->AssertViewModelSettled();
+        // VMA: Grid[0]=Sticks(3), Grid[1]=Rock(2), Grid[2]=Egg(2)
+
+        FItemBundle Sticks_VMA_Grid0 = VMA->GetGridItem(0);
+        bool Sticks_VMA_Grid0_Correct = Sticks_VMA_Grid0.ItemId == ItemIdSticks && Sticks_VMA_Grid0.Quantity == 3;
+        Res &= Test->TestTrue(TEXT("[Rec P13] VMA Grid[0] has 3 Sticks"), Sticks_VMA_Grid0_Correct);
+        FItemBundle Rocks_VMA_Grid1 = VMA->GetGridItem(1);
+        bool Rocks_VMA_Grid1_Correct = Rocks_VMA_Grid1.ItemId == ItemIdRock && Rocks_VMA_Grid1.Quantity == 2;
+        Res &= Test->TestTrue(TEXT("[Rec P13] VMA Grid[1] has 2 Rocks"), Rocks_VMA_Grid1_Correct);
+        FItemBundle Eggs_VMA_Grid2 = VMA->GetGridItem(2);
+        bool Eggs_VMA_Grid2_Correct = Eggs_VMA_Grid2.ItemId == ItemIdBrittleEgg && Eggs_VMA_Grid2.Quantity == 2;
+        Res &= Test->TestTrue(TEXT("[Rec P13] VMA Grid[2] has 2 Eggs"), Eggs_VMA_Grid2_Correct);
+        TArray<UItemInstanceData*> EggInstances_VMA_Original = Eggs_VMA_Grid2.InstanceData;
+        int32 EggInstances_VMA_Original_Count = EggInstances_VMA_Original.Num();
+        Res &= Test->TestTrue(TEXT("[Rec P13] VMA Grid[2] Eggs have 2 instances"), EggInstances_VMA_Original_Count == 2);
+        UItemInstanceData* EggInstance1_VMA = EggInstances_VMA_Original.IsValidIndex(0) ? EggInstances_VMA_Original[0] : nullptr;
+        UItemInstanceData* EggInstance2_VMA = EggInstances_VMA_Original.IsValidIndex(1) ? EggInstances_VMA_Original[1] : nullptr;
+
+        // Create a Coin Purse and add it to InvA (generic slot)
+        InvA->AddItemToAnySlot(Subsystem, ItemIdCoinPurse, 1, EPreferredSlotPolicy::PreferGenericInventory);
+        Res &= VMA->AssertViewModelSettled();
+        // VMA: Grid[0]=Sticks(3), Grid[1]=Rock(2), Grid[2]=Egg(2), Grid[3]=Purse(1)
+        FItemBundle Purse_VMA_Grid3 = VMA->GetGridItem(3);
+        bool PurseInGrid3_VMA = Purse_VMA_Grid3.ItemId == ItemIdCoinPurse;
+        Res &= Test->TestTrue(TEXT("[Rec P13] VMA Grid[3] has CoinPurse"), PurseInGrid3_VMA);
+        URecursiveContainerInstanceData* RCI_A_Purse_P13 = nullptr;
+        if(Purse_VMA_Grid3.InstanceData.IsValidIndex(0)) RCI_A_Purse_P13 = Cast<URecursiveContainerInstanceData>(Purse_VMA_Grid3.InstanceData[0]);
+        UItemContainerComponent* SubInv_A_Purse_P13 = RCI_A_Purse_P13 ? RCI_A_Purse_P13->RepresentedContainer : nullptr;
+        Res &= Test->TestTrue(TEXT("[Rec P13] SubInv_A_Purse_P13 valid"), SubInv_A_Purse_P13 != nullptr);
+        if (!SubInv_A_Purse_P13) return false;
+
+        // Create a ViewModel for the Coin Purse's sub-inventory
+        auto* PurseViewModel_A = NewObject<UInventoryGridViewModel>();
+        PurseViewModel_A->Initialize(SubInv_A_Purse_P13);
+        Res &= PurseViewModel_A->AssertViewModelSettled();
+
+        // Move 1 Egg from VMA Grid[2] (Instance2) to the Coin Purse (PurseViewModel_A Grid[0])
+        bool MovedEggToPurseVM = VMA->MoveItemToOtherViewModel(NoTag, 2, PurseViewModel_A, NoTag, 0, 1); // Move 1 egg
+        Res &= Test->TestTrue(TEXT("[Rec P13] MoveItemToOtherViewModel for Egg (VMA to PurseVM_A) initiated"), MovedEggToPurseVM);
+        Res &= VMA->AssertViewModelSettled();
+        Res &= PurseViewModel_A->AssertViewModelSettled();
+        // VMA: Grid[0]=Sticks(3), Grid[1]=Rock(2), Grid[2]=Egg(1){Instance1}, Grid[3]=Purse(1)[SubInv_A_Purse_P13: Egg(1){Instance2}]
+        
+        Eggs_VMA_Grid2 = VMA->GetGridItem(2);
+        bool Eggs_VMA_Grid2_AfterMove_Correct = Eggs_VMA_Grid2.ItemId == ItemIdBrittleEgg && Eggs_VMA_Grid2.Quantity == 1;
+        Res &= Test->TestTrue(TEXT("[Rec P13] VMA Grid[2] now has 1 Egg"), Eggs_VMA_Grid2_AfterMove_Correct);
+        int32 Eggs_VMA_Grid2_Instances_AfterMove = Eggs_VMA_Grid2.InstanceData.Num();
+        Res &= Test->TestTrue(TEXT("[Rec P13] VMA Grid[2] Egg has 1 instance"), Eggs_VMA_Grid2_Instances_AfterMove == 1);
+        if(Eggs_VMA_Grid2.InstanceData.Num() == 1) {
+             bool EggInstance1_StillInVMA = Eggs_VMA_Grid2.InstanceData[0] == EggInstance1_VMA;
+             Res &= Test->TestTrue(TEXT("[Rec P13] VMA Grid[2] Egg instance is Instance1"), EggInstance1_StillInVMA);
+        }
+        
+        FItemBundle EggInPurse_P13_VM = PurseViewModel_A->GetGridItem(0);
+        bool EggInPurse_P13_VM_Correct = EggInPurse_P13_VM.ItemId == ItemIdBrittleEgg && EggInPurse_P13_VM.Quantity == 1;
+        Res &= Test->TestTrue(TEXT("[Rec P13] PurseViewModel_A Grid[0] contains 1 Egg"), EggInPurse_P13_VM_Correct);
+        int32 EggInstancesInPurse_VM = EggInPurse_P13_VM.InstanceData.Num();
+        Res &= Test->TestTrue(TEXT("[Rec P13] Egg in purse (VM) has 1 instance"), EggInstancesInPurse_VM == 1);
+        if(EggInPurse_P13_VM.InstanceData.Num() == 1) {
+            bool EggInstance2_InPurseVM = EggInPurse_P13_VM.InstanceData[0] == EggInstance2_VMA;
+            Res &= Test->TestTrue(TEXT("[Rec P13] Egg in purse (VM) instance is Instance2"), EggInstance2_InPurseVM);
+        }
+
+        // Drop the Coin Purse (from VMA Grid[3])
+        UItemInstanceData* PurseInstancePtr_P13 = RCI_A_Purse_P13;
+        int32 DroppedPurse_P13 = VMA->DropItem(NoTag, 3, 1);
+        Res &= Test->TestTrue(TEXT("[Rec P13] Dropped CoinPurse from VMA Grid[3]"), DroppedPurse_P13 == 1);
+        Res &= VMA->AssertViewModelSettled();
+        // VMA: Grid[0]=Sticks(3), Grid[1]=Rock(2), Grid[2]=Egg(1){Instance1}, Grid[3]=Empty
+        bool PurseNoLongerInGrid3_VMA = VMA->IsGridSlotEmpty(3);
+        Res &= Test->TestTrue(TEXT("[Rec P13] VMA Grid[3] is empty after dropping Purse"), PurseNoLongerInGrid3_VMA);
+        bool PurseUnregisteredFromA_P13 = !ContextA.TempActor->IsReplicatedSubObjectRegistered(PurseInstancePtr_P13);
+        Res &= Test->TestTrue(TEXT("[Rec P13] Purse instance unregistered from ActorA"), PurseUnregisteredFromA_P13);
+        
+        AWorldItem* DroppedPurseWorldItem_P13 = nullptr;
+        for (TActorIterator<AWorldItem> It(ContextA.World); It; ++It) {
+            if (It->RepresentedItem.ItemId == ItemIdCoinPurse && It->RepresentedItem.InstanceData.IsValidIndex(0) && It->RepresentedItem.InstanceData[0] == PurseInstancePtr_P13) {
+                DroppedPurseWorldItem_P13 = *It; break;
+            }
+        }
+        Res &= Test->TestTrue(TEXT("[Rec P13] Dropped CoinPurse WorldItem found"), DroppedPurseWorldItem_P13 != nullptr);
+        if (!DroppedPurseWorldItem_P13) return false;
+
+        // Pickup the Coin Purse into InvB
+        VMB->PickupItem(DroppedPurseWorldItem_P13, EPreferredSlotPolicy::PreferGenericInventory, true);
+        Res &= VMB->AssertViewModelSettled();
+        // VMB: Grid[0]=Purse(1)[SubInv_B_Purse_P13: Egg(1){Instance2}]
+        FItemBundle Purse_VMB_Grid0 = VMB->GetGridItem(0);
+        bool PurseInGrid0_VMB = Purse_VMB_Grid0.ItemId == ItemIdCoinPurse;
+        Res &= Test->TestTrue(TEXT("[Rec P13] VMB Grid[0] has CoinPurse after pickup"), PurseInGrid0_VMB);
+        URecursiveContainerInstanceData* RCI_B_Purse_P13 = nullptr;
+        if(Purse_VMB_Grid0.InstanceData.IsValidIndex(0)) RCI_B_Purse_P13 = Cast<URecursiveContainerInstanceData>(Purse_VMB_Grid0.InstanceData[0]);
+        bool RCI_B_Purse_P13_IsSame = RCI_B_Purse_P13 == PurseInstancePtr_P13;
+        Res &= Test->TestTrue(TEXT("[Rec P13] Picked up Purse instance is same object"), RCI_B_Purse_P13_IsSame);
+        UItemContainerComponent* SubInv_B_Purse_P13 = RCI_B_Purse_P13 ? RCI_B_Purse_P13->RepresentedContainer : nullptr;
+        Res &= Test->TestTrue(TEXT("[Rec P13] SubInv_B_Purse_P13 is valid"), SubInv_B_Purse_P13 != nullptr);
+        if(!SubInv_B_Purse_P13) return false;
+
+        int32 EggsInPickedUpPurse = SubInv_B_Purse_P13->GetQuantityTotal_Implementation(ItemIdBrittleEgg);
+        Res &= Test->TestTrue(TEXT("[Rec P13] Picked up Purse contains 1 Egg"), EggsInPickedUpPurse == 1);
+        TArray<UItemInstanceData*> EggInstancesInPickedUpPurse = SubInv_B_Purse_P13->GetItemInstanceData(ItemIdBrittleEgg);
+        bool EggInstance2_InPickedUpPurse = EggInstancesInPickedUpPurse.Num() == 1 && EggInstancesInPickedUpPurse[0] == EggInstance2_VMA;
+        Res &= Test->TestTrue(TEXT("[Rec P13] Egg in picked up purse is Instance2"), EggInstance2_InPickedUpPurse);
+
+        // Move Purse from VMB Grid[0] to VMA Grid[0] (which currently has Sticks) - Expects a swap
+        // VMB: Grid[0]=Purse(1)[Egg(1){I2}] || VMA: Grid[0]=Sticks(3), Grid[1]=Rock(2), Grid[2]=Egg(1){I1}
+
+		// TODO: Swapback not currently supported, multistep workaround for now:
+
+		VMB->MoveItemToOtherViewModel(NoTag, 0, VMA, NoTag, 5);
+		VMA->MoveItemToOtherViewModel(NoTag, 0, VMB, NoTag, 0);
+		VMA->MoveItem(NoTag, 5, NoTag, 0);
+		
+        //bool MovedPurseToVMA_Swap = VMB->MoveItemToOtherViewModel(NoTag, 0, VMA, NoTag, 0);
+        //Res &= Test->TestTrue(TEXT("[Rec P13] Moved Purse from VMB to VMA (Swap with Sticks)"), MovedPurseToVMA_Swap);
+        //Res &= VMA->AssertViewModelSettled();
+        //Res &= VMB->AssertViewModelSettled();
+        //// VMB: Grid[0]=Sticks(3) || VMA: Grid[0]=Purse(1)[Egg(1){I2}], Grid[1]=Rock(2), Grid[2]=Egg(1){I1}
+        //FItemBundle Sticks_VMB_Grid0_AfterSwap = VMB->GetGridItem(0);
+        //bool Sticks_VMB_Grid0_AfterSwap_Correct = Sticks_VMB_Grid0_AfterSwap.ItemId == ItemIdSticks && Sticks_VMB_Grid0_AfterSwap.Quantity == 3;
+        //Res &= Test->TestTrue(TEXT("[Rec P13] VMB Grid[0] now has Sticks"), Sticks_VMB_Grid0_AfterSwap_Correct);
+        
+        Purse_VMA_Grid3 = VMA->GetGridItem(0); // Purse should be in Grid[0] of VMA now
+        bool Purse_VMA_Grid0_AfterSwap_Correct = Purse_VMA_Grid3.ItemId == ItemIdCoinPurse;
+        Res &= Test->TestTrue(TEXT("[Rec P13] VMA Grid[0] now has CoinPurse"), Purse_VMA_Grid0_AfterSwap_Correct);
+        URecursiveContainerInstanceData* RCI_A_Purse_P13_AfterSwap = nullptr;
+        if(Purse_VMA_Grid3.InstanceData.IsValidIndex(0)) RCI_A_Purse_P13_AfterSwap = Cast<URecursiveContainerInstanceData>(Purse_VMA_Grid3.InstanceData[0]);
+        UItemContainerComponent* SubInv_A_Purse_P13_AfterSwap = RCI_A_Purse_P13_AfterSwap ? RCI_A_Purse_P13_AfterSwap->RepresentedContainer : nullptr;
+        Res &= Test->TestTrue(TEXT("[Rec P13] SubInv_A_Purse_P13_AfterSwap is valid"), SubInv_A_Purse_P13_AfterSwap != nullptr);
+        if(!SubInv_A_Purse_P13_AfterSwap) return false;
+        int32 EggsInPurse_A_AfterSwap = SubInv_A_Purse_P13_AfterSwap->GetQuantityTotal_Implementation(ItemIdBrittleEgg);
+        Res &= Test->TestTrue(TEXT("[Rec P13] Purse in VMA still contains 1 Egg"), EggsInPurse_A_AfterSwap == 1);
+
+        // Drop Rocks and Sticks from VMA (Grid[1] and VMB Grid[0] respectively)
+        VMA->DropItem(NoTag, 1, 2); // Drop 2 Rocks from VMA Grid[1]
+        Res &= VMA->AssertViewModelSettled();
+        VMB->DropItem(NoTag, 0, 3); // Drop 3 Sticks from VMB Grid[0]
+        Res &= VMB->AssertViewModelSettled();
+        // VMA: Grid[0]=Purse(1)[Egg(1){I2}], Grid[1]=Empty, Grid[2]=Egg(1){I1} || VMB: Empty
+        bool RocksDroppedFromVMA = VMA->IsGridSlotEmpty(1);
+        Res &= Test->TestTrue(TEXT("[Rec P13] VMA Grid[1] (Rocks) is empty after drop"), RocksDroppedFromVMA);
+        bool SticksDroppedFromVMB = VMB->IsGridSlotEmpty(0);
+        Res &= Test->TestTrue(TEXT("[Rec P13] VMB Grid[0] (Sticks) is empty after drop"), SticksDroppedFromVMB);
+
+        // Drop the Coin Purse from VMA Grid[0] again
+        UItemInstanceData* PurseInstancePtr_P13_Again = RCI_A_Purse_P13_AfterSwap;
+        VMA->DropItem(NoTag, 0, 1);
+        Res &= VMA->AssertViewModelSettled();
+        // VMA: Grid[0]=Empty, Grid[1]=Empty, Grid[2]=Egg(1){I1}
+        AWorldItem* DroppedPurseWorldItem_P13_Again = nullptr;
+        for (TActorIterator<AWorldItem> It(ContextA.World); It; ++It) {
+            if (It->RepresentedItem.ItemId == ItemIdCoinPurse && It->RepresentedItem.InstanceData.IsValidIndex(0) && It->RepresentedItem.InstanceData[0] == PurseInstancePtr_P13_Again) {
+                DroppedPurseWorldItem_P13_Again = *It; break;
+            }
+        }
+        Res &= Test->TestTrue(TEXT("[Rec P13] Dropped CoinPurse WorldItem (again) found"), DroppedPurseWorldItem_P13_Again != nullptr);
+        if(!DroppedPurseWorldItem_P13_Again) return false;
+
+        // Pickup Rocks (World) then Coin Purse (World) into VMA
+        AWorldItem* DroppedRocksWorldItem_P13 = nullptr;
+        for (TActorIterator<AWorldItem> It(ContextA.World); It; ++It) {
+            if (It->RepresentedItem.ItemId == ItemIdRock) {
+                DroppedRocksWorldItem_P13 = *It; break;
+            }
+        }
+        Res &= Test->TestTrue(TEXT("[Rec P13] Dropped Rocks WorldItem found"), DroppedRocksWorldItem_P13 != nullptr);
+        if(DroppedRocksWorldItem_P13) {
+            VMA->PickupItem(DroppedRocksWorldItem_P13, EPreferredSlotPolicy::PreferGenericInventory, true);
+            Res &= VMA->AssertViewModelSettled();
+        }
+        // VMA: Grid[0]=Rock(2), Grid[1]=Empty, Grid[2]=Egg(1){I1}
+        Rocks_VMA_Grid1 = VMA->GetGridItem(0); // Should go to first empty slot, Grid[0]
+        bool Rocks_VMA_Grid0_AfterPickup_Correct = Rocks_VMA_Grid1.ItemId == ItemIdRock && Rocks_VMA_Grid1.Quantity == 2;
+        Res &= Test->TestTrue(TEXT("[Rec P13] VMA Grid[0] has Rocks after pickup"), Rocks_VMA_Grid0_AfterPickup_Correct);
+
+        VMA->PickupItem(DroppedPurseWorldItem_P13_Again, EPreferredSlotPolicy::PreferGenericInventory, true);
+        Res &= VMA->AssertViewModelSettled();
+        // VMA: Grid[0]=Rock(2), Grid[1]=Purse(1)[Egg(1){I2}], Grid[2]=Egg(1){I1}
+        Purse_VMA_Grid3 = VMA->GetGridItem(1); // Should go to next empty slot, Grid[1]
+        bool Purse_VMA_Grid1_AfterPickup_Correct = Purse_VMA_Grid3.ItemId == ItemIdCoinPurse;
+        Res &= Test->TestTrue(TEXT("[Rec P13] VMA Grid[1] has CoinPurse after pickup (again)"), Purse_VMA_Grid1_AfterPickup_Correct);
+        URecursiveContainerInstanceData* RCI_A_Purse_P13_PickedUp = nullptr;
+        if(Purse_VMA_Grid3.InstanceData.IsValidIndex(0)) RCI_A_Purse_P13_PickedUp = Cast<URecursiveContainerInstanceData>(Purse_VMA_Grid3.InstanceData[0]);
+        UItemContainerComponent* SubInv_A_Purse_P13_PickedUp = RCI_A_Purse_P13_PickedUp ? RCI_A_Purse_P13_PickedUp->RepresentedContainer : nullptr;
+        Res &= Test->TestTrue(TEXT("[Rec P13] SubInv_A_Purse_P13_PickedUp is valid"), SubInv_A_Purse_P13_PickedUp != nullptr);
+        if(!SubInv_A_Purse_P13_PickedUp) return false;
+
+        int32 EggsInPurse_A_PickedUp = SubInv_A_Purse_P13_PickedUp->GetQuantityTotal_Implementation(ItemIdBrittleEgg);
+        Res &= Test->TestTrue(TEXT("[Rec P13] Picked up Purse in VMA contains 1 Egg"), EggsInPurse_A_PickedUp == 1);
+
+        // Swap Egg (VMA Grid[2]{Instance1}) with Rocks (VMA Grid[0])
+        // VMA: Grid[0]=Rock(2), Grid[1]=Purse(1)[Egg(1){I2}], Grid[2]=Egg(1){I1}
+
+
+		// TODO: Swapback not currently supported, multistep workaround for now:
+		VMA->MoveItemToOtherViewModel(NoTag, 2, VMB, NoTag, 5);
+		VMB->MoveItemToOtherViewModel(NoTag, 0, VMA, NoTag, 2);
+		VMB->MoveItem(NoTag, 5, NoTag, 0);
+
+		// TODO: Swap
+        //bool SwappedEggAndRock = VMA->MoveItem(NoTag, 2, NoTag, 0);
+        //Res &= Test->TestTrue(TEXT("[Rec P13] Swapped Egg (Grid[2]) with Rocks (Grid[0]) in VMA"), SwappedEggAndRock);
+        //Res &= VMA->AssertViewModelSettled();
+        //// VMA: Grid[0]=Egg(1){I1}, Grid[1]=Purse(1)[Egg(1){I2}], Grid[2]=Rock(2)
+        //Eggs_VMA_Grid2 = VMA->GetGridItem(0); // Egg is now in Grid[0]
+        //bool Eggs_VMA_Grid0_AfterSwap_Correct = Eggs_VMA_Grid2.ItemId == ItemIdBrittleEgg && Eggs_VMA_Grid2.Quantity == 1;
+        //Res &= Test->TestTrue(TEXT("[Rec P13] VMA Grid[0] has Egg after swap"), Eggs_VMA_Grid0_AfterSwap_Correct);
+        //bool EggInstance1_InGrid0_VMA = Eggs_VMA_Grid2.InstanceData.Num()==1 && Eggs_VMA_Grid2.InstanceData[0] == EggInstance1_VMA;
+        //Res &= Test->TestTrue(TEXT("[Rec P13] VMA Grid[0] Egg instance is Instance1"), EggInstance1_InGrid0_VMA);
+        //Rocks_VMA_Grid1 = VMA->GetGridItem(2); // Rocks are now in Grid[2]
+        //bool Rocks_VMA_Grid2_AfterSwap_Correct = Rocks_VMA_Grid1.ItemId == ItemIdRock && Rocks_VMA_Grid1.Quantity == 2;
+        //Res &= Test->TestTrue(TEXT("[Rec P13] VMA Grid[2] has Rocks after swap"), Rocks_VMA_Grid2_AfterSwap_Correct);
+		
+        
+        return Res;
+    }
+	
 };
 
 	
@@ -1489,6 +2336,7 @@ bool FRISGridViewModelTest::RunTest(const FString& Parameters)
 	Res &= TestScenarios.TestDrop();
     Res &= TestScenarios.TestUseInstanceDataItems();
 	Res &= TestScenarios.TestMoveItemToOtherViewModel();
+	Res &= TestScenarios.TestRecursiveContainers();
 
 	/* Things to test:
 	 * Container filled with 1/5 rocks -> add sticks

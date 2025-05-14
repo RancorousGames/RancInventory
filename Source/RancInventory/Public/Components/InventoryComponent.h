@@ -310,7 +310,7 @@ protected:
 	virtual int32 DropAllItems_ServerImpl() override;
 	virtual int32 DestroyItemImpl(const FGameplayTag& ItemId, int32 Quantity, TArray<UItemInstanceData*> InstancesToDestroy, EItemChangeReason Reason, bool AllowPartial = false, bool SuppressEvents = false, bool SuppressUpdate = false) override;
 	virtual void ClearServerImpl() override;
-	virtual int32 ExtractItemImpl_IfServer(const FGameplayTag& ItemId, int32 Quantity, const TArray<UItemInstanceData*>& InstancesToExtract, EItemChangeReason Reason, TArray<UItemInstanceData*>& InstanceArrayToAppendTo, bool AllowPartial, bool SuppressEvents, bool SuppressUpdate) override;
+	virtual int32 ExtractItem_ServerImpl(const FGameplayTag& ItemId, int32 Quantity, const TArray<UItemInstanceData*>& InstancesToExtract, EItemChangeReason Reason, TArray<UItemInstanceData*>& InstanceArrayToAppendTo, bool AllowPartial, bool SuppressEvents, bool SuppressUpdate) override;
 	
 	// Unlike other extract methods, this Does NOT allow partial extraction, will return 0
 	int32 ExtractItemFromTaggedSlot_IfServer(const FGameplayTag& TaggedSlot, const FGameplayTag& ItemId, int32 Quantity, const TArray<UItemInstanceData*>& InstancesToExtract, EItemChangeReason Reason, TArray<UItemInstanceData*>& InstanceArrayToAppendTo);
