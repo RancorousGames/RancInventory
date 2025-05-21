@@ -22,7 +22,9 @@ public class RancInventoryTest : ModuleRules
             "UnrealEd",
             "AssetTools",
             "Engine",
-            "GameplayTags", "GameplayTagsEditor", "GameplayTagsEditor"
+            "GameplayTags",
+            "GameplayTagsEditor",
+            "GameplayTagsEditor"
         });
     }
 }

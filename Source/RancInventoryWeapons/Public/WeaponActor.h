@@ -97,6 +97,18 @@ public:
 
 	UFUNCTION(Server, Reliable)
 	void HolsterServer();
+
+	/*
+	Weapon no longer inventory. This is what you call when a weapon is dropped from ACharacter to clean up
+	*/
+	void Remove();
+
+	UFUNCTION(NetMulticast, Reliable)
+	void RemoveMulticast();
+
+	UFUNCTION(Server, Reliable)
+	void RemoveServer();
+	
 protected:
 	
 	/* Index of the next attack montage to play, only managed on server */

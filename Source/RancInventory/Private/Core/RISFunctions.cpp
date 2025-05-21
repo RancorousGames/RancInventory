@@ -92,12 +92,12 @@ TArray<UItemStaticData*> URISFunctions::LoadRancItemData_Internal(
 		const bool bOutput = IsValid(InAsset);
 		if (bOutput)
 		{
-			UE_LOG(LogRISInventory, Display, TEXT("%s: Item data %s found and loaded"), *FString(FuncName),
+			UE_LOG(LogRancInventorySystem, Display, TEXT("%s: Item data %s found and loaded"), *FString(FuncName),
 			       *InAsset->GetName());
 		}
 		else
 		{
-			UE_LOG(LogRISInventory, Error, TEXT("%s: Failed to load item data: Invalid Asset"),
+			UE_LOG(LogRancInventorySystem, Error, TEXT("%s: Failed to load item data: Invalid Asset"),
 			       *FString(FuncName));
 		}
 
@@ -108,7 +108,7 @@ TArray<UItemStaticData*> URISFunctions::LoadRancItemData_Internal(
 	{
 		if (URISFunctions::HasEmptyParam(InArr))
 		{
-			UE_LOG(LogRISInventory, Error, TEXT("%s: Failed to find items with the given parameters"),
+			UE_LOG(LogRancInventorySystem, Error, TEXT("%s: Failed to find items with the given parameters"),
 			       *FString(FuncName));
 		}
 

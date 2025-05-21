@@ -7,8 +7,9 @@
 #include "RISInventoryTestSetup.cpp" // Include for test item and tag definitions
 #include "WeaponActor.h"
 #include "Framework/DebugTestResult.h"
-#include "GameFramework/Character.h"
 #include "MockClasses/ItemHoldingCharacter.h"
+
+#if WITH_DEV_AUTOMATION_TESTS && WITH_EDITOR
 
 #define TestName "GameTests.RIS.4_GearManager"
 
@@ -699,3 +700,5 @@ bool FRancGearManagerComponentTest::RunTest(const FString& Parameters)
 
 	return Res;
 }
+
+#endif // #if WITH_DEV_AUTOMATION_TESTS

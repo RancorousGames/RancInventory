@@ -12,6 +12,8 @@
 #include "Framework/TestDelegateForwardHelper.h"
 #include "MockClasses/ItemHoldingCharacter.h"
 
+#if WITH_DEV_AUTOMATION_TESTS && WITH_EDITOR
+
 #define TestName "GameTests.RIS.1_ItemContainerComponent"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRancItemContainerComponentTest, TestName,
@@ -1067,3 +1069,5 @@ bool FRancItemContainerComponentTest::RunTest(const FString& Parameters)
     Res &= FItemContainerTestScenarios::TestRecursiveContainerLifecycle(this);
 	return Res;
 }
+
+#endif // #if WITH_DEV_AUTOMATION_TESTS

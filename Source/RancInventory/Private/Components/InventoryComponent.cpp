@@ -198,7 +198,7 @@ int32 UInventoryComponent::ExtractItem_ServerImpl(const FGameplayTag& ItemId, in
 
 	if (AllowPartial && !InstancesToExtract.IsEmpty())
 	{
-		UE_LOG(LogRISInventory, Error, TEXT("ExtractItem_ServerImpl: AllowPartial with InstancesToDestroy is not currently supported."));
+		UE_LOG(LogRancInventorySystem, Error, TEXT("ExtractItem_ServerImpl: AllowPartial with InstancesToDestroy is not currently supported."));
 		return 0;
 	}
 
@@ -257,7 +257,7 @@ int32 UInventoryComponent::ExtractItemFromTaggedSlot_IfServer(const FGameplayTag
 	int32 Index = GetIndexForTaggedSlot(TaggedSlot);
 	if (Index == INDEX_NONE || !TaggedSlotItems[Index].Contains(Quantity, InstancesToExtract))
 	{
-		UE_LOG(LogRISInventory, Warning, TEXT("Tagged slot %s does not contain item %s"), *TaggedSlot.ToString(),
+		UE_LOG(LogRancInventorySystem, Warning, TEXT("Tagged slot %s does not contain item %s"), *TaggedSlot.ToString(),
 		       *ItemId.ToString());
 		return 0;
 	}
@@ -347,11 +347,11 @@ int32 UInventoryComponent::AddItemToTaggedSlot_IfServer(TScriptInterface<IItemSo
 			                        FGameplayTag::EmptyTag) != ExistingItem.Quantity)
 			{
 				// We could not unequip the blocking item, so we can't add this item
-				UE_LOG(LogRISInventory, Log, TEXT("AddItemsToTaggedSlot_IfServer: Failed to auto-unequip blocking item from %s to allow adding %s to %s."),
+				UE_LOG(LogRancInventorySystem, Log, TEXT("AddItemsToTaggedSlot_IfServer: Failed to auto-unequip blocking item from %s to allow adding %s to %s."),
 					*UniversalSlotDefinition->UniversalSlotToBlock.ToString(), *ItemId.ToString(), *SlotTag.ToString());
 				return 0;
 			}
-			UE_LOG(LogRISInventory, Log, TEXT("AddItemsToTaggedSlot_IfServer: Auto-unequipped item from %s to allow adding %s to %s."),
+			UE_LOG(LogRancInventorySystem, Log, TEXT("AddItemsToTaggedSlot_IfServer: Auto-unequipped item from %s to allow adding %s to %s."),
 				*UniversalSlotDefinition->UniversalSlotToBlock.ToString(), *ItemId.ToString(), *SlotTag.ToString());
 		}
 	}
@@ -370,7 +370,7 @@ int32 UInventoryComponent::AddItemToTaggedSlot_IfServer(TScriptInterface<IItemSo
 		int32 MovedQuantity = MoveItem_ServerImpl(SlotItem->ItemId, SlotItem->Quantity, NoInstances, SlotTag, FGameplayTag::EmptyTag);
 		if (MovedQuantity != PreMoveQuantity)
 		{
-			UE_LOG(LogRISInventory, Warning, TEXT("AddItemsToTaggedSlot_IfServer: Failed to move existing item %s from %s to container. Aborting tagged slot add."),
+			UE_LOG(LogRancInventorySystem, Warning, TEXT("AddItemsToTaggedSlot_IfServer: Failed to move existing item %s from %s to container. Aborting tagged slot add."),
 				*SlotItem->ItemId.ToString(), *SlotTag.ToString());
 			return 0;
 		}
@@ -451,18 +451,18 @@ int32 UInventoryComponent::AddItemToTaggedSlot_IfServer(TScriptInterface<IItemSo
 				if(ContainerInstance->InstanceData.IsValidIndex(i)) { // Extra safety check
 					AddedInstances.Add(ContainerInstance->InstanceData[i]);
 				} else {
-					UE_LOG(LogRISInventory, Error, TEXT("AddItemsToTaggedSlot_IfServer: Invalid instance index %d accessed in container for %s."), i, *ItemId.ToString());
+					UE_LOG(LogRancInventorySystem, Error, TEXT("AddItemsToTaggedSlot_IfServer: Invalid instance index %d accessed in container for %s."), i, *ItemId.ToString());
 				}
 			}
 			// Sanity check
 			if(AddedInstances.Num() != ActualAddedToContainer && ActualAddedToContainer > 0) {
-				 UE_LOG(LogRISInventory, Error, TEXT("AddItemsToTaggedSlot_IfServer: Instance count mismatch. Expected %d, Got %d for %s."), ActualAddedToContainer, AddedInstances.Num(), *ItemId.ToString());
+				 UE_LOG(LogRancInventorySystem, Error, TEXT("AddItemsToTaggedSlot_IfServer: Instance count mismatch. Expected %d, Got %d for %s."), ActualAddedToContainer, AddedInstances.Num(), *ItemId.ToString());
 				 // Correct the count based on actual instances fetched
 				 ActualAddedToContainer = AddedInstances.Num();
 			}
 			SlotItem->InstanceData.Append(AddedInstances);
 		} else {
-			 UE_LOG(LogRISInventory, Error, TEXT("AddItemsToTaggedSlot_IfServer: ContainerInstance for %s not found after Super::AddItem_ServerImpl! Tagged slot instance data will be missing."), *ItemId.ToString());
+			 UE_LOG(LogRancInventorySystem, Error, TEXT("AddItemsToTaggedSlot_IfServer: ContainerInstance for %s not found after Super::AddItem_ServerImpl! Tagged slot instance data will be missing."), *ItemId.ToString());
 			 ActualAddedToContainer = 0; // Cannot proceed without container instance
 		}
 	}
@@ -516,14 +516,14 @@ int32 UInventoryComponent::AddItemToAnySlot(TScriptInterface<IItemSource> ItemSo
 	// If the base container couldn't accept the items (e.g., source dried up unexpectedly), abort.
 	if (ActualAddedToContainer < ViableQuantity)
 	{
-		UE_LOG(LogRISInventory, Error, TEXT("AddItemToAnySlot: AddItem_ServerImpl failed to add %s (Calculated Viable: %d, Actual: %d). Aborting."), *ItemId.ToString(), ViableQuantity, ActualAddedToContainer);
+		UE_LOG(LogRancInventorySystem, Error, TEXT("AddItemToAnySlot: AddItem_ServerImpl failed to add %s (Calculated Viable: %d, Actual: %d). Aborting."), *ItemId.ToString(), ViableQuantity, ActualAddedToContainer);
 		return 0;
 	}
 	
 	auto* ContainerInstance = FindItemInstanceMutable(ItemId); // Get mutable pointer to the container item bundle
 	if (!ContainerInstance && ActualAddedToContainer > 0)
 	{
-		 UE_LOG(LogRISInventory, Error, TEXT("AddItemToAnySlot: Failed to find container instance for %s after adding %d items! Aborting distribution."), *ItemId.ToString(), ActualAddedToContainer);
+		 UE_LOG(LogRancInventorySystem, Error, TEXT("AddItemToAnySlot: Failed to find container instance for %s after adding %d items! Aborting distribution."), *ItemId.ToString(), ActualAddedToContainer);
 		 // Consider how to handle this - maybe just return ActualAddedToContainer as added to generic?
 		 return 0; // Abort distribution if container state is inconsistent
 	}
@@ -544,7 +544,7 @@ int32 UInventoryComponent::AddItemToAnySlot(TScriptInterface<IItemSource> ItemSo
 
 		// Defensive check: Don't try to distribute more than what was actually added to the container
 		if (ViableQuantitySlot > QuantityRemainingInPlan) {
-			 UE_LOG(LogRISInventory, Error, TEXT("AddItemToAnySlot: Distribution plan requests %d for %s, but only %d remain available from container add. Adjusting."), ViableQuantitySlot, SlotTag.IsValid() ? *SlotTag.ToString() : TEXT("Generic"), QuantityRemainingInPlan);
+			 UE_LOG(LogRancInventorySystem, Error, TEXT("AddItemToAnySlot: Distribution plan requests %d for %s, but only %d remain available from container add. Adjusting."), ViableQuantitySlot, SlotTag.IsValid() ? *SlotTag.ToString() : TEXT("Generic"), QuantityRemainingInPlan);
 			 // Adjust ViableQuantitySlot if needed, though ideally the plan matches ActualAddedToContainer
 			 const_cast<int32&>(ViableQuantitySlot) = QuantityRemainingInPlan; // Modifying tuple element - use with caution or rebuild plan
 			 if (ViableQuantitySlot <= 0) continue; // Skip if nothing left to distribute here
@@ -564,7 +564,7 @@ int32 UInventoryComponent::AddItemToAnySlot(TScriptInterface<IItemSource> ItemSo
 
             // Verify fetched instance count matches expected quantity for this slot
 			if (InstancesForThisSlot.Num() != ViableQuantitySlot) {
-                 UE_LOG(LogRISInventory, Error, TEXT("AddItemToAnySlot: Instance count mismatch for distribution step. Slot: %s, Expected: %d, Got: %d"), SlotTag.IsValid() ? *SlotTag.ToString() : TEXT("Generic"), ViableQuantitySlot, InstancesForThisSlot.Num());
+                 UE_LOG(LogRancInventorySystem, Error, TEXT("AddItemToAnySlot: Instance count mismatch for distribution step. Slot: %s, Expected: %d, Got: %d"), SlotTag.IsValid() ? *SlotTag.ToString() : TEXT("Generic"), ViableQuantitySlot, InstancesForThisSlot.Num());
                  // Correct quantity based on actual instances for this step
                  const_cast<int32&>(ViableQuantitySlot) = InstancesForThisSlot.Num();
                  if (ViableQuantitySlot <= 0) continue;
@@ -582,7 +582,7 @@ int32 UInventoryComponent::AddItemToAnySlot(TScriptInterface<IItemSource> ItemSo
 
 			if (ActualMovedQuantity != ViableQuantitySlot)
 			{
-				UE_LOG(LogRISInventory, Warning, TEXT("AddItemToAnySlot: Failed internal move of %d/%d %s to tagged slot %s. Items remain in generic."),
+				UE_LOG(LogRancInventorySystem, Warning, TEXT("AddItemToAnySlot: Failed internal move of %d/%d %s to tagged slot %s. Items remain in generic."),
 					ActualMovedQuantity, ViableQuantitySlot, *ItemId.ToString(), *SlotTag.ToString());
 				// Items that failed to move stay in generic. Add them to the generic count.
 				QuantityAddedToGenericSlot += ViableQuantitySlot - ActualMovedQuantity;
@@ -593,7 +593,7 @@ int32 UInventoryComponent::AddItemToAnySlot(TScriptInterface<IItemSource> ItemSo
 					 // A more robust way would be needed if partial internal moves were common/expected.
 					 if(ActualMovedQuantity == 0) InstancesForGenericSlotsEvent.Append(InstancesForThisSlot);
                      // If partial move, log warning, instances remain associated with generic
-                     else UE_LOG(LogRISInventory, Warning, TEXT("AddItemToAnySlot: Partial internal move occurred. Instance tracking for events might be imprecise."));
+                     else UE_LOG(LogRancInventorySystem, Warning, TEXT("AddItemToAnySlot: Partial internal move occurred. Instance tracking for events might be imprecise."));
 				}
 			} else {
                 // Successful move, collect instances for the specific tagged slot event
@@ -670,7 +670,7 @@ int32 UInventoryComponent::RemoveQuantityFromTaggedSlot_IfServer(FGameplayTag Sl
 
 	if (AllowPartial && InstancesToRemove.Num() > 0)
 	{
-		UE_LOG(LogRISInventory, Warning, TEXT("Removing specific instances from tagged slot %s when AllowPartial is true is currently not supported"), *SlotTag.ToString());
+		UE_LOG(LogRancInventorySystem, Warning, TEXT("Removing specific instances from tagged slot %s when AllowPartial is true is currently not supported"), *SlotTag.ToString());
 		return 0;
 	}
 
@@ -678,7 +678,7 @@ int32 UInventoryComponent::RemoveQuantityFromTaggedSlot_IfServer(FGameplayTag Sl
 
 	if (IndexToRemoveAt < 0)
 	{
-		UE_LOG(LogRISInventory, Warning, TEXT("RemoveQuantityFromTaggedSlot_IfServer: Tagged slot %s not found"), *SlotTag.ToString());
+		UE_LOG(LogRancInventorySystem, Warning, TEXT("RemoveQuantityFromTaggedSlot_IfServer: Tagged slot %s not found"), *SlotTag.ToString());
 		return 0;
 	}
 
@@ -686,13 +686,13 @@ int32 UInventoryComponent::RemoveQuantityFromTaggedSlot_IfServer(FGameplayTag Sl
 
 	if (!TaggedBundleToRemoveFrom || !TaggedBundleToRemoveFrom->IsValid())
 	{
-		UE_LOG(LogRISInventory, Warning, TEXT("RemoveQuantityFromTaggedSlot_IfServer: Tagged slot %s is empty"), *SlotTag.ToString());
+		UE_LOG(LogRancInventorySystem, Warning, TEXT("RemoveQuantityFromTaggedSlot_IfServer: Tagged slot %s is empty"), *SlotTag.ToString());
 		return 0;
 	}
 
 	if ((!AllowPartial || !InstancesToRemove.IsEmpty()) && !TaggedBundleToRemoveFrom->Contains(QuantityToRemove, InstancesToRemove))
 	{
-		UE_LOG(LogRISInventory, Warning, TEXT("Tagged slot %s does not contain specified items"), *SlotTag.ToString());
+		UE_LOG(LogRancInventorySystem, Warning, TEXT("Tagged slot %s does not contain specified items"), *SlotTag.ToString());
 		return 0;
 	}
 
@@ -834,7 +834,7 @@ int32 UInventoryComponent::MoveItem_ServerImpl(const FGameplayTag& ItemId, int32
 		SourceTaggedSlotIndex = GetIndexForTaggedSlot(SourceTaggedSlot);
         // If validation passed, index should be valid. Add defensive check just in case.
         if (!TaggedSlotItems.IsValidIndex(SourceTaggedSlotIndex)) {
-            UE_LOG(LogRISInventory, Warning, TEXT("MoveItem_ServerImpl: Tried to move from invalid tagged slot %s"), *SourceTaggedSlot.ToString());
+            UE_LOG(LogRancInventorySystem, Warning, TEXT("MoveItem_ServerImpl: Tried to move from invalid tagged slot %s"), *SourceTaggedSlot.ToString());
             return 0;
         }
 		SourceItem = &TaggedSlotItems[SourceTaggedSlotIndex];
@@ -844,7 +844,7 @@ int32 UInventoryComponent::MoveItem_ServerImpl(const FGameplayTag& ItemId, int32
         // Find the item in the container (validation confirmed it exists)
         FItemBundle* FoundSourceInContainer = FindItemInstanceMutable(ItemId);
          if (!FoundSourceInContainer) {
-             UE_LOG(LogRISInventory, Warning, TEXT("MoveItem_ServerImpl: Source item %s not found in container."), *ItemId.ToString());
+             UE_LOG(LogRancInventorySystem, Warning, TEXT("MoveItem_ServerImpl: Source item %s not found in container."), *ItemId.ToString());
              return 0;
          }
         SourceItem = FoundSourceInContainer;
@@ -866,7 +866,7 @@ int32 UInventoryComponent::MoveItem_ServerImpl(const FGameplayTag& ItemId, int32
 				TaggedSlotItems.Add(FTaggedItemBundle(TargetTaggedSlot, FItemBundle::EmptyItemInstance));
 				TargetItem = &TaggedSlotItems.Last();
 			} else {
-                 UE_LOG(LogRISInventory, Error, TEXT("MoveItem_ServerImpl: Target tagged slot %s not configured post-validation."), *TargetTaggedSlot.ToString());
+                 UE_LOG(LogRancInventorySystem, Error, TEXT("MoveItem_ServerImpl: Target tagged slot %s not configured post-validation."), *TargetTaggedSlot.ToString());
                  return 0;
             }
 		}
@@ -887,7 +887,7 @@ int32 UInventoryComponent::MoveItem_ServerImpl(const FGameplayTag& ItemId, int32
         {
             FItemBundle* FoundSwapTarget = FindItemInstanceMutable(SwapItemId);
             if (!FoundSwapTarget) {
-                 UE_LOG(LogRISInventory, Error, TEXT("MoveItem_ServerImpl: Target container swap item %s not found post-validation."), *SwapItemId.ToString());
+                 UE_LOG(LogRancInventorySystem, Error, TEXT("MoveItem_ServerImpl: Target container swap item %s not found post-validation."), *SwapItemId.ToString());
                  return 0;
             }
 			TargetItem = FoundSwapTarget;
@@ -1191,7 +1191,7 @@ void UInventoryComponent::MoveBetweenContainers_ServerImpl(UItemContainerCompone
 		// Target is a basic Container
 		if (TargetTaggedSlot.IsValid())
 		{
-			UE_LOG(LogRISInventory, Error, TEXT("RequestMoveItemToOtherContainer_Server: TargetTaggedSlot specified, but TargetComponent is not a UInventoryComponent. Move failed."));
+			UE_LOG(LogRancInventorySystem, Error, TEXT("RequestMoveItemToOtherContainer_Server: TargetTaggedSlot specified, but TargetComponent is not a UInventoryComponent. Move failed."));
 			return; // Cannot move to tagged slot of basic container
 		}
 		// Validate against the generic container part using base validation
@@ -1241,7 +1241,7 @@ void UInventoryComponent::MoveBetweenContainers_ServerImpl(UItemContainerCompone
 
                  if(ActuallyAdded != ReceivedByTargetContainer)
                  {
-	                 UE_LOG(LogRISInventory, Error, TEXT("RequestMove: Failed internal move generic->tagged in target despite validation.."));
+	                 UE_LOG(LogRancInventorySystem, Error, TEXT("RequestMove: Failed internal move generic->tagged in target despite validation.."));
 
                  	// Remove ActuallyAdded from InstancesActuallyInTargetContainer
                  	for (int32 i = InstancesActuallyInTargetContainer.Num() - 1; ActuallyAdded > 0 && i >= 0; --i)
@@ -1311,7 +1311,7 @@ void UInventoryComponent::MoveBetweenContainers_ServerImpl(UItemContainerCompone
                        }
                   }
                  int32 MovedBackToTagged = SourceInventoryComp->MoveItem_ServerImpl(ItemId, ReturnedToSource, ActualReturnedInstances, FGameplayTag(), SourceTaggedSlot, false, FGameplayTag(), 0, false, false);
-                 if (MovedBackToTagged != ReturnedToSource) UE_LOG(LogRISInventory, Warning, TEXT("RequestMove: Failed internal move generic->tagged in source after return."));
+                 if (MovedBackToTagged != ReturnedToSource) UE_LOG(LogRancInventorySystem, Warning, TEXT("RequestMove: Failed internal move generic->tagged in source after return."));
             }
         }
     }
@@ -1323,7 +1323,7 @@ void UInventoryComponent::PickupItem(AWorldItem* WorldItem, EPreferredSlotPolicy
 {
 	if (!IsValid(WorldItem))
 	{
-		UE_LOG(LogRISInventory, Warning, TEXT("PickupItem called with null world item"));
+		UE_LOG(LogRancInventorySystem, Warning, TEXT("PickupItem called with null world item"));
 		return;
 	}
 
@@ -1417,7 +1417,7 @@ int32 UInventoryComponent::RemoveAnyItemFromTaggedSlot_IfServer(FGameplayTag Slo
 	// If the slot is empty or the item is invalid, there's nothing to clear
 	if (!ItemInSlot.IsValid())
 	{
-		// UE_LOG(LogRISInventory, Verbose, TEXT("ClearTaggedSlot_IfServer: Slot %s is already empty or invalid."), *SlotTag.ToString());
+		// UE_LOG(LogRancInventorySystem, Verbose, TEXT("ClearTaggedSlot_IfServer: Slot %s is already empty or invalid."), *SlotTag.ToString());
 		return 0;
 	}
 
@@ -1440,12 +1440,12 @@ int32 UInventoryComponent::RemoveAnyItemFromTaggedSlot_IfServer(FGameplayTag Slo
 
 	if (QuantityActuallyMoved < QuantityToMove && QuantityActuallyMoved > 0)
 	{
-		UE_LOG(LogRISInventory, Log, TEXT("ClearTaggedSlot_IfServer: Partially cleared slot %s. Moved %d/%d of %s. Container likely full."),
+		UE_LOG(LogRancInventorySystem, Log, TEXT("ClearTaggedSlot_IfServer: Partially cleared slot %s. Moved %d/%d of %s. Container likely full."),
 			*SlotTag.ToString(), QuantityActuallyMoved, QuantityToMove, *ItemIdToMove.ToString());
 	}
 	else if (QuantityActuallyMoved == 0 && QuantityToMove > 0)
 	{
-		UE_LOG(LogRISInventory, Warning, TEXT("ClearTaggedSlot_IfServer: Failed to clear slot %s containing %d of %s. Container likely full or move rejected."),
+		UE_LOG(LogRancInventorySystem, Warning, TEXT("ClearTaggedSlot_IfServer: Failed to clear slot %s containing %d of %s. Container likely full or move rejected."),
 			*SlotTag.ToString(), QuantityToMove, *ItemIdToMove.ToString());
 	}
 
@@ -1471,7 +1471,7 @@ int32 UInventoryComponent::UseItemFromTaggedSlot(const FGameplayTag& SlotTag, in
 
 	if (!UsableItem)
 	{
-		UE_LOG(LogRISInventory, Warning, TEXT("Item is not usable: %s"), *ItemId.ToString());
+		UE_LOG(LogRancInventorySystem, Warning, TEXT("Item is not usable: %s"), *ItemId.ToString());
 		return 0;
 	}
 
@@ -1507,7 +1507,7 @@ void UInventoryComponent::UseItemFromTaggedSlot_Server_Implementation(const FGam
 
 		if (!UsableItem)
 		{
-			UE_LOG(LogRISInventory, Warning, TEXT("Item is not usable: %s"), *ItemId.ToString());
+			UE_LOG(LogRancInventorySystem, Warning, TEXT("Item is not usable: %s"), *ItemId.ToString());
 			return;
 		}
 
@@ -1885,12 +1885,12 @@ void UInventoryComponent::SortUniversalTaggedSlots()
     // If cycles are detected, log a warning and partially sort
     if (!CyclicIndices.IsEmpty())
     {
-       UE_LOG(LogRISInventory, Warning, TEXT("Cycle detected in UniversalTaggedSlots dependency graph! %d slots have cyclic dependencies."), CyclicIndices.Num());
+       UE_LOG(LogRancInventorySystem, Warning, TEXT("Cycle detected in UniversalTaggedSlots dependency graph! %d slots have cyclic dependencies."), CyclicIndices.Num());
        
        // Log the specific cyclic slots for debugging
        for (int32 CyclicIndex : CyclicIndices)
        {
-           UE_LOG(LogRISInventory, Warning, TEXT("Cyclic Slot Index: %d, Slot: %s"), 
+           UE_LOG(LogRancInventorySystem, Warning, TEXT("Cyclic Slot Index: %d, Slot: %s"), 
                   CyclicIndex, 
                   *UniversalTaggedSlots[CyclicIndex].Slot.ToString());
        }
@@ -1974,7 +1974,7 @@ bool UInventoryComponent::CraftRecipe_IfServer(const UObjectRecipeData* Recipe)
 			                                           EItemChangeReason::Transformed);
 			if (Removed < Component.Quantity)
 			{
-				UE_LOG(LogRISInventory, Error, TEXT("Failed to remove all items for crafting even though they were confirmed"));
+				UE_LOG(LogRancInventorySystem, Error, TEXT("Failed to remove all items for crafting even though they were confirmed"));
 				return false;
 			}
 		}
@@ -1987,11 +1987,11 @@ bool UInventoryComponent::CraftRecipe_IfServer(const UObjectRecipeData* Recipe)
 			                                                      true);
 			if (QuantityAdded < ItemRecipe->QuantityCreated)
 			{
-				UE_LOG(LogRISInventory, Display, TEXT("Failed to add crafted item to inventory, dropping item instead"));
+				UE_LOG(LogRancInventorySystem, Display, TEXT("Failed to add crafted item to inventory, dropping item instead"));
 
 				if (!Subsystem)
 				{
-					UE_LOG(LogRISInventory, Error, TEXT("Subsystem is null, cannot drop item"));
+					UE_LOG(LogRancInventorySystem, Error, TEXT("Subsystem is null, cannot drop item"));
 					return false;
 				}
 
@@ -2108,7 +2108,7 @@ void UInventoryComponent::DropFromTaggedSlot_ServerImpl(const FGameplayTag& Slot
 	const FTaggedItemBundle& Item = TaggedSlotItems[Index];
 	if (!Item.Tag.IsValid())
 	{
-		UE_LOG(LogRISInventory, Warning, TEXT("DropFromTaggedSlot called with invalid slot tag"));
+		UE_LOG(LogRancInventorySystem, Warning, TEXT("DropFromTaggedSlot called with invalid slot tag"));
 		return;
 	}
 

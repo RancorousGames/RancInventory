@@ -12,6 +12,8 @@
 #include "Framework/DebugTestResult.h"
 #include "MockClasses/ItemHoldingCharacter.h"
 
+#if WITH_DEV_AUTOMATION_TESTS && WITH_EDITOR
+
 #define TestNameGVM "GameTests.RIS.3_GridViewModel"
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRISGridViewModelTest, TestNameGVM, EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
@@ -2346,3 +2348,5 @@ bool FRISGridViewModelTest::RunTest(const FString& Parameters)
 
 	return Res;
 }
+
+#endif // #if WITH_DEV_AUTOMATION_TESTS

@@ -9,6 +9,8 @@
 #include "Framework/DebugTestResult.h"
 #include "MockClasses/ItemHoldingCharacter.h"
 
+#if WITH_DEV_AUTOMATION_TESTS && WITH_EDITOR
+
 #define TestName "GameTests.RIS.2_InventoryComponent"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRancInventoryComponentTest, TestName,
@@ -1835,10 +1837,7 @@ bool FRancInventoryComponentTest::RunTest(const FString& Parameters)
 	Res &= TestScenarios.TestInventoryMaxCapacity();
 	Res &= TestScenarios.TestReceivableQuantity();
 
-	// Tests to add:
-	//  * AddItemToTaggedSlot_IfServer with pushoutexistingitem = true
-	//  * Move item with swapback that violates indirect blocking
-	//  * RequestMoveItemToOtherContainer - include case where generic slots are full but there is space in tagged slots
+	return Res;	
+};
 	
-	return Res;
-}
+#endif // #if WITH_DEV_AUTOMATION_TESTS

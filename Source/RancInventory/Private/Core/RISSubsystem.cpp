@@ -282,7 +282,7 @@ void URISSubsystem::HardcodeItem(FGameplayTag ItemId, UItemStaticData* ItemData)
 {
 	if (AllLoadedItemsByTag.Contains(ItemId))
 	{
-		UE_LOG(LogRISInventory, Warning, TEXT("HardcodeItem: Item with id %s already exists"), *ItemId.ToString());
+		UE_LOG(LogRancInventorySystem, Warning, TEXT("HardcodeItem: Item with id %s already exists"), *ItemId.ToString());
 		return;
 	}
 
@@ -294,7 +294,7 @@ void URISSubsystem::HardcodeRecipe(FGameplayTag RecipeId, UObjectRecipeData* Rec
 {
 	if (AllLoadedRecipes.Contains(RecipeData))
 	{
-		UE_LOG(LogRISInventory, Warning, TEXT("HardcodeRecipe: Recipe with id %s already exists"),
+		UE_LOG(LogRancInventorySystem, Warning, TEXT("HardcodeRecipe: Recipe with id %s already exists"),
 		       *RecipeId.ToString());
 		return;
 	}
@@ -395,7 +395,7 @@ AWorldItem* URISSubsystem::SpawnWorldItem(UObject* WorldContextObject,
 	
     if (!World || !WorldItemClass || !Item.ItemId.IsValid())
     {
-        UE_LOG(LogRISInventory, Warning, TEXT("SpawnWorldItem: Invalid parameters provided"));
+        UE_LOG(LogRancInventorySystem, Warning, TEXT("SpawnWorldItem: Invalid parameters provided"));
         return nullptr;
     }
 
@@ -403,7 +403,7 @@ AWorldItem* URISSubsystem::SpawnWorldItem(UObject* WorldContextObject,
     UItemStaticData* ItemData = AllLoadedItemsByTag.FindRef(Item.ItemId);
     if (!ItemData)
     {
-        UE_LOG(LogRISInventory, Warning, TEXT("SpawnWorldItem: Could not find item data for ID: %s"), 
+        UE_LOG(LogRancInventorySystem, Warning, TEXT("SpawnWorldItem: Could not find item data for ID: %s"), 
             *Item.ItemId.ToString());
         return nullptr;
     }
@@ -437,7 +437,7 @@ AWorldItem* URISSubsystem::SpawnWorldItem(UObject* WorldContextObject,
     }
     else
     {
-        UE_LOG(LogRISInventory, Warning, TEXT("SpawnWorldItem: Failed to spawn world item for ID: %s"), 
+        UE_LOG(LogRancInventorySystem, Warning, TEXT("SpawnWorldItem: Failed to spawn world item for ID: %s"), 
             *Item.ItemId.ToString());
     }
 

@@ -106,7 +106,7 @@ bool UItemContainerComponent::ContainsByPredicate(const FGameplayTag& ItemId,
 
 	if (!ItemData->DefaultInstanceDataTemplate) // Check if the Class pointer itself is null/invalid
 	{
-		UE_LOG(LogRISInventory, Verbose,
+		UE_LOG(LogRancInventorySystem, Verbose,
 		       TEXT("ContainsByPredicate: Item %s does not use Instance Data. Checking total quantity."),
 		       *ItemId.ToString());
 		return false;
@@ -115,7 +115,7 @@ bool UItemContainerComponent::ContainsByPredicate(const FGameplayTag& ItemId,
 	if (FoundItemBundle->Quantity != FoundItemBundle->InstanceData.Num() && FoundItemBundle->InstanceData.Num() > 0)
 	{
 		// Another inconsistency: Quantity doesn't match instance count.
-		UE_LOG(LogRISInventory, Warning,
+		UE_LOG(LogRancInventorySystem, Warning,
 		       TEXT(
 			       "ContainsByPredicate: Item %s Quantity (%d) does not match InstanceData count (%d). Predicate check might be unreliable."
 		       ),
@@ -138,7 +138,7 @@ bool UItemContainerComponent::ContainsByPredicate(const FGameplayTag& ItemId,
 		}
 		else
 		{
-			UE_LOG(LogRISInventory, Warning,
+			UE_LOG(LogRancInventorySystem, Warning,
 			       TEXT("ContainsByPredicate: Found null pointer in InstanceData array for item %s."),
 			       *ItemId.ToString());
 		}
@@ -273,7 +273,7 @@ int32 UItemContainerComponent::AddItemWithInstances_IfServer(
 	UObject* ItemSourceObj = ItemSource.GetObjectRef();
 	if (!ItemSourceObj || !ItemId.IsValid())
 	{
-		UE_LOG(LogRISInventory, Warning, TEXT("AddItem_IfServer: Item source is null or ItemId is invalid!"));
+		UE_LOG(LogRancInventorySystem, Warning, TEXT("AddItem_IfServer: Item source is null or ItemId is invalid!"));
 		return 0;
 	}
 
@@ -295,7 +295,7 @@ int32 UItemContainerComponent::AddItemWithInstances_IfServer(
 
 	if (ViableQuantity <= 0 || (ViableQuantity < QuantityToValidate && !AllowPartial))
 	{
-		UE_LOG(LogRISInventory, Verbose,
+		UE_LOG(LogRancInventorySystem, Verbose,
 		       TEXT("AddItem_IfServer: Target container cannot receive item %s (Capacity: %d, Requested: %d)"),
 		       *ItemId.ToString(), ViableQuantity, QuantityToValidate);
 		return 0; // Target cannot receive any
@@ -316,7 +316,7 @@ int32 UItemContainerComponent::AddItemWithInstances_IfServer(
 
 	if (ActualExtractedQuantity <= 0)
 	{
-		UE_LOG(LogRISInventory, Verbose, TEXT("AddItem_IfServer: Source failed to provide item %s (Requested attempt: %d)"),
+		UE_LOG(LogRancInventorySystem, Verbose, TEXT("AddItem_IfServer: Source failed to provide item %s (Requested attempt: %d)"),
 		       *ItemId.ToString(), ViableQuantity);
 		return 0; // Source couldn't provide the item
 	}
@@ -326,7 +326,7 @@ int32 UItemContainerComponent::AddItemWithInstances_IfServer(
 	{
 		if (ActualExtractedQuantity != InstancesToExtract.Num())
 		{
-			UE_LOG(LogRISInventory, Warning,
+			UE_LOG(LogRancInventorySystem, Warning,
 			       TEXT(
 				       "AddItem_IfServer: Source extracted %d instances, but %d specific instances were requested for %s. Aborting add."
 			       ), ActualExtractedQuantity, InstancesToExtract.Num(), *ItemId.ToString());
@@ -371,7 +371,7 @@ int32 UItemContainerComponent::AddItemWithInstances_IfServer(
 				}
 				else
 				{
-					UE_LOG(LogRISInventory, Warning,
+					UE_LOG(LogRancInventorySystem, Warning,
 					       TEXT("AddItem_IfServer: Encountered null pointer in ExtractedInstances array for %s."),
 					       *ItemId.ToString());
 				}
@@ -380,7 +380,7 @@ int32 UItemContainerComponent::AddItemWithInstances_IfServer(
 		// If ExtractedInstances is empty but DefaultInstanceDataTemplate is valid, log a warning because we are NOT creating instances here.
 		else if (ActualExtractedQuantity > 0)
 		{
-			UE_LOG(LogRISInventory, Warning,
+			UE_LOG(LogRancInventorySystem, Warning,
 			       TEXT(
 				       "AddItem_IfServer: Item %s requires instance data, but source did not provide any. Instances will be missing."
 			       ), *ItemId.ToString());
@@ -429,7 +429,7 @@ int32 UItemContainerComponent::UseItem(const FGameplayTag& ItemId, int32 ItemToU
 
 	if (!UsableItem)
 	{
-		UE_LOG(LogRISInventory, Warning, TEXT("Item is not usable: %s"), *ItemId.ToString());
+		UE_LOG(LogRancInventorySystem, Warning, TEXT("Item is not usable: %s"), *ItemId.ToString());
 		return 0;
 	}
 
@@ -449,7 +449,7 @@ int32 UItemContainerComponent::DropItem(const FGameplayTag& ItemId, int32 Quanti
 {
 	if (!ContainsInstances(ItemId, Quantity, InstancesToDrop))
 	{
-		UE_LOG(LogRISInventory, Warning, TEXT("Cannot drop item: %s"), *ItemId.ToString());
+		UE_LOG(LogRancInventorySystem, Warning, TEXT("Cannot drop item: %s"), *ItemId.ToString());
 		return 0;
 	}
 
@@ -555,7 +555,7 @@ void UItemContainerComponent::DropItemFromContainer_ServerImpl(FGameplayTag Item
 
 	if (Extracted <= 0)
 	{
-		UE_LOG(LogRISInventory, Warning, TEXT("DropItemFromContainer_ServerImpl: Items not found"));
+		UE_LOG(LogRancInventorySystem, Warning, TEXT("DropItemFromContainer_ServerImpl: Items not found"));
 		return;
 	}
 
@@ -572,7 +572,7 @@ int32 UItemContainerComponent::DropAllItems_ServerImpl()
 	AActor* OwnerActor = GetOwner();
 	if (!OwnerActor)
 	{
-		UE_LOG(LogRISInventory, Error, TEXT("DropAllItems_ServerImpl: Cannot drop items, OwnerActor is null."));
+		UE_LOG(LogRancInventorySystem, Error, TEXT("DropAllItems_ServerImpl: Cannot drop items, OwnerActor is null."));
 		return 0;
 	}
 
@@ -592,7 +592,7 @@ int32 UItemContainerComponent::DropAllItems_ServerImpl()
 		// 3a. Get Item Data and Stack Size
 		if (!ItemIdToProcess.IsValid() || !IsValid(ItemData))
 		{
-			UE_LOG(LogRISInventory, Error, TEXT("DropAllItems_ServerImpl: ItemId %s is invalid or ItemData not found."),
+			UE_LOG(LogRancInventorySystem, Error, TEXT("DropAllItems_ServerImpl: ItemId %s is invalid or ItemData not found."),
 			       *ItemIdToProcess.ToString());
 			ItemsVer.Items.Pop();
 			continue;
@@ -640,7 +640,7 @@ void UItemContainerComponent::UseItem_Server_Implementation(const FGameplayTag& 
 
 	if (!UsableItem)
 	{
-		UE_LOG(LogRISInventory, Warning, TEXT("Item is not usable: %s"), *ItemId.ToString());
+		UE_LOG(LogRancInventorySystem, Warning, TEXT("Item is not usable: %s"), *ItemId.ToString());
 		return;
 	}
 
@@ -697,7 +697,7 @@ void UItemContainerComponent::ClearServerImpl()
 {
 	if (GetOwnerRole() < ROLE_Authority && GetOwnerRole() != ROLE_None)
 	{
-		UE_LOG(LogRISInventory, Warning, TEXT("ClearInventory called on non-authority!"));
+		UE_LOG(LogRancInventorySystem, Warning, TEXT("ClearInventory called on non-authority!"));
 		return;
 	}
 
@@ -734,7 +734,7 @@ int32 UItemContainerComponent::DestroyItemImpl(const FGameplayTag& ItemId, int32
 
 	if (!ContainedItem || (!AllowPartial && ContainedItem->Quantity < Quantity))
 	{
-		UE_LOG(LogRISInventory, Warning, TEXT("Cannot remove item: %s, Instances provided: %d"), *ItemId.ToString(),
+		UE_LOG(LogRancInventorySystem, Warning, TEXT("Cannot remove item: %s, Instances provided: %d"), *ItemId.ToString(),
 		       InstancesToDestroy.Num());
 		return 0;
 	}
@@ -1022,7 +1022,7 @@ int32 UItemContainerComponent::ReceiveExtractedItems_IfServer(const FGameplayTag
 {
 	if (!ItemId.IsValid())
 	{
-		UE_LOG(LogRISInventory, Warning, TEXT("ReceiveExtractedItems_IfServer: Invalid ItemId provided."));
+		UE_LOG(LogRancInventorySystem, Warning, TEXT("ReceiveExtractedItems_IfServer: Invalid ItemId provided."));
 		return 0;
 	}
 
@@ -1033,7 +1033,7 @@ int32 UItemContainerComponent::ReceiveExtractedItems_IfServer(const FGameplayTag
 
 	if (InstancesUsed && ReceivedInstances.Num() == 0)
 	{
-		UE_LOG(LogRISInventory, Warning, TEXT("ReceiveExtractedItems_IfServer: No instances to receive for item %s."),
+		UE_LOG(LogRancInventorySystem, Warning, TEXT("ReceiveExtractedItems_IfServer: No instances to receive for item %s."),
 		       *ItemId.ToString());
 		return 0;
 	}
@@ -1049,7 +1049,7 @@ int32 UItemContainerComponent::ReceiveExtractedItems_IfServer(const FGameplayTag
 
 	if (QuantityToReceive <= 0)
 	{
-		UE_LOG(LogRISInventory, Warning,
+		UE_LOG(LogRancInventorySystem, Warning,
 		       TEXT("ReceiveExtractedItems_IfServer: Cannot receive item %s, container full or invalid."),
 		       *ItemId.ToString());
 		return 0;
@@ -1082,7 +1082,7 @@ int32 UItemContainerComponent::ReceiveExtractedItems_IfServer(const FGameplayTag
 			}
 			else
 			{
-				UE_LOG(LogRISInventory, Warning,
+				UE_LOG(LogRancInventorySystem, Warning,
 				       TEXT("ReceiveExtractedItems_IfServer: Encountered null instance pointer during receive for %s."),
 				       *ItemId.ToString());
 			}
@@ -1148,7 +1148,7 @@ bool UItemContainerComponent::IsClient(const char* FunctionName) const
 	if (FunctionName && IsClient)
 	{
 		FString FuncName(FunctionName);
-		UE_LOG(LogRISInventory, Error,
+		UE_LOG(LogRancInventorySystem, Error,
 			   TEXT("%s called from non authority"),
 			   *FuncName);
 	}
@@ -1163,11 +1163,11 @@ bool UItemContainerComponent::BadItemData(const UItemStaticData* ItemData, const
 	{
 		if (ItemId.IsValid())
 		{
-			UE_LOG(LogRISInventory, Warning, TEXT("Could not find item data for item: %s"), *ItemId.ToString());
+			UE_LOG(LogRancInventorySystem, Warning, TEXT("Could not find item data for item: %s"), *ItemId.ToString());
 		}
 		else
 		{
-			UE_LOG(LogRISInventory, Warning, TEXT("Could not find item data for item"));
+			UE_LOG(LogRancInventorySystem, Warning, TEXT("Could not find item data for item"));
 		}
 			
 		return true;

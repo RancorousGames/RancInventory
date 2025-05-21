@@ -2,4 +2,4 @@
 
 #include "..\Public\LogRancInventorySystem.h"
 
-DEFINE_LOG_CATEGORY(LogRISInventory);
+DEFINE_LOG_CATEGORY(LogRancInventorySystem);

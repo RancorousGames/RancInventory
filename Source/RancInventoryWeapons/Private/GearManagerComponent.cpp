@@ -11,6 +11,58 @@
 #include "RecordingSystem/WeaponAttackRecorderComponent.h"
 #include "RecordingSystem/WeaponAttackRecorderDataTypes.h"
 
+template <typename T>
+static FString PrintArrayContents(const TArray<T>& Array, bool bReverse = false)
+{
+#if !UE_BUILD_SHIPPING
+	FString Result = "{";
+
+	if (!bReverse)
+	{
+		for (int32 i = 0; i < Array.Num(); ++i)
+		{
+			Result += Array[i].ToString();
+
+			if (i < Array.Num() - 1)
+			{
+				Result += ", ";
+			}
+		}
+	}
+	else
+	{
+		for (int32 i = Array.Num() - 1; i >= 0; --i)
+		{
+			Result += Array[i].ToString();
+
+			if (i > 0)
+			{
+				Result += ", ";
+			}
+		}
+	}
+
+	Result += "}";
+
+	return Result;
+#else
+	return "";
+#endif
+}
+
+template <typename EnumType>
+static FString EnumToString(const FString& EnumName, EnumType Value)
+{
+	// Deprecated, fix with https://forums.unrealengine.com/t/findobject-withough-any-package/742812/5
+	UEnum* Enum = FindObject<UEnum>(ANY_PACKAGE, *EnumName, true);
+	if (!Enum)
+	{
+		return FString("Invalid");
+	}
+	return Enum->GetNameStringByValue(static_cast<int64>(Value));
+}
+
+
 // Sets default values for this component's properties
 UGearManagerComponent::UGearManagerComponent()
 {
@@ -33,7 +85,7 @@ void UGearManagerComponent::InitializeComponent()
 
 		if (!LinkedInventoryComponent)
 		{
-			UE_LOG(LogRISInventory, Warning, TEXT("LinkedInventoryComponent is nullptr."))
+			UE_LOG(LogRancInventorySystem, Warning, TEXT("LinkedInventoryComponent is nullptr."))
 			return;
 		}
 	}
@@ -70,7 +122,7 @@ void UGearManagerComponent::Initialize()
 	Owner = Cast<ACharacter>(GetOwner());
 	if (!Owner || !LinkedInventoryComponent)
 	{
-		UE_LOG(LogRISInventory, Error, TEXT("Owner or LinkedInventoryComponent is nullptr."))
+		UE_LOG(LogRancInventorySystem, Error, TEXT("Owner or LinkedInventoryComponent is nullptr."))
 		return;
 	}
 
@@ -195,7 +247,7 @@ void UGearManagerComponent::AddAndSetSelectedWeapon_IfServer(const UItemStaticDa
 
 	if (!WeaponData)
 	{
-		UE_LOG(LogRISInventory, Warning, TEXT("WeaponData is nullptr."))
+		UE_LOG(LogRancInventorySystem, Warning, TEXT("WeaponData is nullptr."))
 		return;
 	}
 	
@@ -213,7 +265,7 @@ void UGearManagerComponent::AddAndSetSelectedWeapon_IfServer(const UItemStaticDa
 	{
 		if (!WeaponToReplace->ItemData)
 		{
-			UE_LOG(LogRISInventory, Warning, TEXT("WeaponToReplace->ItemData is nullptr. EquipWeapon() Failed"))
+			UE_LOG(LogRancInventorySystem, Warning, TEXT("WeaponToReplace->ItemData is nullptr. EquipWeapon() Failed"))
 			return;
 		}
 		
@@ -232,7 +284,7 @@ void UGearManagerComponent::RegisterSpawnedWeapon(AWeaponActor* WeaponActor)
 	int32 HandSlotIndex = WeaponActor->HandSlotIndex;
 	if (!GearSlots.IsValidIndex(HandSlotIndex))
 	{
-		UE_LOG(LogRISInventory, Error, TEXT("RegisterSpawnedWeapon() failed. HandSlotIndex is out of range."))
+		UE_LOG(LogRancInventorySystem, Error, TEXT("RegisterSpawnedWeapon() failed. HandSlotIndex is out of range."))
 		return;
 	}
 	
@@ -253,7 +305,7 @@ void UGearManagerComponent::RegisterSpawnedWeapon(AWeaponActor* WeaponActor)
 	{
 		if (SelectableWeaponsData.Num() == MaxSelectableWeaponCount)
 		{
-			UE_LOG(LogRISInventory, Verbose, TEXT("NumberOfWeaponsAcquired >= WeaponSlots, replaced earliest weapon"))
+			UE_LOG(LogRancInventorySystem, Verbose, TEXT("NumberOfWeaponsAcquired >= WeaponSlots, replaced earliest weapon"))
 
 			SelectableWeaponsData.RemoveAt(0);
 		}
@@ -314,7 +366,7 @@ int32 UGearManagerComponent::GetHandSlotIndexToUse(const UWeaponDefinition* Weap
 		}
 	}
 
-	UE_LOG(LogRISInventory, Warning, TEXT("GetHandSlotIndexToUse() failed."))
+	UE_LOG(LogRancInventorySystem, Warning, TEXT("GetHandSlotIndexToUse() failed."))
 	return -1;
 }
 
@@ -348,7 +400,7 @@ void UGearManagerComponent::AttachWeaponToOwner(AWeaponActor* InputWeaponActor, 
 
 	if (!CharMesh)
 	{
-		UE_LOG(LogRISInventory, Warning, TEXT("AttachWeaponToOwner() failed, CharMesh is nullptr"))
+		UE_LOG(LogRancInventorySystem, Warning, TEXT("AttachWeaponToOwner() failed, CharMesh is nullptr"))
 		return;
 	}
 
@@ -373,7 +425,7 @@ bool UGearManagerComponent::Check(AWeaponActor* InputWeaponActor) const
 {
 	if (!Owner)
 	{
-		UE_LOG(LogRISInventory, Warning, TEXT("Owner a nullptr. Initialize this component propertly!"));
+		UE_LOG(LogRancInventorySystem, Warning, TEXT("Owner a nullptr. Initialize this component propertly!"));
 
 		return false;
 	}
@@ -381,7 +433,7 @@ bool UGearManagerComponent::Check(AWeaponActor* InputWeaponActor) const
 
 	if (!InputWeaponActor)
 	{
-		UE_LOG(LogRISInventory, Warning, TEXT("InputWeaponActor is nullptr!"))
+		UE_LOG(LogRancInventorySystem, Warning, TEXT("InputWeaponActor is nullptr!"))
 		return false;
 	}
 	return true;
@@ -401,13 +453,13 @@ void UGearManagerComponent::ManualAddSelectableWeapon(const UItemStaticData* Ite
 	// Ensure this is not called on dedicated server
 	if (IsRunningDedicatedServer())
 	{
-		UE_LOG(LogRISInventory, Warning, TEXT("ManualAddSelectableWeapon() failed. This function should not be called on a dedicated server."))
+		UE_LOG(LogRancInventorySystem, Warning, TEXT("ManualAddSelectableWeapon() failed. This function should not be called on a dedicated server."))
 		return;
 	}
 	
 	if (!ItemStaticData || InsertionIndex > MaxSelectableWeaponCount)
 	{
-		UE_LOG(LogRISInventory, Warning, TEXT("ManualAddSelectableWeapon() failed. ItemStaticData is nullptr or InsertionIndex is out of range."))
+		UE_LOG(LogRancInventorySystem, Warning, TEXT("ManualAddSelectableWeapon() failed. ItemStaticData is nullptr or InsertionIndex is out of range."))
 		return;
 	}
 	
@@ -429,7 +481,7 @@ void UGearManagerComponent::RemoveSelectableWeapon(int32 WeaponIndexToRemove)
 	}
 	else
 	{
-		UE_LOG(LogRISInventory, Warning, TEXT("RemoveSelectableWeapon() failed. WeaponIndexToRemove is out of range."))
+		UE_LOG(LogRancInventorySystem, Warning, TEXT("RemoveSelectableWeapon() failed. WeaponIndexToRemove is out of range."))
 	}
 }
 
@@ -439,7 +491,7 @@ void UGearManagerComponent::SelectActiveWeapon_Server_Implementation(FGameplayTa
 
 	if (!ItemData)
 	{
-		UE_LOG(LogRISInventory, Warning, TEXT("WeaponData is nullptr."))
+		UE_LOG(LogRancInventorySystem, Warning, TEXT("WeaponData is nullptr."))
 		return;
 	}
 
@@ -507,7 +559,7 @@ void UGearManagerComponent::UnequipGear(FGameplayTag Slot, const UItemStaticData
     // Basic validation (keeping this minimal)
     if (!ItemData || !Owner)
     {
-        UE_LOG(LogRISInventory, Error, TEXT("UnequipGear: Invalid input (ItemData or Owner is null). Slot: %s"), *Slot.ToString());
+        UE_LOG(LogRancInventorySystem, Error, TEXT("UnequipGear: Invalid input (ItemData or Owner is null). Slot: %s"), *Slot.ToString());
         return;
     }
 
@@ -581,7 +633,7 @@ void UGearManagerComponent::UnequipGear(FGameplayTag Slot, const UItemStaticData
         }
 
         default:
-            UE_LOG(LogRISInventory, Error, TEXT("UnequipGear (SkipQueue=true): Invalid GearChangeStep %d."), static_cast<int32>(Step));
+            UE_LOG(LogRancInventorySystem, Error, TEXT("UnequipGear (SkipQueue=true): Invalid GearChangeStep %d."), static_cast<int32>(Step));
             break;
     }
 }
@@ -630,7 +682,7 @@ void UGearManagerComponent::EquipGear(FGameplayTag Slot, const UItemStaticData* 
 {
     if (!NewItemData)
     {
-        UE_LOG(LogRISInventory, Warning, TEXT("ItemData is nullptr. EquipGear() Failed"));
+        UE_LOG(LogRancInventorySystem, Warning, TEXT("ItemData is nullptr. EquipGear() Failed"));
         return;
     }
 
@@ -638,7 +690,7 @@ void UGearManagerComponent::EquipGear(FGameplayTag Slot, const UItemStaticData* 
     FGearSlotDefinition* GearSlot = FindGearSlotDefinition(Slot);
     if (!GearSlot)
     {
-        UE_LOG(LogRISInventory, Warning, TEXT("No gear slot found for slot %s"), *Slot.ToString());
+        UE_LOG(LogRancInventorySystem, Warning, TEXT("No gear slot found for slot %s"), *Slot.ToString());
         return;
     }
 	
@@ -691,7 +743,7 @@ void UGearManagerComponent::EquipGear(FGameplayTag Slot, const UItemStaticData* 
         }
 
         default:
-            UE_LOG(LogRISInventory, Error, TEXT("Invalid GearChangeStep."));
+            UE_LOG(LogRancInventorySystem, Error, TEXT("Invalid GearChangeStep."));
             break;
     }
 }
@@ -761,6 +813,9 @@ AWeaponActor* UGearManagerComponent::SpawnWeapon_IfServer(const UItemStaticData*
 		NewWeaponActor->HandSlotIndex = HandSlotIndex;
 		NewWeaponActor->SetOwner(Owner);
 
+		
+		
+#if WITH_EDITOR
 		if (bRecordAttackTraces)
 		{
 			if (UWeaponAttackRecorderComponent* RecorderComponent = NewObject<UWeaponAttackRecorderComponent>(
@@ -770,12 +825,13 @@ AWeaponActor* UGearManagerComponent::SpawnWeapon_IfServer(const UItemStaticData*
 				RecorderComponent->RegisterComponent();
 			}
 		}
+#endif
 
 		NewWeaponActor->FinishSpawning(FTransform(FRotator(0.0f, 0.0f, 0.0f), SpawnLocation, FVector::OneVector));
 		return NewWeaponActor;
 	}
 
-	UE_LOG(LogRISInventory, Warning, TEXT("Failed to spawn weapon actor!"))
+	UE_LOG(LogRancInventorySystem, Warning, TEXT("Failed to spawn weapon actor!"))
 	return nullptr;
 }
 
@@ -783,21 +839,21 @@ float UGearManagerComponent::PlayMontage(ACharacter* OwnerChar, UAnimMontage* Mo
 {
 	if (!OwnerChar)
 	{
-		UE_LOG(LogRISInventory, Warning, TEXT("UGearManagerComponent::PlayMontage: OwnerChar is a nullptr, PlayMontage() returning 0.0f "))
+		UE_LOG(LogRancInventorySystem, Warning, TEXT("UGearManagerComponent::PlayMontage: OwnerChar is a nullptr, PlayMontage() returning 0.0f "))
 
 		return 0.0f;
 	}
 
 	if (!Montage)
 	{
-		UE_LOG(LogRISInventory, Warning, TEXT("UGearManagerComponent::PlayMontage: Montage is a nullptr, PlayMontage() returning 0.0f "))
+		UE_LOG(LogRancInventorySystem, Warning, TEXT("UGearManagerComponent::PlayMontage: Montage is a nullptr, PlayMontage() returning 0.0f "))
 
 		return 0.0f;
 	}
 
 	if (PlayRate < 0.0f)
 	{
-		UE_LOG(LogRISInventory, Warning, TEXT("UGearManagerComponent::PlayMontage: Playrate was < 0, setting Playrate = 1!"))
+		UE_LOG(LogRancInventorySystem, Warning, TEXT("UGearManagerComponent::PlayMontage: Playrate was < 0, setting Playrate = 1!"))
 		PlayRate = 1.0f;
 	}
 	

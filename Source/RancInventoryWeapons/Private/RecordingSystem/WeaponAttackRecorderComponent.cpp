@@ -2,10 +2,10 @@
 
 #include "RecordingSystem/WeaponAttackRecorderComponent.h"
 #include "WeaponActor.h"
-#include "Engine/SkeletalMeshSocket.h"
 #include "AssetRegistry/AssetRegistryModule.h"
-#include "Kismet/GameplayStatics.h"
 #include "UObject/SavePackage.h"
+
+#if WITH_EDITOR
 
 UWeaponAttackRecorderComponent::UWeaponAttackRecorderComponent()
 {
@@ -612,6 +612,30 @@ void UWeaponAttackRecorderComponent::UpdateMontageDataWithRecordedSequence(FAtta
     {
         MontageData.RecordedTraceSequence = AttackData;
     }
+    
+    /* Code from the old branch for updating data asset
+    if (CurrentSession.AttackData && CurrentSession.AttackingWeapon && CurrentSession.AttackingWeapon->WeaponData)
+    {
+    // Load the newly created data asset, we cannot use the pointer directly
+    UWeaponAttackData* AttackDataDataAsset = LoadObject<UWeaponAttackData>(nullptr, *LastSavedAssetData->GetPathName());
+        
+    const_cast<UWeaponStaticData*>(CurrentSession.AttackingWeapon->WeaponData)->AttackMontages[CurrentSession.MontageIndex].RecordedTraceSequence =
+    AttackDataDataAsset;
+        
+    CurrentSession.AttackingWeapon->WeaponData->MarkPackageDirty();
+    UPackage* WeaponDataAsset = CurrentSession.AttackingWeapon->WeaponData->GetOutermost();
+
+    FSavePackageArgs SaveArgs;
+    SaveArgs.TopLevelFlags = RF_Public | RF_Standalone;
+    SaveArgs.Error = GError;
+    SaveArgs.bForceByteSwapping = true;
+    SaveArgs.bWarnOfLongFilename = true;
+    SaveArgs.SaveFlags = SAVE_NoError;
+
+    FString PackageFileName = FPackageName::LongPackageNameToFilename(WeaponDataAsset->GetName(), FPackageName::GetAssetPackageExtension());
+    UWeaponStaticData* WeaponData = const_cast<UWeaponStaticData*>(CurrentSession.AttackingWeapon->WeaponData);
+    UPackage::SavePackage(WeaponDataAsset, WeaponData, *PackageFileName, SaveArgs);
+    }*/
 }
 
 void UWeaponAttackRecorderComponent::StartReplayVisualization()
@@ -673,3 +697,5 @@ void UWeaponAttackRecorderComponent::ReplayRecording()
     ReplayCurrentIndex++;
     GetWorld()->GetTimerManager().SetTimer(ReplayTimerHandle, this, &UWeaponAttackRecorderComponent::ReplayRecording, ReplayInterval, false);
 }
+
+#endif // WITH_EDITOR

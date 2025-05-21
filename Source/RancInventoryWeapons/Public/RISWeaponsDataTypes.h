@@ -19,25 +19,6 @@ enum class EHandCompatibility : uint8
     None
 };
 
-USTRUCT(BlueprintType)
-struct FAttackMontageData2
-{
-    GENERATED_BODY()
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ranc Inventory | Weapon")
-    UAnimMontage* Montage = nullptr;
-
-};
-
-USTRUCT(BlueprintType)
-struct FAttackMontageData3
-{
-    GENERATED_BODY()
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ranc Inventory | Weapon")
-    TObjectPtr<UAnimMontage> Montage = nullptr;
-
-};
 
 USTRUCT(BlueprintType)
 struct FAttackMontageData
@@ -74,5 +55,37 @@ struct FMontageData
     bool IsValid() const
     {
         return Montage != nullptr;
+    }
+};
+
+
+USTRUCT(BlueprintType)
+struct FProjectileFiringData : public FTableRowBase
+{
+    GENERATED_BODY()
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=Pattern)
+    TSoftClassPtr<class AActor> ProjectileSoftClass;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=Pattern)
+    int32 ProjectilesPerShot = 1;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=Pattern)
+    float DegreeSpacingForSpreadPattern = 10.0f;
+
+    //How far apart additional bullets will be in unreal units
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=Pattern)
+    float BulletSpacingForNonSpreadPattern = 100.0f; 
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=RandomSpread)
+    float MinRandomDegreeSpread = -10.0f; 
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=RandomSpread)
+    float MaxRandomDegreeSpread = 10.0f;
+
+
+    FProjectileFiringData()
+    {
+
     }
 };

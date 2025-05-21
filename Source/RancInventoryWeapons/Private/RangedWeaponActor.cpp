@@ -1,4 +1,4 @@
-#include "RangedWeaponActor.h"
+﻿#include "RangedWeaponActor.h"
 
 #include "LogRancInventorySystem.h"
 #include "Components/ItemContainerComponent.h"
@@ -22,21 +22,21 @@ ARangedWeaponActor::ARangedWeaponActor(const FObjectInitializer& ObjectInitializ
 void ARangedWeaponActor::Initialize_Implementation(bool InitializeWeaponData, bool InitializeStaticMesh)
 {
     Super::Initialize_Implementation(InitializeWeaponData, InitializeStaticMesh);
-    UE_LOG(LogRISInventory, Verbose, TEXT("Initialize_Impl called for %s"), *GetName());
+    UE_LOG(LogRancInventorySystem, Verbose, TEXT("Initialize_Impl called for %s"), *GetName());
 
     InternalMagazineAmmoContainer = GetComponentByClass<UItemContainerComponent>();
     if (!InternalMagazineAmmoContainer)
     {
         InternalMagazineAmmoContainer = NewObject<UItemContainerComponent>(this, UItemContainerComponent::StaticClass());
         InternalMagazineAmmoContainer->RegisterComponent();
-        UE_LOG(LogRISInventory, Warning, TEXT("MagazineAmmoContainer created for %s"), *GetName());
+        UE_LOG(LogRancInventorySystem, Warning, TEXT("MagazineAmmoContainer created for %s"), *GetName());
     }
 
     WeaponHolder = Cast<ACharacter>(GetOwner());
     if (WeaponHolder)
     {
         InstigatingController = WeaponHolder->GetInstigatorController();
-        UE_LOG(LogRISInventory, Verbose, TEXT("WeaponHolder and InstigatingController set for %s"), *GetName());
+        UE_LOG(LogRancInventorySystem, Verbose, TEXT("WeaponHolder and InstigatingController set for %s"), *GetName());
     }
     
     if (URISSubsystem::Get(this)->AreAllItemsLoaded())
@@ -45,14 +45,14 @@ void ARangedWeaponActor::Initialize_Implementation(bool InitializeWeaponData, bo
 
         if (!WeaponData || !RangedWeaponData)
         {
-            UE_LOG(LogRISInventory, Error, TEXT("WeaponData is not of type URangedWeaponStaticData for ranged weapon actor %s"), *GetName());
+            UE_LOG(LogRancInventorySystem, Error, TEXT("WeaponData is not of type URangedWeaponStaticData for ranged weapon actor %s"), *GetName());
             return;
         }
 
         if (RangedWeaponData && !RangedWeaponData->bInfiniteReserve && !ReserveAmmoContainer && WeaponHolder)
         {
             ReserveAmmoContainer = WeaponHolder->FindComponentByClass<UItemContainerComponent>();
-            UE_LOG(LogRISInventory, Verbose, TEXT("ReserveAmmoContainer set for %s"), *GetName());
+            UE_LOG(LogRancInventorySystem, Verbose, TEXT("ReserveAmmoContainer set for %s"), *GetName());
         }
 
         if (IsValid(GetStaticMeshComponent()->GetStaticMesh()))
@@ -60,7 +60,7 @@ void ARangedWeaponActor::Initialize_Implementation(bool InitializeWeaponData, bo
             if (UStaticMeshSocket* socket = GetStaticMeshComponent()->GetStaticMesh()->FindSocket(RangedWeaponData->ArrowSpawnSocketName))
             {
                 FireOriginOffset = socket->RelativeLocation;
-                UE_LOG(LogRISInventory, Verbose, TEXT("FireOriginOffset set from StaticMesh for %s"), *GetName());
+                UE_LOG(LogRancInventorySystem, Verbose, TEXT("FireOriginOffset set from StaticMesh for %s"), *GetName());
             }
         }
         else
@@ -68,10 +68,10 @@ void ARangedWeaponActor::Initialize_Implementation(bool InitializeWeaponData, bo
             USkeletalMeshComponent* SkeletalMeshComponent = Cast<USkeletalMeshComponent>(GetComponentByClass(USkeletalMeshComponent::StaticClass()));
             if (SkeletalMeshComponent)
             {
-                if (USkeletalMeshSocket* socket = SkeletalMeshComponent->SkeletalMesh->FindSocket(RangedWeaponData->ArrowSpawnSocketName))
+                if (USkeletalMeshSocket* socket = SkeletalMeshComponent->GetSkinnedAsset()->FindSocket(RangedWeaponData->ArrowSpawnSocketName))
                 {
                     FireOriginOffset = socket->RelativeLocation;
-                    UE_LOG(LogRISInventory, Verbose, TEXT("FireOriginOffset set from SkeletalMesh for %s"), *GetName());
+                    UE_LOG(LogRancInventorySystem, Verbose, TEXT("FireOriginOffset set from SkeletalMesh for %s"), *GetName());
                 }
             }
         }
@@ -81,12 +81,12 @@ void ARangedWeaponActor::Initialize_Implementation(bool InitializeWeaponData, bo
 bool ARangedWeaponActor::CanAttack_Implementation()
 {
     bool bCanAttack = RangedWeaponData && RangedWeaponData->bInfiniteAmmo || CurrentAmmo > 0;
-    UE_LOG(LogRISInventory, Verbose, TEXT("CanAttack_Impl called for %s, result: %s"), *GetName(), bCanAttack ? TEXT("true") : TEXT("false"));
+    UE_LOG(LogRancInventorySystem, Verbose, TEXT("CanAttack_Impl called for %s, result: %s"), *GetName(), bCanAttack ? TEXT("true") : TEXT("false"));
 
     if (!bCanAttack && RangedWeaponData->bAutomaticReload && CurrentAmmo == 0)
     {
         ReloadWeapon();
-        UE_LOG(LogRISInventory, Verbose, TEXT("Automatic reload initiated for %s"), *GetName());
+        UE_LOG(LogRancInventorySystem, Verbose, TEXT("Automatic reload initiated for %s"), *GetName());
     }
     
     return bCanAttack;
@@ -98,7 +98,7 @@ void ARangedWeaponActor::OnAttackPerformed_Implementation()
     
     if (CurrentAmmo <= 0 || !RangedWeaponData)
     {
-        UE_LOG(LogRISInventory, Warning, TEXT("PerformAttack_Impl called for %s but no ammo or RangedWeaponData"), *GetName());
+        UE_LOG(LogRancInventorySystem, Warning, TEXT("PerformAttack_Impl called for %s but no ammo or RangedWeaponData"), *GetName());
         return;
     }
 
@@ -117,7 +117,7 @@ void ARangedWeaponActor::OnAttackPerformed_Implementation()
     }
     else if (USkeletalMeshComponent* SkeletalMeshComponent = Cast<USkeletalMeshComponent>(GetComponentByClass(USkeletalMeshComponent::StaticClass())))
     {
-        if (USkeletalMeshSocket* Socket = SkeletalMeshComponent->SkeletalMesh->FindSocket(RangedWeaponData->ArrowSpawnSocketName))
+        if (USkeletalMeshSocket* Socket = SkeletalMeshComponent->GetSkinnedAsset()->FindSocket(RangedWeaponData->ArrowSpawnSocketName))
         {
             FireOrigin = Socket->GetSocketLocation(SkeletalMeshComponent);
         }
@@ -149,7 +149,7 @@ void ARangedWeaponActor::OnAttackPerformed_Implementation()
             {
                 Projectile->SetOwner(this);
                 Projectile->SetInstigator(WeaponHolder);
-                UE_LOG(LogRISInventory, Verbose, TEXT("Projectile spawned by %s"), *GetName());
+                UE_LOG(LogRancInventorySystem, Verbose, TEXT("Projectile spawned by %s"), *GetName());
             }
 
             // Debug lines
@@ -173,21 +173,21 @@ void ARangedWeaponActor::OnAttackPerformed_Implementation()
             CollisionParams.AddIgnoredActor(WeaponHolder);
             GetWorld()->LineTraceSingleByChannel(HitResult, FireOrigin, End, RangedWeaponData->TraceChannel, CollisionParams);
             ApplyInstantHit(HitResult);
-            UE_LOG(LogRISInventory, Verbose, TEXT("Line trace performed by %s"), *GetName());
+            UE_LOG(LogRancInventorySystem, Verbose, TEXT("Line trace performed by %s"), *GetName());
         }
     }
 
     CurrentAmmo--;
-    UE_LOG(LogRISInventory, Verbose, TEXT("CurrentAmmo decremented for %s, new value: %d"), *GetName(), CurrentAmmo);
+    UE_LOG(LogRancInventorySystem, Verbose, TEXT("CurrentAmmo decremented for %s, new value: %d"), *GetName(), CurrentAmmo);
     if (CurrentAmmo <= 0 && RangedWeaponData->bAutomaticReload)
     {
         ReloadWeapon();
-        UE_LOG(LogRISInventory, Verbose, TEXT("Automatic reload initiated for %s"), *GetName());
+        UE_LOG(LogRancInventorySystem, Verbose, TEXT("Automatic reload initiated for %s"), *GetName());
     }
 	/*
     if (CurrentAmmo <= 0 && !RangedWeaponData)
     {
-        UE_LOG(LogRISInventory, Warning, TEXT("PerformAttack_Impl called for %s but no ammo or RangedWeaponData"), *GetName());
+        UE_LOG(LogRancInventorySystem, Warning, TEXT("PerformAttack_Impl called for %s but no ammo or RangedWeaponData"), *GetName());
         return;
     }
 
@@ -223,7 +223,7 @@ void ARangedWeaponActor::OnAttackPerformed_Implementation()
             {
                 Projectile->SetOwner(this);
                 Projectile->SetInstigator(WeaponHolder);
-                UE_LOG(LogRISInventory, Verbose, TEXT("Projectile spawned by %s"), *GetName());
+                UE_LOG(LogRancInventorySystem, Verbose, TEXT("Projectile spawned by %s"), *GetName());
             }
 
             
@@ -249,18 +249,18 @@ void ARangedWeaponActor::OnAttackPerformed_Implementation()
             CollisionParams.AddIgnoredActor(WeaponHolder);
             GetWorld()->LineTraceSingleByChannel(HitResult, Start, End, RangedWeaponData->TraceChannel, CollisionParams);
             ApplyInstantHit(HitResult);
-            UE_LOG(LogRISInventory, Verbose, TEXT("Line trace performed by %s"), *GetName());
+            UE_LOG(LogRancInventorySystem, Verbose, TEXT("Line trace performed by %s"), *GetName());
         }
     }
 
     CurrentAmmo--;
-    UE_LOG(LogRISInventory, Verbose, TEXT("CurrentAmmo decremented for %s, new value: %d"), *GetName(), CurrentAmmo);
+    UE_LOG(LogRancInventorySystem, Verbose, TEXT("CurrentAmmo decremented for %s, new value: %d"), *GetName(), CurrentAmmo);
     if (CurrentAmmo <= 0)
     {
         if (RangedWeaponData->bAutomaticReload)
         {
             ReloadWeapon();
-            UE_LOG(LogRISInventory, Verbose, TEXT("Automatic reload initiated for %s"), *GetName());
+            UE_LOG(LogRancInventorySystem, Verbose, TEXT("Automatic reload initiated for %s"), *GetName());
         }
     }*/
 }
@@ -271,7 +271,7 @@ void ARangedWeaponActor::Equip_Impl_Implementation()
 
     if (!RangedWeaponData)
     {
-        UE_LOG(LogRISInventory, Warning, TEXT("EquipMulticastImpl called for %s but no RangedWeaponData"), *GetName());
+        UE_LOG(LogRancInventorySystem, Warning, TEXT("EquipMulticastImpl called for %s but no RangedWeaponData"), *GetName());
         return;
     }
     
@@ -279,7 +279,7 @@ void ARangedWeaponActor::Equip_Impl_Implementation()
     {
         FTimerHandle TimerHandle;
         GetWorld()->GetTimerManager().SetTimer(TimerHandle, this, &ARangedWeaponActor::ReloadWeapon, 1, false);
-        UE_LOG(LogRISInventory, Verbose, TEXT("ReloadWeapon timer set for %s"), *GetName());
+        UE_LOG(LogRancInventorySystem, Verbose, TEXT("ReloadWeapon timer set for %s"), *GetName());
     }
 }
 
@@ -292,7 +292,7 @@ void ARangedWeaponActor::ReloadWeapon()
         return;
 
     bIsReloading = true;
-    UE_LOG(LogRISInventory, Verbose, TEXT("Reloading started for %s"), *GetName());
+    UE_LOG(LogRancInventorySystem, Verbose, TEXT("Reloading started for %s"), *GetName());
 
     float ReloadAnimDuration = PlayMontage(WeaponHolder, RangedWeaponData->ReloadMontage.Montage, RangedWeaponData->ReloadMontage.PlayRate, NAME_None, false);
     float ReloadCallbackDuration = RangedWeaponData->ReloadTime > 0 ? RangedWeaponData->ReloadTime : ReloadAnimDuration;
@@ -301,7 +301,7 @@ void ARangedWeaponActor::ReloadWeapon()
     {
         FTimerHandle TimerHandle;
         GetWorldTimerManager().SetTimer(TimerHandle, this, &ARangedWeaponActor::OnReloadComplete_IfServer, ReloadCallbackDuration, false);
-        UE_LOG(LogRISInventory, Verbose, TEXT("Reload callback timer set for %s"), *GetName());
+        UE_LOG(LogRancInventorySystem, Verbose, TEXT("Reload callback timer set for %s"), *GetName());
     }
 }
 
@@ -310,7 +310,7 @@ void ARangedWeaponActor::OnReloadComplete_IfServer()
     if (GetLocalRole() != ROLE_Authority) return;
 
     bIsReloading = false;
-    UE_LOG(LogRISInventory, Verbose, TEXT("Reloading completed for %s"), *GetName());
+    UE_LOG(LogRancInventorySystem, Verbose, TEXT("Reloading completed for %s"), *GetName());
    
 
     if (RangedWeaponData->bInfiniteReserve)
@@ -321,7 +321,7 @@ void ARangedWeaponActor::OnReloadComplete_IfServer()
     {
         if (!ReserveAmmoContainer)
         {
-            UE_LOG(LogRISInventory, Warning, TEXT("No ammo reserve container set for weapon %s"), *GetName());
+            UE_LOG(LogRancInventorySystem, Warning, TEXT("No ammo reserve container set for weapon %s"), *GetName());
             return;
         }
         
@@ -334,13 +334,13 @@ void ARangedWeaponActor::OnReloadComplete_IfServer()
 //void ARangedWeaponActor::OnReloadComplete_Client_Implementation(int32 AmmoToReload)
 //{
 //    CurrentAmmo = AmmoToReload;
-//    UE_LOG(LogRISInventory, Verbose, TEXT("OnReloadComplete_Client called for %s, ammo reloaded: %d"), *GetName(), AmmoToReload);
+//    UE_LOG(LogRancInventorySystem, Verbose, TEXT("OnReloadComplete_Client called for %s, ammo reloaded: %d"), *GetName(), AmmoToReload);
 //}
 
 void ARangedWeaponActor::ApplyInstantHit_Implementation(FHitResult HitResult)
 {
     ApplyInstantHit_Impl(HitResult);
-    UE_LOG(LogRISInventory, Verbose, TEXT("ApplyInstantHit_Implementation called for %s"), *GetName());
+    UE_LOG(LogRancInventorySystem, Verbose, TEXT("ApplyInstantHit_Implementation called for %s"), *GetName());
 }
 
 void ARangedWeaponActor::ApplyInstantHit_Impl(FHitResult HitResult)
@@ -348,7 +348,7 @@ void ARangedWeaponActor::ApplyInstantHit_Impl(FHitResult HitResult)
     if (HitResult.GetActor())
     {
         HitResult.GetActor()->TakeDamage(RangedWeaponData->Damage, FDamageEvent(), InstigatingController, this);
-        UE_LOG(LogRISInventory, Verbose, TEXT("Damage applied to %s by %s"), *HitResult.GetActor()->GetName(), *GetName());
+        UE_LOG(LogRancInventorySystem, Verbose, TEXT("Damage applied to %s by %s"), *HitResult.GetActor()->GetName(), *GetName());
     }
 }
 
@@ -358,14 +358,14 @@ float ARangedWeaponActor::PlayMontage(ACharacter* OwnerChar, UAnimMontage* Monta
     {
         if (bShowDebugWarnings)
         {
-            UE_LOG(LogRISInventory, Warning, TEXT("Invalid parameters for PlayMontage!"))
+            UE_LOG(LogRancInventorySystem, Warning, TEXT("Invalid parameters for PlayMontage!"))
         }
 
         return 0.0f;
     }
 
     const float duration = OwnerChar->PlayAnimMontage(Montage, PlayRate, StartSectionName);
-    UE_LOG(LogRISInventory, Verbose, TEXT("RangedWeaponActor PlayMontage called for %s, montage: %s"), *OwnerChar->GetName(), *Montage->GetName());
+    UE_LOG(LogRancInventorySystem, Verbose, TEXT("RangedWeaponActor PlayMontage called for %s, montage: %s"), *OwnerChar->GetName(), *Montage->GetName());
 
     return duration;
 }

@@ -22,6 +22,22 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Item")
 	void SetItem(const FItemBundle& NewItem);
 
+
+	// Called when this item is picked up by a new inventory, this is right before its destruction if item is not set to be visible when held
+	UFUNCTION(BlueprintNativeEvent, CallInEditor, BlueprintCallable, Category = "Ranc Inventory")
+	void OnPickedUp(UInventoryComponent* NewInventory);
+	
+	// Called when this item is dropped by an inventory, this is right after its creation if item is not set to be visible when held
+	UFUNCTION(BlueprintNativeEvent, CallInEditor, BlueprintCallable, Category = "Ranc Inventory")
+	void OnDropped(UInventoryComponent* NewInventory);
+	
+	UFUNCTION(BlueprintNativeEvent , Category = "Ranc Inventory")
+	void PredictDestruction();
+	
+	UFUNCTION(BlueprintNativeEvent , Category = "Ranc Inventory")
+	void PredictDestructionRollback();
+
+	
 	virtual void OnConstruction(const FTransform& Transform) override;
 	
 	virtual void BeginPlay() override;
@@ -33,7 +49,11 @@ public:
 	virtual int32 ExtractItem_IfServer_Implementation(const FGameplayTag& ItemId, int32 Quantity, const TArray<UItemInstanceData*>& InstancesToExtract, EItemChangeReason Reason, TArray<UItemInstanceData*>& StateArrayToAppendTo, bool AllowPartial) override;
 	
 	virtual int32 GetQuantityTotal_Implementation(const FGameplayTag& ItemId) const override;
-	
+
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	virtual void PreReplication( IRepChangedPropertyTracker & ChangedPropertyTracker ) override;
+
+private:
+	FTimerHandle RollbackTimerHandle;
+	bool bWaitingForItemLoad = false;
 };

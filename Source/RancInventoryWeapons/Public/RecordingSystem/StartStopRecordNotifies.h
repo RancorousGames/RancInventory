@@ -19,13 +19,14 @@ class RANCINVENTORYWEAPONS_API UStartAttackTraceNotify : public UAnimNotify
 			if (auto* ActiveWeapon = GearManager->GetActiveWeapon())
 			{
 				GearManager->OnAttackTraceStateBeginEnd(true);
-				
+#if WITH_EDITOR
 				if (GearManager->bRecordAttackTraces)
 				if (UWeaponAttackRecorderComponent* WeaponAttackRecorder = ActiveWeapon->FindComponentByClass<
 			UWeaponAttackRecorderComponent>())
 				{
 					WeaponAttackRecorder->OnAnimNotifyBegin(Animation->GetFName());
 				}
+#endif
 			}
 		}
 	}
@@ -44,13 +45,14 @@ class RANCINVENTORYWEAPONS_API UStopAttackTraceNotify : public UAnimNotify
 			if (auto* ActiveWeapon = GearManager->GetActiveWeapon())
 			{
 				GearManager->OnAttackTraceStateBeginEnd(false);
-				
+#if WITH_EDITOR
 				if (GearManager->bRecordAttackTraces)
 				if (UWeaponAttackRecorderComponent* WeaponAttackRecorder = ActiveWeapon->FindComponentByClass<
 			UWeaponAttackRecorderComponent>())
 				{
 					WeaponAttackRecorder->OnAnimNotifyEnd(Animation->GetFName());
 				}
+#endif
 			}
 		}
 	}

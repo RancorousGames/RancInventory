@@ -9,11 +9,15 @@
 #include "Engine/StaticMesh.h"
 #include "Net/UnrealNetwork.h"
 
-
 void AWorldItem::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
 	bReplicateUsingRegisteredSubObjectList = true;
+
+	if (RepresentedItem.IsValid() && (!ItemData || RepresentedItem.ItemId != ItemData->ItemId))
+	{
+		Initialize();
+	}
 }
 
 void AWorldItem::BeginPlay()
@@ -30,6 +34,15 @@ void AWorldItem::SetItem(const FItemBundle& NewItem)
 {	
 	RepresentedItem = NewItem;
 	Initialize();
+}
+
+
+void AWorldItem::OnDropped_Implementation(UInventoryComponent* NewInventory)
+{
+}
+
+void AWorldItem::OnPickedUp_Implementation(UInventoryComponent* NewInventory)
+{
 }
 
 void AWorldItem::OnRep_Item()
@@ -53,7 +66,14 @@ void AWorldItem::Initialize_Implementation()
 
 	if (!ItemData)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("AWorldItem::Initialize: ItemData is null for ItemId: %s"), *RepresentedItem.ItemId.ToString());
+		if (auto* SubSystem = URISSubsystem::Get(this))
+		{
+			if (!bWaitingForItemLoad)
+			{
+				SubSystem->OnAllItemsLoaded.AddDynamic(this, &AWorldItem::Initialize);
+				bWaitingForItemLoad = true;
+			}
+		}
 		return;
 	}
 
@@ -92,6 +112,22 @@ void AWorldItem::Initialize_Implementation()
 		mesh->SetStaticMesh(Cast<UStaticMesh>(StaticLoadObject(UStaticMesh::StaticClass(), NULL, *CubePath)));
 		mesh->SetWorldScale3D(FVector(0.2f, 0.2f, 0.2f));
 	}
+}
+
+
+
+void AWorldItem::PredictDestruction_Implementation()
+{
+	SetActorHiddenInGame(false);
+	GetStaticMeshComponent()->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+	GetWorld()->GetTimerManager().SetTimer(RollbackTimerHandle, this, &AWorldItem::PredictDestructionRollback, 2.0f, false);
+}
+
+void AWorldItem::PredictDestructionRollback_Implementation()
+{
+	// show static mesh and enable collision
+	SetActorHiddenInGame(false);
+	GetStaticMeshComponent()->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 }
 
 void AWorldItem::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const

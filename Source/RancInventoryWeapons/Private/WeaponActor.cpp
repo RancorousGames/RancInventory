@@ -180,7 +180,14 @@ void AWeaponActor::Equip_Multicast_Implementation()
 
 void AWeaponActor::Holster()
 {
-    HolsterMulticast();
+    if (HasAuthority())
+    {
+        HolsterMulticast();
+    }
+    else if (!HasAuthority() && GetLocalRole() == ROLE_AutonomousProxy)
+    {
+        HolsterServer();
+    }
 }
 
 void AWeaponActor::HolsterMulticast_Implementation()
@@ -191,4 +198,26 @@ void AWeaponActor::HolsterMulticast_Implementation()
 void AWeaponActor::HolsterServer_Implementation()
 {
     Holster();
+}
+
+void AWeaponActor::Remove()
+{
+    if (HasAuthority())
+    {
+        RemoveMulticast();
+    }
+    else if (!HasAuthority() && GetLocalRole() == ROLE_AutonomousProxy)
+    {
+        RemoveServer();
+    }
+}
+
+
+void AWeaponActor::RemoveMulticast_Implementation()
+{
+}
+
+void AWeaponActor::RemoveServer_Implementation()
+{
+    RemoveMulticast();
 }

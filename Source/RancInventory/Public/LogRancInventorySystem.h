@@ -4,4 +4,4 @@
 
 #include <Logging/LogMacros.h>
 
-RANCINVENTORY_API DECLARE_LOG_CATEGORY_EXTERN(LogRISInventory, Display, All);
+RANCINVENTORY_API DECLARE_LOG_CATEGORY_EXTERN(LogRancInventorySystem, Display, All);

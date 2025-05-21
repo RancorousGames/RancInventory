@@ -1,4 +1,4 @@
-#include "Data/ItemInstanceData.h"
+﻿#include "Data/ItemInstanceData.h"
 
 #include "Net/UnrealNetwork.h"
 
@@ -15,4 +15,10 @@ void UItemInstanceData::OnDestroy_Implementation()
 void UItemInstanceData::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	UObject::GetLifetimeReplicatedProps(OutLifetimeProps);
+}
+
+UItemInstanceData* UItemInstanceData::PickInstanceToRemove_Implementation(
+	const TArray<UItemInstanceData*>& StateInstances)
+{
+	return StateInstances.Last();
 }

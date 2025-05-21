@@ -18,7 +18,7 @@ void UInventoryGridViewModel::Initialize_Implementation(UItemContainerComponent*
 {
     if (!IsValid(ContainerComponent))
     {
-        if (!ContainerComponent) UE_LOG(LogRISInventory, Warning, TEXT("RisInventoryViewModel::Initialize failed: ContainerComponent is null."));
+        if (!ContainerComponent) UE_LOG(LogRancInventorySystem, Warning, TEXT("RisInventoryViewModel::Initialize failed: ContainerComponent is null."));
         return;
     }
 
@@ -70,7 +70,7 @@ void UInventoryGridViewModel::Initialize_Implementation(UItemContainerComponent*
             if (ViewableTaggedSlots.Contains(TaggedItem.Tag)) {
                  ViewableTaggedSlots[TaggedItem.Tag] = FItemBundle(TaggedItem.ItemId, TaggedItem.Quantity, TaggedItem.InstanceData);
             } else if (TaggedItem.Tag.IsValid()) {
-                 UE_LOG(LogRISInventory, Warning, TEXT("InitializeInventory: Tagged item %s found in component but tag %s is not registered in ViewableTaggedSlots. Adding it."), *TaggedItem.ItemId.ToString(), *TaggedItem.Tag.ToString());
+                 UE_LOG(LogRancInventorySystem, Warning, TEXT("InitializeInventory: Tagged item %s found in component but tag %s is not registered in ViewableTaggedSlots. Adding it."), *TaggedItem.ItemId.ToString(), *TaggedItem.Tag.ToString());
                  ViewableTaggedSlots.Add(TaggedItem.Tag, FItemBundle(TaggedItem.ItemId, TaggedItem.Quantity, TaggedItem.InstanceData));
             }
         }
@@ -234,7 +234,7 @@ const FItemBundle& UInventoryGridViewModel::GetItemForTaggedSlot(const FGameplay
     {
         return *Found;
     }
-    UE_LOG(LogRISInventory, Warning, TEXT("GetItemForTaggedSlot: SlotTag %s not found visually."), *SlotTag.ToString());
+    UE_LOG(LogRancInventorySystem, Warning, TEXT("GetItemForTaggedSlot: SlotTag %s not found visually."), *SlotTag.ToString());
     return DummyEmptyBundle;
 }
 
@@ -247,7 +247,7 @@ FItemBundle& UInventoryGridViewModel::GetMutableItemForTaggedSlotInternal(const 
 {
     // This one is non-const and used internally or when mutation is explicitly needed
      if (!LinkedInventoryComponent) {
-         UE_LOG(LogRISInventory, Error, TEXT("GetMutableItemForTaggedSlotInternal: Not an inventory component. Returning dummy.") );
+         UE_LOG(LogRancInventorySystem, Error, TEXT("GetMutableItemForTaggedSlotInternal: Not an inventory component. Returning dummy.") );
          return DummyEmptyBundle;
      }
     FItemBundle* Found = ViewableTaggedSlots.Find(SlotTag);
@@ -256,7 +256,7 @@ FItemBundle& UInventoryGridViewModel::GetMutableItemForTaggedSlotInternal(const 
         return *Found;
     }
 
-    UE_LOG(LogRISInventory, Error, TEXT("GetMutableItemForTaggedSlotInternal: Critical error: SlotTag %s not found visually. Adding dummy."), *SlotTag.ToString());
+    UE_LOG(LogRancInventorySystem, Error, TEXT("GetMutableItemForTaggedSlotInternal: Critical error: SlotTag %s not found visually. Adding dummy."), *SlotTag.ToString());
     // Add a dummy entry to avoid returning a reference to a temporary.
     return ViewableTaggedSlots.Add(SlotTag, FItemBundle::EmptyItemInstance);
 }
@@ -299,7 +299,7 @@ int32 UInventoryGridViewModel::UseItem(FGameplayTag SourceTaggedSlot, int32 Sour
     // If QuantityToConsume is 0, the item might be usable without consumption
 
     if (QuantityToConsume > 1 && SourceItem.InstanceData.Num() > 0) {
-        UE_LOG(LogRISInventory, Error, TEXT("Using item '%s' with consume count > 1 and instance data is not currently supported."), *ItemIdToUse.ToString());
+        UE_LOG(LogRancInventorySystem, Error, TEXT("Using item '%s' with consume count > 1 and instance data is not currently supported."), *ItemIdToUse.ToString());
         return 0;
     }
 
@@ -498,7 +498,7 @@ bool UInventoryGridViewModel::MoveItemToOtherViewModel(
     {
         if (!TargetViewModel->LinkedInventoryComponent)
         {
-            UE_LOG(LogRISInventory, Warning, TEXT("MoveItemToOtherViewModel: Target tagged slot %s requires target to be an inventory."), *TargetTaggedSlot.ToString());
+            UE_LOG(LogRancInventorySystem, Warning, TEXT("MoveItemToOtherViewModel: Target tagged slot %s requires target to be an inventory."), *TargetTaggedSlot.ToString());
             return false; // Target Tag requires target to be Inventory
         }
         QuantityToMove = TargetViewModel->CanTaggedSlotReceiveItem(ItemIdToMove, QuantityToMove, TargetTaggedSlot, false, true) ? QuantityToMove : 0;
@@ -652,12 +652,12 @@ bool UInventoryGridViewModel::AssertViewModelSettled() const
     ensureMsgf(bOpsSettled, TEXT("ViewModel is not settled. %d operations pending."), OperationsToConfirm.Num());
     if (!bOpsSettled)
     {
-        UE_LOG(LogRISInventory, Warning, TEXT("ViewModel pending ops: %d"), OperationsToConfirm.Num());
+        UE_LOG(LogRancInventorySystem, Warning, TEXT("ViewModel pending ops: %d"), OperationsToConfirm.Num());
         for(const auto& Op : OperationsToConfirm) {
              if(Op.TaggedSlot.IsValid()) {
-                  UE_LOG(LogRISInventory, Warning, TEXT("  - Pending Tagged Op: %d for %s on %s (Qty: %d)"), (int)Op.Operation, *Op.ItemId.ToString(), *Op.TaggedSlot.ToString(), Op.Quantity);
+                  UE_LOG(LogRancInventorySystem, Warning, TEXT("  - Pending Tagged Op: %d for %s on %s (Qty: %d)"), (int)Op.Operation, *Op.ItemId.ToString(), *Op.TaggedSlot.ToString(), Op.Quantity);
              } else {
-                  UE_LOG(LogRISInventory, Warning, TEXT("  - Pending Grid Op: %d for %s (Qty: %d)"), (int)Op.Operation, *Op.ItemId.ToString(), Op.Quantity);
+                  UE_LOG(LogRancInventorySystem, Warning, TEXT("  - Pending Grid Op: %d for %s (Qty: %d)"), (int)Op.Operation, *Op.ItemId.ToString(), Op.Quantity);
              }
         }
     }
@@ -711,11 +711,11 @@ bool UInventoryGridViewModel::AssertViewModelSettled() const
             {
                 bQuantitiesMatch = false;
                 ensureMsgf(false, TEXT("Total Quantity mismatch for %s. Component: %d, ViewModel(Grid+Tagged): %d"), *ItemId.ToString(), CompQty, VmQty);
-                UE_LOG(LogRISInventory, Warning, TEXT("Total Quantity mismatch for %s. Component: %d, ViewModel(Grid+Tagged): %d"), *ItemId.ToString(), CompQty, VmQty);
+                UE_LOG(LogRancInventorySystem, Warning, TEXT("Total Quantity mismatch for %s. Component: %d, ViewModel(Grid+Tagged): %d"), *ItemId.ToString(), CompQty, VmQty);
             }
         }
          ensureMsgf(bQuantitiesMatch, TEXT("ViewModel total quantities (Grid+Tagged) do not match LinkedComponent totals."));
-          if (!bQuantitiesMatch) UE_LOG(LogRISInventory, Warning, TEXT("ViewModel total quantity mismatch."));
+          if (!bQuantitiesMatch) UE_LOG(LogRancInventorySystem, Warning, TEXT("ViewModel total quantity mismatch."));
 
 
         // Check Tagged Slot Consistency (Only if Inventory)
@@ -741,32 +741,32 @@ bool UInventoryGridViewModel::AssertViewModelSettled() const
                        bTaggedConsistency = false;
                        // Log specific error message
                        ensureMsgf(false, TEXT("Tagged slot validity mismatch for %s: VMValid=%d, ActualValid=%d"), *Tag.ToString(), bVmValid, bActualValid);
-                       UE_LOG(LogRISInventory, Warning, TEXT("Tagged slot validity mismatch for %s: VMValid=%d, ActualValid=%d"), *Tag.ToString(), bVmValid, bActualValid);
+                       UE_LOG(LogRancInventorySystem, Warning, TEXT("Tagged slot validity mismatch for %s: VMValid=%d, ActualValid=%d"), *Tag.ToString(), bVmValid, bActualValid);
                   } else if (bVmValid && bActualValid) { // Both valid, compare contents
                        if (ActualItem->ItemId != VmItemPtr->ItemId || ActualItem->Quantity != VmItemPtr->Quantity) {
                             bTaggedConsistency = false;
                             // Log specific error message
                             ensureMsgf(false, TEXT("Tagged slot content mismatch for %s: VM=%s(x%d), Actual=%s(x%d)"), *Tag.ToString(), *VmItemPtr->ItemId.ToString(), VmItemPtr->Quantity, *ActualItem->ItemId.ToString(), ActualItem->Quantity);
-                            UE_LOG(LogRISInventory, Warning, TEXT("Tagged slot content mismatch for %s: VM=%s(x%d), Actual=%s(x%d)"), *Tag.ToString(), *VmItemPtr->ItemId.ToString(), VmItemPtr->Quantity, *ActualItem->ItemId.ToString(), ActualItem->Quantity);
+                            UE_LOG(LogRancInventorySystem, Warning, TEXT("Tagged slot content mismatch for %s: VM=%s(x%d), Actual=%s(x%d)"), *Tag.ToString(), *VmItemPtr->ItemId.ToString(), VmItemPtr->Quantity, *ActualItem->ItemId.ToString(), ActualItem->Quantity);
                        }
                        // Instance Data Pointer Check (if needed)
                        // if (ActualItem->InstanceData != VmItemPtr->InstanceData) { ... } // Be careful comparing TArrays directly like this
                        if (ActualItem->InstanceData.Num() != VmItemPtr->InstanceData.Num()) {
                            bTaggedConsistency = false;
                            ensureMsgf(false, TEXT("Tagged slot instance count mismatch for %s: VM=%d, Actual=%d"), *Tag.ToString(), VmItemPtr->InstanceData.Num(), ActualItem->InstanceData.Num());
-                           UE_LOG(LogRISInventory, Warning, TEXT("Tagged slot instance count mismatch for %s: VM=%d, Actual=%d"), *Tag.ToString(), VmItemPtr->InstanceData.Num(), ActualItem->InstanceData.Num());
+                           UE_LOG(LogRancInventorySystem, Warning, TEXT("Tagged slot instance count mismatch for %s: VM=%d, Actual=%d"), *Tag.ToString(), VmItemPtr->InstanceData.Num(), ActualItem->InstanceData.Num());
                        } else {
                             // Optionally, compare actual instance pointers if order matters
                        }
                   }
              }
               ensureMsgf(bTaggedConsistency, TEXT("ViewModel tagged slots do not match LinkedInventoryComponent state."));
-               if (!bTaggedConsistency) UE_LOG(LogRISInventory, Warning, TEXT("ViewModel tagged slot state mismatch."));
+               if (!bTaggedConsistency) UE_LOG(LogRancInventorySystem, Warning, TEXT("ViewModel tagged slot state mismatch."));
         }
     }
     else
     {
-        UE_LOG(LogRISInventory, Warning, TEXT("AssertViewModelSettled: LinkedContainerComponent is null. Cannot verify quantities."));
+        UE_LOG(LogRancInventorySystem, Warning, TEXT("AssertViewModelSettled: LinkedContainerComponent is null. Cannot verify quantities."));
         bQuantitiesMatch = false;
         bTaggedConsistency = false;
     }
@@ -928,7 +928,7 @@ void UInventoryGridViewModel::HandleItemAdded_Implementation(const UItemStaticDa
         }
     }
 
-    UE_LOG(LogRISInventory, Log, TEXT("HandleItemAdded: Received unpredicted add for %s x%d. Updating visuals."), *ItemData->ItemId.ToString(), Quantity);
+    UE_LOG(LogRancInventorySystem, Log, TEXT("HandleItemAdded: Received unpredicted add for %s x%d. Updating visuals."), *ItemData->ItemId.ToString(), Quantity);
     int32 RemainingItems = Quantity;
     int32 InstanceIdx = 0; // Track index for added instances
     while (RemainingItems > 0)
@@ -936,7 +936,7 @@ void UInventoryGridViewModel::HandleItemAdded_Implementation(const UItemStaticDa
         int32 SlotIndex = FindGridSlotIndexForItem(ItemData->ItemId, RemainingItems);
         if (SlotIndex < 0)
         {
-             UE_LOG(LogRISInventory, Error, TEXT("HandleItemAdded: No available visual slot found for server-added item %s."), *ItemData->ItemId.ToString());
+             UE_LOG(LogRancInventorySystem, Error, TEXT("HandleItemAdded: No available visual slot found for server-added item %s."), *ItemData->ItemId.ToString());
              ForceFullUpdate(); // Resync if visual state seems wrong
              break;
         }
@@ -950,14 +950,14 @@ void UInventoryGridViewModel::HandleItemAdded_Implementation(const UItemStaticDa
              TargetSlot.Quantity = 0;
              TargetSlot.InstanceData.Empty();
          } else {
-             UE_LOG(LogRISInventory, Error, TEXT("HandleItemAdded: FindGridSlotIndexForItem returned incompatible slot %d."), SlotIndex);
+             UE_LOG(LogRancInventorySystem, Error, TEXT("HandleItemAdded: FindGridSlotIndexForItem returned incompatible slot %d."), SlotIndex);
              ForceFullUpdate(); // Resync
              break;
          }
 
         int32 ActuallyAddedToSlot = FMath::Min(RemainingItems, AddableQuantity);
         if (ActuallyAddedToSlot <= 0) {
-              UE_LOG(LogRISInventory, Warning, TEXT("HandleItemAdded: Could not add to found slot %d (already full?). Forcing full update."), SlotIndex);
+              UE_LOG(LogRancInventorySystem, Warning, TEXT("HandleItemAdded: Could not add to found slot %d (already full?). Forcing full update."), SlotIndex);
               ForceFullUpdate();
               break;
         }
@@ -994,7 +994,7 @@ void UInventoryGridViewModel::HandleItemRemoved_Implementation(const UItemStatic
         }
     }
 
-    UE_LOG(LogRISInventory, Log, TEXT("HandleItemRemoved: Received unpredicted remove for %s x%d. Updating visuals."), *ItemData->ItemId.ToString(), Quantity);
+    UE_LOG(LogRancInventorySystem, Log, TEXT("HandleItemRemoved: Received unpredicted remove for %s x%d. Updating visuals."), *ItemData->ItemId.ToString(), Quantity);
     int32 RemainingToRemove = Quantity;
     for (int32 SlotIndex = 0; SlotIndex < ViewableGridSlots.Num() && RemainingToRemove > 0; ++SlotIndex)
     {
@@ -1040,7 +1040,7 @@ void UInventoryGridViewModel::HandleItemRemoved_Implementation(const UItemStatic
 
     if (RemainingToRemove > 0)
     {
-        UE_LOG(LogRISInventory, Error, TEXT("HandleItemRemoved: Could not remove %d items of type %s visually from grid. Forcing full update."), RemainingToRemove, *ItemData->ItemId.ToString());
+        UE_LOG(LogRancInventorySystem, Error, TEXT("HandleItemRemoved: Could not remove %d items of type %s visually from grid. Forcing full update."), RemainingToRemove, *ItemData->ItemId.ToString());
         ForceFullUpdate();
     }
 }
@@ -1063,14 +1063,14 @@ void UInventoryGridViewModel::HandleTaggedItemAdded_Implementation(const FGamepl
                  auto& ViewableItem = ViewableTaggedSlots[SlotTag];
                  if (ActualItem.IsValid()) {
                      if(!ViewableItem.IsValid() || ViewableItem.ItemId != ActualItem.ItemId || ViewableItem.Quantity != ActualItem.Quantity || ViewableItem.InstanceData.Num() != ActualItem.InstanceData.Num()) {
-                          UE_LOG(LogRISInventory, Log, TEXT("Correcting visual tag %s after confirmed add."), *SlotTag.ToString());
+                          UE_LOG(LogRancInventorySystem, Log, TEXT("Correcting visual tag %s after confirmed add."), *SlotTag.ToString());
                           ViewableItem.ItemId = ActualItem.ItemId;
                           ViewableItem.Quantity = ActualItem.Quantity;
                           ViewableItem.InstanceData = ActualItem.InstanceData;
                           // Potentially rebroadcast if state was wrong? OnTaggedSlotUpdated.Broadcast(SlotTag);
                      }
                  } else if (ViewableItem.IsValid()) { // Server says empty, VM has item?
-                      UE_LOG(LogRISInventory, Warning, TEXT("Mismatch after confirming AddTagged for tag %s (server empty). Forcing slot update."), *SlotTag.ToString());
+                      UE_LOG(LogRancInventorySystem, Warning, TEXT("Mismatch after confirming AddTagged for tag %s (server empty). Forcing slot update."), *SlotTag.ToString());
                       TArray<UItemInstanceData*> OldInstances = ViewableItem.InstanceData;
                        ViewableItem = FItemBundle::EmptyItemInstance;
                        OnTaggedSlotUpdated.Broadcast(SlotTag, OldInstances);
@@ -1080,7 +1080,7 @@ void UInventoryGridViewModel::HandleTaggedItemAdded_Implementation(const FGamepl
         }
     }
 
-    UE_LOG(LogRISInventory, Verbose, TEXT("HandleTaggedItemAdded: Received unpredicted add for %s x%d to tag %s. Updating viewmodel."), *ItemData->ItemId.ToString(), Quantity, *SlotTag.ToString());
+    UE_LOG(LogRancInventorySystem, Verbose, TEXT("HandleTaggedItemAdded: Received unpredicted add for %s x%d to tag %s. Updating viewmodel."), *ItemData->ItemId.ToString(), Quantity, *SlotTag.ToString());
     if (ViewableTaggedSlots.Contains(SlotTag))
     {
         FItemBundle& TargetSlot = GetMutableItemForTaggedSlotInternal(SlotTag);
@@ -1092,7 +1092,7 @@ void UInventoryGridViewModel::HandleTaggedItemAdded_Implementation(const FGamepl
             TargetSlot.InstanceData = ActualItem.InstanceData;
             OnTaggedSlotUpdated.Broadcast(SlotTag, OldInstances);
         } else {
-             UE_LOG(LogRISInventory, Warning, TEXT("HandleTaggedItemAdded: Component reported add but tag %s is empty in component state?"), *SlotTag.ToString());
+             UE_LOG(LogRancInventorySystem, Warning, TEXT("HandleTaggedItemAdded: Component reported add but tag %s is empty in component state?"), *SlotTag.ToString());
              // Maybe clear the visual slot if it wasn't already?
              if(TargetSlot.IsValid()) {
                  TargetSlot = FItemBundle::EmptyItemInstance;
@@ -1102,7 +1102,7 @@ void UInventoryGridViewModel::HandleTaggedItemAdded_Implementation(const FGamepl
     }
     else
     {
-         UE_LOG(LogRISInventory, Error, TEXT("HandleTaggedItemAdded: Critical Error: Received add for unmanaged tag %s!"), *SlotTag.ToString());
+         UE_LOG(LogRancInventorySystem, Error, TEXT("HandleTaggedItemAdded: Critical Error: Received add for unmanaged tag %s!"), *SlotTag.ToString());
     }
 }
 
@@ -1124,13 +1124,13 @@ void UInventoryGridViewModel::HandleTaggedItemRemoved_Implementation(const FGame
                  auto& ViewableItem = ViewableTaggedSlots[SlotTag];
                   if (ActualItem.IsValid()) {
                      if(!ViewableItem.IsValid() || ViewableItem.ItemId != ActualItem.ItemId || ViewableItem.Quantity != ActualItem.Quantity || ViewableItem.InstanceData.Num() != ActualItem.InstanceData.Num()) {
-                          UE_LOG(LogRISInventory, Log, TEXT("Correcting visual tag %s after confirmed remove (item still present)."), *SlotTag.ToString());
+                          UE_LOG(LogRancInventorySystem, Log, TEXT("Correcting visual tag %s after confirmed remove (item still present)."), *SlotTag.ToString());
                           ViewableItem.ItemId = ActualItem.ItemId;
                           ViewableItem.Quantity = ActualItem.Quantity;
                           ViewableItem.InstanceData = ActualItem.InstanceData;
                      }
                  } else if (ViewableItem.IsValid()) { // Server says empty, VM has item
-                      UE_LOG(LogRISInventory, Log, TEXT("Correcting visual tag %s after confirmed remove (now empty)."), *SlotTag.ToString());
+                      UE_LOG(LogRancInventorySystem, Log, TEXT("Correcting visual tag %s after confirmed remove (now empty)."), *SlotTag.ToString());
                        ViewableItem = FItemBundle::EmptyItemInstance;
                  }
                  // If both are empty, visual state matches, do nothing.
@@ -1139,7 +1139,7 @@ void UInventoryGridViewModel::HandleTaggedItemRemoved_Implementation(const FGame
         }
     }
 
-    UE_LOG(LogRISInventory, Verbose, TEXT("HandleTaggedItemRemoved: Received unpredicted remove for %s x%d from tag %s. Updating visuals."), *ItemData->ItemId.ToString(), Quantity, *SlotTag.ToString());
+    UE_LOG(LogRancInventorySystem, Verbose, TEXT("HandleTaggedItemRemoved: Received unpredicted remove for %s x%d from tag %s. Updating visuals."), *ItemData->ItemId.ToString(), Quantity, *SlotTag.ToString());
     if (ViewableTaggedSlots.Contains(SlotTag))
     {
         FItemBundle& TargetSlot = GetMutableItemForTaggedSlotInternal(SlotTag);
@@ -1157,12 +1157,12 @@ void UInventoryGridViewModel::HandleTaggedItemRemoved_Implementation(const FGame
         }
         else if (TargetSlot.IsValid() && TargetSlot.ItemId != ItemData->ItemId)
         {
-             UE_LOG(LogRISInventory, Warning, TEXT("HandleTaggedItemRemoved: Server removed %s from tag %s, but VM shows %s. Forcing full update."), *ItemData->ItemId.ToString(), *SlotTag.ToString(), *TargetSlot.ItemId.ToString());
+             UE_LOG(LogRancInventorySystem, Warning, TEXT("HandleTaggedItemRemoved: Server removed %s from tag %s, but VM shows %s. Forcing full update."), *ItemData->ItemId.ToString(), *SlotTag.ToString(), *TargetSlot.ItemId.ToString());
              ForceFullUpdate();
         }
     }
      else {
-         UE_LOG(LogRISInventory, Error, TEXT("HandleTaggedItemRemoved: Received remove for unmanaged tag %s!"), *SlotTag.ToString());
+         UE_LOG(LogRancInventorySystem, Error, TEXT("HandleTaggedItemRemoved: Received remove for unmanaged tag %s!"), *SlotTag.ToString());
      }
 }
 
@@ -1187,14 +1187,14 @@ bool UInventoryGridViewModel::TryUnblockingMove(FGameplayTag TargetTaggedSlot, F
                int32 TargetGridIndex = FindGridSlotIndexForItem(BlockingItem.ItemId, BlockingItem.Quantity);
                if (TargetGridIndex != -1 && IsGridSlotEmpty(TargetGridIndex))
                {
-                   UE_LOG(LogRISInventory, Log, TEXT("TryUnblockingMove: Attempting to move blocking item %s from slot %s to grid slot %d."), *BlockingItem.ItemId.ToString(), *SlotToClear.ToString(), TargetGridIndex);
+                   UE_LOG(LogRancInventorySystem, Log, TEXT("TryUnblockingMove: Attempting to move blocking item %s from slot %s to grid slot %d."), *BlockingItem.ItemId.ToString(), *SlotToClear.ToString(), TargetGridIndex);
                    // Call internal move, passing full quantity (0 means full move)
                    bUnblocked = MoveItem_Internal(SlotToClear, -1, FGameplayTag(), TargetGridIndex, 0, false);
                    if (!bUnblocked) {
-                        UE_LOG(LogRISInventory, Warning, TEXT("TryUnblockingMove: Failed to move blocking item %s from %s."), *BlockingItem.ItemId.ToString(), *SlotToClear.ToString());
+                        UE_LOG(LogRancInventorySystem, Warning, TEXT("TryUnblockingMove: Failed to move blocking item %s from %s."), *BlockingItem.ItemId.ToString(), *SlotToClear.ToString());
                    }
                } else {
-                    UE_LOG(LogRISInventory, Warning, TEXT("TryUnblockingMove: No empty grid slot found for blocking item %s from slot %s."), *BlockingItem.ItemId.ToString(), *SlotToClear.ToString());
+                    UE_LOG(LogRancInventorySystem, Warning, TEXT("TryUnblockingMove: No empty grid slot found for blocking item %s from slot %s."), *BlockingItem.ItemId.ToString(), *SlotToClear.ToString());
                }
           }
      }
@@ -1217,7 +1217,7 @@ bool UInventoryGridViewModel::MoveItem_Internal(FGameplayTag SourceTaggedSlot, i
     if (bSourceIsTag && bTargetIsTag && SourceTaggedSlot == TargetTaggedSlot) return false;
     // If tagged slots are involved, ensure we have an Inventory Component
     if ((bSourceIsTag || bTargetIsTag) && !LinkedInventoryComponent) {
-         UE_LOG(LogRISInventory, Error, TEXT("MoveItem_Internal: Tagged slot operation attempted on a non-Inventory ViewModel."));
+         UE_LOG(LogRancInventorySystem, Error, TEXT("MoveItem_Internal: Tagged slot operation attempted on a non-Inventory ViewModel."));
          return false;
     }
 
@@ -1333,11 +1333,11 @@ void UInventoryGridViewModel::ForceFullUpdate_Implementation()
     // Implementation moved from UInventoryGridViewModel::ForceFullUpdate_Implementation
     if (!LinkedContainerComponent)
     {
-        UE_LOG(LogRISInventory, Error, TEXT("ForceFullUpdate: Cannot update, LinkedContainerComponent is null."));
+        UE_LOG(LogRancInventorySystem, Error, TEXT("ForceFullUpdate: Cannot update, LinkedContainerComponent is null."));
         return;
     }
 
-    UE_LOG(LogRISInventory, Log, TEXT("ForceFullUpdate: Resynchronizing visual slots."));
+    UE_LOG(LogRancInventorySystem, Log, TEXT("ForceFullUpdate: Resynchronizing visual slots."));
 
     // Clear pending operations first
     OperationsToConfirm.Empty();
@@ -1363,7 +1363,7 @@ void UInventoryGridViewModel::ForceFullUpdate_Implementation()
             int32 SlotToAddTo = FindGridSlotIndexForItem(BackingItem.ItemId, RemainingQuantity);
             if (SlotToAddTo == -1)
             {
-                UE_LOG(LogRISInventory, Error, TEXT("ForceFullUpdate: Failed to find visual grid slot for item %s during resync."), *BackingItem.ItemId.ToString());
+                UE_LOG(LogRancInventorySystem, Error, TEXT("ForceFullUpdate: Failed to find visual grid slot for item %s during resync."), *BackingItem.ItemId.ToString());
                 break;
             }
 
@@ -1377,13 +1377,13 @@ void UInventoryGridViewModel::ForceFullUpdate_Implementation()
                  TargetSlot.Quantity = 0;
                  TargetSlot.InstanceData.Empty();
             } else {
-                 UE_LOG(LogRISInventory, Error, TEXT("ForceFullUpdate: FindGridSlotIndexForItem returned incompatible grid slot %d."), SlotToAddTo);
+                 UE_LOG(LogRancInventorySystem, Error, TEXT("ForceFullUpdate: FindGridSlotIndexForItem returned incompatible grid slot %d."), SlotToAddTo);
                  break;
             }
 
             int32 AddedAmount = FMath::Min(RemainingQuantity, AddLimit);
             if(AddedAmount <= 0) {
-                 UE_LOG(LogRISInventory, Error, TEXT("ForceFullUpdate: Calculated Grid AddedAmount is zero for slot %d."), SlotToAddTo);
+                 UE_LOG(LogRancInventorySystem, Error, TEXT("ForceFullUpdate: Calculated Grid AddedAmount is zero for slot %d."), SlotToAddTo);
                  break;
             }
 
@@ -1421,7 +1421,7 @@ void UInventoryGridViewModel::ForceFullUpdate_Implementation()
             }
             else if (TaggedItem.Tag.IsValid())
             {
-                 UE_LOG(LogRISInventory, Warning, TEXT("ForceFullUpdate: Tagged item %s found in component but tag %s is not registered visually. Adding."), *TaggedItem.ItemId.ToString(), *TaggedItem.Tag.ToString());
+                 UE_LOG(LogRancInventorySystem, Warning, TEXT("ForceFullUpdate: Tagged item %s found in component but tag %s is not registered visually. Adding."), *TaggedItem.ItemId.ToString(), *TaggedItem.Tag.ToString());
                  ViewableTaggedSlots.Add(TaggedItem.Tag, FItemBundle(TaggedItem.ItemId, TaggedItem.Quantity, TaggedItem.InstanceData));
                  OnTaggedSlotUpdated.Broadcast(TaggedItem.Tag, TaggedItem.InstanceData);
             }

@@ -17,6 +17,8 @@
 #include "Data/UsableItemDefinition.h"
 #include "MockClasses/TestUsableItemDefinition.h"
 
+#if WITH_DEV_AUTOMATION_TESTS && WITH_EDITOR
+
 // Define Gameplay Tags
 UE_DEFINE_GAMEPLAY_TAG(LeftHandSlot, "Test.Gameplay.Hands.LeftHand");
 UE_DEFINE_GAMEPLAY_TAG(RightHandSlot, "Test.Gameplay.Hands.RightHand");
@@ -373,6 +375,10 @@ private:
 		return GameInstance->GetSubsystem<URISSubsystem>();
 	}
 
+
 	UWorld* World = nullptr;
 	URISSubsystem* Subsystem = nullptr;
+
 };
+
+#endif // #if WITH_DEV_AUTOMATION_TESTS

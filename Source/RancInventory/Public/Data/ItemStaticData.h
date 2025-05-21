@@ -20,7 +20,7 @@ enum class EFoundState : uint8
 	NotFound UMETA(DisplayName = "Not Found")
 };
 
-UCLASS(Blueprintable, Category = "RIS | Classes | Data")
+UCLASS(NotBlueprintable, NotPlaceable, Category = "RIS | Classes | Data")
 class RANCINVENTORY_API UItemStaticData : public UPrimaryDataAsset
 {
 	GENERATED_BODY()

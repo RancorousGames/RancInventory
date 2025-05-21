@@ -35,6 +35,8 @@ struct FRecordingSession
     FTimerHandle RecordingTimerHandle;
 };
 
+		
+#if WITH_EDITOR
 // A component for recording trace sequences to be replayed later. Added to weaponactors when settings are defined.
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class RANCINVENTORYWEAPONS_API UWeaponAttackRecorderComponent : public UActorComponent
@@ -44,6 +46,9 @@ class RANCINVENTORYWEAPONS_API UWeaponAttackRecorderComponent : public UActorCom
 public:
     UWeaponAttackRecorderComponent();
 
+#endif
+
+#if WITH_EDITORONLY_DATA 
     // Settings for the recording process
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Recording")
     UWeaponAttackRecorderSettings* Settings;
@@ -51,25 +56,12 @@ public:
     // Folder path to save new assets
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Recording", meta = (RelativeToGameContentDir))
     FDirectoryPath AssetSavePath;
-    bool bIsRecording;
-    bool RecordingInitialized;
-    double RecordStartTime;
-    double RecordInitTime;
-    int ReplayCurrentIndex;
-    bool bReplaySlowmotion;
+
     UPROPERTY()
     FRecordingSession ReplayedSession;
-    double ReplayStopTime;
-    FTimerHandle ReplayTimerHandle;
+    
     UPROPERTY()
     ACharacter* OwningCharacter;
-
-    void OnAnimNotifyBegin(FName AnimName);
-    void OnAnimNotifyEnd(FName AnimName);
-    
-protected:
-    virtual void BeginPlay() override;
-    virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 private:
     FRecordingSession CurrentSession;
@@ -81,6 +73,28 @@ private:
     UGearManagerComponent* OwningGearManager;
     UPROPERTY()
     UAnimInstance* OwningCharacterAnimInstance;
+public:
+    
+#endif
+#if WITH_EDITOR
+    
+    bool bIsRecording;
+    bool RecordingInitialized;
+    double RecordStartTime;
+    double RecordInitTime;
+    int ReplayCurrentIndex;
+    bool bReplaySlowmotion;
+    double ReplayStopTime;
+    FTimerHandle ReplayTimerHandle;
+
+    void OnAnimNotifyBegin(FName AnimName);
+    void OnAnimNotifyEnd(FName AnimName);
+    
+protected:
+    virtual void BeginPlay() override;
+    virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
+
     
     void Initialize();
     virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
@@ -101,3 +115,5 @@ private:
     void StopReplayVisualization();
     void ReplayRecording();
 };
+
+#endif // WITH_EDITOR
